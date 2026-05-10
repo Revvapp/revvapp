@@ -1,0 +1,77 @@
+// Revv — Firestore + Storage security rules (paste into Firebase Console).
+// Deploy: firebase deploy --only firestore:rules,storage
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    match /users/{uid} {
+      allow read: if isOwner(uid);
+      allow create: if isOwner(uid)
+        && request.resource.data.uid == uid
+        && request.resource.data.email == request.auth.token.email;
+      allow update: if isOwner(uid);
+      allow delete: if false;
+    }
+
+    // Public read: normalized email -> { uid, userType } for signup conflict UX only.
+    match /emailLookup/{emailKey} {
+      allow read: if true;
+      allow create: if signedIn()
+        && request.resource.data.keys().hasAll(['uid', 'userType'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.userType in ['client', 'detailer'];
+      allow update, delete: if false;
+    }
+
+    match /detailers/{uid} {
+      allow read: if true;
+      allow create, update: if isOwner(uid)
+        && request.resource.data.uid == uid;
+      allow delete: if false;
+    }
+
+    match /clients/{uid} {
+      allow read: if isOwner(uid);
+      allow create, update: if isOwner(uid)
+        && request.resource.data.uid == uid;
+      allow delete: if false;
+
+      match /vehicles/{vehicleId} {
+        allow read: if isOwner(uid);
+        allow create, update: if isOwner(uid)
+          && request.resource.data.ownerId == uid;
+        allow delete: if isOwner(uid);
+      }
+    }
+
+    match /bookings/{bookingId} {
+      allow read: if signedIn()
+        && (resource.data.clientId == request.auth.uid
+            || resource.data.detailerId == request.auth.uid);
+      allow create: if signedIn();
+      allow update: if signedIn()
+        && (resource.data.clientId == request.auth.uid
+            || resource.data.detailerId == request.auth.uid);
+      allow delete: if false;
+    }
+  }
+}
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /detailers/{uid}/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == uid;
+    }
+  }
+}
