@@ -34,7 +34,7 @@ export function useClientDashboard(): ClientDashboardModel {
   const [model, setModel] = useState<Omit<ClientDashboardModel, 'loading' | 'error' | 'refetch'>>({
     displayName: '',
     initials: 'RV',
-    cityLine: 'Sacramento, CA',
+    cityLine: '',
     vehicles: [],
     activeBookings: [],
   });
@@ -55,8 +55,8 @@ export function useClientDashboard(): ClientDashboardModel {
 
       const clientData = clientSnap.exists() ? clientSnap.data() : null;
       const fullName = String(clientData?.fullName ?? '');
-      const city = String(clientData?.city ?? 'Sacramento');
-      const state = String(clientData?.state ?? 'CA');
+      const city = clientData?.city ? String(clientData.city) : '';
+      const state = clientData?.state ? String(clientData.state) : '';
 
       const vehicles: VehicleDocument[] = vehiclesSnap.docs.map((d) => {
         const v = d.data();
@@ -93,10 +93,12 @@ export function useClientDashboard(): ClientDashboardModel {
         ? fullName.trim().toUpperCase()
         : (user.email ?? 'CLIENT').toUpperCase();
 
+      const cityLine = city && state ? `${city}, ${state}` : city || state || '';
+
       setModel({
         displayName,
         initials: initialsFrom(fullName, user.email),
-        cityLine: `${city}, ${state}`,
+        cityLine,
         vehicles,
         activeBookings,
       });

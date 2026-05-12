@@ -60,6 +60,10 @@ export default function DetailerOnboardingStep3() {
       ? selectedDays.filter((d) => d !== index)
       : [...selectedDays, index].sort((a, b) => a - b);
     updateField('workingDays', next);
+    const daily = onboarding.incomeGoal.daily;
+    if (daily > 0) {
+      updateField('incomeGoal', { daily, weekly: daily * Math.max(1, next.length) });
+    }
     if (error) setError('');
   };
 
@@ -72,7 +76,18 @@ export default function DetailerOnboardingStep3() {
     if (!onboarding.maxJobsPerDay || onboarding.maxJobsPerDay < 1) {
       return 'Max jobs per day is required.';
     }
+    if (!onboarding.incomeGoal.daily || onboarding.incomeGoal.daily < 1) {
+      return 'Daily income goal is required.';
+    }
     return '';
+  };
+
+  const onDailyGoalChange = (text: string) => {
+    const n = parseInt(text.replace(/\D/g, ''), 10);
+    const daily = Number.isNaN(n) ? 0 : n;
+    const days = selectedDays.length || 1;
+    updateField('incomeGoal', { daily, weekly: daily * days });
+    if (error) setError('');
   };
 
   const onNext = () => {
@@ -197,6 +212,23 @@ export default function DetailerOnboardingStep3() {
                   </Pressable>
                 </View>
 
+                <Text style={styles.label}>DAILY INCOME GOAL</Text>
+                <View style={styles.goalRow}>
+                  <Text style={styles.goalPrefix}>$</Text>
+                  <TextInput
+                    value={onboarding.incomeGoal.daily ? String(onboarding.incomeGoal.daily) : ''}
+                    onChangeText={onDailyGoalChange}
+                    style={[styles.input, styles.goalInput]}
+                    placeholder="500"
+                    placeholderTextColor="#8A96A3"
+                    keyboardType="numeric"
+                    inputMode="numeric"
+                  />
+                </View>
+                <Text style={styles.helper}>
+                  We&apos;ll track your daily earnings against this. Weekly target auto-fills to ${onboarding.incomeGoal.weekly} based on your selected days.
+                </Text>
+
                 {!!error && <Text style={styles.errorText}>{error}</Text>}
 
                 <Pressable style={styles.nextButton} onPress={onNext}>
@@ -296,6 +328,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   changeText: { color: '#24415E', fontSize: 13, fontWeight: '700' },
+  goalRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  goalPrefix: {
+    color: COLORS.darkText,
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  goalInput: { flex: 1 },
   errorText: { color: COLORS.error, fontSize: 12, fontWeight: '700', marginTop: 8 },
   nextButton: {
     marginTop: 14,

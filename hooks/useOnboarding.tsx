@@ -24,6 +24,7 @@ export type OnboardingState = {
   workingHours: { from: string; to: string };
   serviceArea: string;
   maxJobsPerDay: number;
+  incomeGoal: { daily: number; weekly: number };
   profilePhotoUrl: string;
   portfolioUrls: string[];
   idVerified: boolean;
@@ -39,8 +40,9 @@ const initialState = (): OnboardingState => ({
   rates: {},
   workingDays: [1, 2, 3, 4, 5, 6],
   workingHours: { from: '8:00 AM', to: '6:00 PM' },
-  serviceArea: 'Sacramento, CA',
+  serviceArea: '',
   maxJobsPerDay: 3,
+  incomeGoal: { daily: 0, weekly: 0 },
   profilePhotoUrl: '',
   portfolioUrls: [],
   idVerified: false,
@@ -98,7 +100,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
           profilePhotoUrl: state.profilePhotoUrl,
           portfolioUrls: state.portfolioUrls,
           idVerified: state.idVerified,
-          incomeGoal: { daily: 500, weekly: 2500 },
+          incomeGoal: state.incomeGoal,
           rating: 0,
           reviewCount: 0,
           isActive: true,

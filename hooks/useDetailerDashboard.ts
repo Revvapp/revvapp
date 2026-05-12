@@ -55,8 +55,8 @@ function initialsFromName(name: string, email: string | null | undefined) {
 
 function firstToken(name: string) {
   const n = name.trim();
-  if (!n) return 'Pro';
-  return n.split(/\s+/)[0] ?? 'Pro';
+  if (!n) return '';
+  return n.split(/\s+/)[0] ?? '';
 }
 
 export function useDetailerDashboard(): DetailerDashboardModel {
@@ -64,15 +64,15 @@ export function useDetailerDashboard(): DetailerDashboardModel {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [model, setModel] = useState<Omit<DetailerDashboardModel, 'loading' | 'error' | 'refetch'>>({
-    firstName: 'Pro',
+    firstName: '',
     displayName: '',
     initials: 'RV',
     profilePhotoUrl: null,
     todayLabel: formatDisplayDate(new Date()),
-    dailyGoal: 500,
+    dailyGoal: 0,
     todayEarnings: 0,
     progressFraction: 0,
-    awayFromGoal: 500,
+    awayFromGoal: 0,
     progressPercentLabel: '0%',
     weekEarnings: 0,
     monthEarnings: 0,
@@ -111,7 +111,7 @@ export function useDetailerDashboard(): DetailerDashboardModel {
       const incomeGoal = detailerSnap.exists()
         ? (detailerSnap.data().incomeGoal as { daily?: number; weekly?: number } | undefined)
         : undefined;
-      const dailyGoal = incomeGoal?.daily ?? 500;
+      const dailyGoal = incomeGoal?.daily ?? 0;
 
       const bookings: BookingDocument[] = bookingsSnap.docs.map((d) => {
         const x = d.data();
