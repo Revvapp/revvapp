@@ -18,9 +18,11 @@ export function ProtectedRoute({ requiredType, publicPaths = [], children }: Pro
   const { user, userProfile, loading } = useAuth();
 
   const isPublic = pathname ? publicPaths.includes(pathname) : false;
+  const pathPrefix = requiredType === 'detailer' ? '/detailer' : '/client';
+  const isInScope = pathname ? (pathname.startsWith(pathPrefix) || isPublic) : false;
 
   useEffect(() => {
-    if (!pathname || loading) return;
+    if (!pathname || loading || !isInScope) return;
 
     if (user && userProfile && userProfile.userType !== requiredType) {
       navigateAfterAuth(userProfile);
@@ -37,7 +39,7 @@ export function ProtectedRoute({ requiredType, publicPaths = [], children }: Pro
       router.replace('/');
       return;
     }
-  }, [pathname, isPublic, loading, user, userProfile, requiredType]);
+  }, [pathname, isPublic, isInScope, loading, user, userProfile, requiredType]);
 
   const wrongType = !!(user && userProfile && userProfile.userType !== requiredType);
 
@@ -52,7 +54,7 @@ export function ProtectedRoute({ requiredType, publicPaths = [], children }: Pro
     return <>{children}</>;
   }
 
-  if (loading) {
+  if (!isInScope || loading) {
     return (
       <View style={styles.loader}>
         <ActivityIndicator size="large" color="#C9A227" />

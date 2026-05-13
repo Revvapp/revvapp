@@ -8,6 +8,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -40,6 +41,7 @@ type AuthContextValue = {
   userProfile: UserDocument | null;
   userType: UserType | null;
   loading: boolean;
+  initialized: boolean;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 };
@@ -48,6 +50,9 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 async function loadUserProfile(uid: string): Promise<UserDocument | null> {
   try {
+    if (auth.currentUser) {
+      await auth.currentUser.getIdToken(true);
+    }
     const snap = await getDoc(doc(db, 'users', uid));
     if (!snap.exists()) return null;
     return snap.data() as UserDocument;
@@ -60,6 +65,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserDocument | null>(null);
   const [loading, setLoading] = useState(true);
+  // initialized becomes true after the first auth check completes — never goes back to false
+  const [initialized, setInitialized] = useState(false);
+  const initializedRef = useRef(false);
   const pathname = usePathname();
 
   const refreshProfile = useCallback(async () => {
@@ -73,10 +81,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (nextUser) => {
+      setLoading(true);
       setUser(nextUser);
       if (!nextUser) {
         setUserProfile(null);
         setLoading(false);
+        if (!initializedRef.current) {
+          initializedRef.current = true;
+          setInitialized(true);
+        }
         return;
       }
       try {
@@ -84,6 +97,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUserProfile(p);
       } finally {
         setLoading(false);
+        if (!initializedRef.current) {
+          initializedRef.current = true;
+          setInitialized(true);
+        }
       }
     });
     return unsub;
@@ -105,7 +122,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     if (!userProfile) {
-      router.replace('/');
+      if (!isPublicPath(pathname)) {
+        router.replace('/');
+      }
       return;
     }
 
@@ -176,10 +195,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       userProfile,
       userType: userProfile?.userType ?? null,
       loading,
+      initialized,
       signOut,
       refreshProfile,
     }),
-    [user, userProfile, loading, signOut, refreshProfile]
+    [user, userProfile, loading, initialized, signOut, refreshProfile]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

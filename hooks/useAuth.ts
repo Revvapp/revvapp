@@ -11,6 +11,7 @@ export function useAuth() {
     isDetailer,
     isClient,
     loading: ctx.loading,
+    initialized: ctx.initialized,
     signOut: ctx.signOut,
     refreshProfile: ctx.refreshProfile,
   };

@@ -1,7 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import {
-  fetchSignInMethodsForEmail,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
 } from 'firebase/auth';
@@ -71,37 +70,23 @@ export default function LoginScreen() {
 
     setLoading(true);
     try {
-      let methods: string[];
-      try {
-        methods = await fetchSignInMethodsForEmail(auth, email.trim());
-      } catch (fetchErr) {
-        if (isNetworkError(fetchErr)) {
-          setNetworkBanner(true);
-          return;
-        }
-        if (
-          fetchErr &&
-          typeof fetchErr === 'object' &&
-          'code' in fetchErr &&
-          (fetchErr as { code?: string }).code === 'auth/invalid-email'
-        ) {
-          setEmailError('Enter a valid email address.');
-          return;
-        }
-        setEmailError('Something went wrong. Try again.');
-        return;
-      }
-      if (methods.length === 0) {
-        setEmailError('__NO_ACCOUNT__');
-        return;
-      }
       await signInWithEmailAndPassword(auth, email.trim(), password);
     } catch (e) {
+      const code = (e as { code?: string })?.code;
+      console.log('[Login] error code:', code, e);
       if (isNetworkError(e)) {
         setNetworkBanner(true);
         return;
       }
-      setPasswordError('Incorrect password. Try again.');
+      if (code === 'auth/invalid-email') {
+        setEmailError('Enter a valid email address.');
+      } else if (code === 'auth/user-not-found' || code === 'auth/invalid-credential') {
+        setEmailError('__NO_ACCOUNT__');
+      } else if (code === 'auth/wrong-password') {
+        setPasswordError('Incorrect password. Try again.');
+      } else {
+        setPasswordError('Incorrect email or password. Try again.');
+      }
     } finally {
       setLoading(false);
     }

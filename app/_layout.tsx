@@ -10,9 +10,9 @@ import { useAuth } from '@/hooks/useAuth';
 
 function RootNavigator() {
   const colorScheme = useColorScheme();
-  const { loading } = useAuth();
+  const { initialized } = useAuth();
 
-  if (loading) {
+  if (!initialized) {
     return (
       <View
         style={{
