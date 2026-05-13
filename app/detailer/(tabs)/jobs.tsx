@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { toTitleCase } from '@/lib/format';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 type JobStatus = 'Scheduled' | 'In Progress' | 'Completed';
@@ -87,12 +88,12 @@ export default function DetailerJobsScreen() {
         {filteredJobs.map((job) => (
           <View key={job.id} style={styles.jobCard}>
             <View style={styles.jobTopRow}>
-              <Text style={styles.clientName}>{job.clientName}</Text>
+              <Text style={styles.clientName}>{toTitleCase(job.clientName)}</Text>
               <View style={[styles.statusBadge, getBadgeStyle(job.status)]}>
                 <Text style={styles.statusText}>{job.status}</Text>
               </View>
             </View>
-            <Text style={styles.serviceText}>{job.serviceType}</Text>
+            <Text style={styles.serviceText}>{toTitleCase(job.serviceType)}</Text>
             <View style={styles.jobBottomRow}>
               <Text style={styles.metaText}>{job.time}</Text>
               <Text style={styles.priceText}>{job.price}</Text>

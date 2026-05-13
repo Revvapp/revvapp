@@ -1,7 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { useEffect, useRef } from 'react';
-import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { router } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  Animated,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useDetailerDashboard } from '@/hooks/useDetailerDashboard';
@@ -17,6 +26,10 @@ const COLORS = {
   progressTrack: '#9AA5B1',
 };
 
+function fmt(n: number): string {
+  return `$${Math.round(n).toLocaleString()}`;
+}
+
 function SkeletonBlock({ style }: { style?: object }) {
   return <View style={[styles.skeleton, style]} />;
 }
@@ -24,6 +37,7 @@ function SkeletonBlock({ style }: { style?: object }) {
 export default function DetailerDashboardScreen() {
   const d = useDetailerDashboard();
   const progressAnim = useRef(new Animated.Value(0)).current;
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     Animated.timing(progressAnim, {
@@ -38,6 +52,21 @@ export default function DetailerDashboardScreen() {
     outputRange: ['0%', '100%'],
   });
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await d.refetch();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [d.refetch]);
+
+  function goalFooterText(): string {
+    if (d.emptyToday) return 'No Jobs Today Yet';
+    if (d.goalReached) return 'Daily Goal Completed';
+    return `${fmt(d.awayFromGoal)} Away From Today's Target`;
+  }
+
   return (
     <SafeAreaView edges={['top']} style={styles.safe}>
       <View style={styles.container}>
@@ -51,13 +80,13 @@ export default function DetailerDashboardScreen() {
               <Ionicons name="notifications-outline" size={22} color={COLORS.white} />
               <View style={styles.notificationDot} />
             </View>
-            <View style={styles.headerAvatar}>
+            <Pressable style={styles.headerAvatar} onPress={() => router.push('/detailer/profile')}>
               {d.profilePhotoUrl ? (
                 <Image source={{ uri: d.profilePhotoUrl }} style={styles.headerAvatarImage} />
               ) : (
                 <Text style={styles.headerAvatarText}>{d.initials}</Text>
               )}
-            </View>
+            </Pressable>
           </View>
         </View>
 
@@ -75,12 +104,33 @@ export default function DetailerDashboardScreen() {
             </View>
           </View>
         ) : (
-          <ScrollView style={styles.contentArea} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            style={styles.contentArea}
+            contentContainerStyle={styles.content}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor={COLORS.gold}
+                colors={[COLORS.gold]}
+              />
+            }
+          >
             {!!d.error && <Text style={styles.bannerError}>{d.error}</Text>}
 
             <View style={styles.welcomeCard}>
-              <Text style={styles.smallLabel}>Good morning, {d.firstName}</Text>
-              <Text style={styles.welcomeName}>{d.displayName}</Text>
+              <Text style={styles.smallLabel}>
+                {d.firstName ? `${d.greeting}, ${d.firstName}` : d.greeting}
+              </Text>
+              <Text
+                style={styles.welcomeName}
+                numberOfLines={2}
+                adjustsFontSizeToFit
+                minimumFontScale={0.6}
+              >
+                {d.displayName}
+              </Text>
               <Text style={styles.dateText}>{d.todayLabel}</Text>
               <View style={styles.cardAvatar}>
                 {d.profilePhotoUrl ? (
@@ -91,59 +141,72 @@ export default function DetailerDashboardScreen() {
               </View>
             </View>
 
-            <View style={styles.goalCard}>
+            <Pressable
+              style={({ pressed }) => [styles.goalCard, pressed && styles.goalCardPressed]}
+              onPress={() => router.navigate('/detailer/jobs')}
+            >
               <View style={styles.goalTopRow}>
-                <Text style={styles.smallLabel}>Today&apos;s income</Text>
+                <Text style={styles.smallLabel}>Today&apos;s Income</Text>
                 <Pressable style={styles.editGoalBtn}>
                   <Text style={styles.editGoalText}>
-                    {d.dailyGoal > 0 ? 'Edit goal' : 'Set your first goal'}
+                    {d.dailyGoal > 0 ? 'Edit Goal' : 'Set Your First Goal'}
                   </Text>
                 </Pressable>
               </View>
-              <Text style={styles.goalAmount}>${d.todayEarnings}</Text>
-              <Text style={styles.goalSub}>Daily goal: ${d.dailyGoal}</Text>
+              <Text style={styles.goalAmount}>{fmt(d.todayEarnings)}</Text>
+              <Text style={styles.goalSub}>
+                {d.dailyGoal > 0 ? `Daily Goal: ${fmt(d.dailyGoal)}` : 'No Daily Goal Set'}
+              </Text>
               <View style={styles.goalScaleRow}>
                 <Text style={styles.scaleText}>$0</Text>
-                <Text style={styles.scaleText}>${d.dailyGoal}</Text>
+                <Text style={styles.scaleText}>
+                  {d.dailyGoal > 0 ? fmt(d.dailyGoal) : '—'}
+                </Text>
               </View>
               <View style={styles.goalTrack}>
                 <Animated.View style={[styles.goalFill, { width: progressWidth }]} />
               </View>
               <View style={styles.goalFooter}>
-                <Text style={styles.goalFooterLeft}>
-                  {d.emptyToday
-                    ? 'No jobs today yet'
-                    : `$${d.awayFromGoal} away from today's target`}
+                <Text style={styles.goalFooterLeft}>{goalFooterText()}</Text>
+                <Text style={[styles.goalFooterRight, d.goalReached && styles.goalFooterReached]}>
+                  {d.progressPercentLabel}
                 </Text>
-                <Text style={styles.goalFooterRight}>{d.progressPercentLabel}</Text>
               </View>
-            </View>
+              <View style={styles.viewJobsRow}>
+                <Text style={styles.viewJobsText}>View Today's Jobs</Text>
+                <Ionicons name="chevron-forward" size={13} color={COLORS.gold} />
+              </View>
+            </Pressable>
 
             <View style={styles.grid}>
               <View style={styles.statCard}>
                 <Text style={styles.statTitle}>THIS WEEK</Text>
-                <Text style={styles.statValue}>${d.weekEarnings}</Text>
-                <Text style={styles.statMuted}>Completed job payouts (calendar week)</Text>
+                <Text style={styles.statValue}>{fmt(d.weekEarnings)}</Text>
+                <Text style={styles.statMuted}>Completed Job Payouts (Calendar Week)</Text>
               </View>
               <View style={styles.statCard}>
                 <Text style={styles.statTitle}>THIS MONTH</Text>
-                <Text style={styles.statValue}>${d.monthEarnings}</Text>
-                <Text style={styles.statMuted}>Completed job payouts (calendar month)</Text>
+                <Text style={styles.statValue}>{fmt(d.monthEarnings)}</Text>
+                <Text style={styles.statMuted}>Completed Job Payouts (Calendar Month)</Text>
               </View>
               <View style={styles.statCard}>
                 <Text style={styles.statTitle}>JOBS TODAY</Text>
                 <Text style={styles.statValue}>{d.jobsTodayTotal}</Text>
                 <Text style={styles.statMuted}>
                   {d.emptyToday
-                    ? 'No jobs today yet'
-                    : `${d.jobsTodayDone} done · ${d.jobsTodayLeft} left`}
+                    ? 'No Jobs Today Yet'
+                    : `${d.jobsTodayDone} Done · ${d.jobsTodayLeft} Left`}
                 </Text>
               </View>
               <View style={styles.statCard}>
                 <Text style={styles.statTitle}>AVG PER JOB</Text>
-                <Text style={styles.statValue}>{d.avgPerJob != null ? `$${Math.round(d.avgPerJob)}` : '—'}</Text>
+                <Text style={styles.statValue}>
+                  {d.avgPerJob != null ? fmt(Math.round(d.avgPerJob)) : '—'}
+                </Text>
                 <Text style={styles.statMuted}>
-                  {d.avgPerJob != null ? 'Based on completed jobs this week' : 'No completed jobs this week'}
+                  {d.avgPerJob != null
+                    ? 'Based On Completed Jobs This Week'
+                    : 'No Completed Jobs This Week'}
                 </Text>
               </View>
             </View>
@@ -226,7 +289,8 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   smallLabel: { color: COLORS.gray, fontSize: 12, fontWeight: '600', marginBottom: 4 },
-  welcomeName: { color: COLORS.white, fontSize: 24, fontWeight: '900', marginBottom: 4 },
+  welcomeName: { color: COLORS.white, fontSize: 24, fontWeight: '900', marginBottom: 4, paddingRight: 66 },
+  businessNameText: { color: COLORS.gold, fontSize: 13, fontWeight: '700', marginBottom: 4 },
   dateText: { color: COLORS.gray, fontSize: 12, fontWeight: '600' },
   cardAvatar: {
     position: 'absolute',
@@ -247,6 +311,21 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     marginBottom: 14,
+  },
+  goalCardPressed: {
+    opacity: 0.85,
+  },
+  viewJobsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    marginTop: 10,
+    gap: 3,
+  },
+  viewJobsText: {
+    color: COLORS.gold,
+    fontSize: 12,
+    fontWeight: '700',
   },
   goalTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   editGoalBtn: {
@@ -278,6 +357,7 @@ const styles = StyleSheet.create({
   goalFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   goalFooterLeft: { color: COLORS.gray, fontSize: 12, fontWeight: '600', flex: 1, marginRight: 8 },
   goalFooterRight: { color: COLORS.gold, fontSize: 13, fontWeight: '900' },
+  goalFooterReached: { color: '#4CAF50' },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',

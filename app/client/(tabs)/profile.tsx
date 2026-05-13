@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { db } from '@/firebaseConfig';
 import { useAuth } from '@/hooks/useAuth';
+import { toTitleCase } from '@/lib/format';
 import type { ClientDocument } from '@/types/firestore';
 
 const COLORS = {
@@ -79,11 +80,11 @@ export default function ClientProfileScreen() {
     );
   }
 
-  const fullName = (profile?.fullName ?? '').trim();
+  const fullName = toTitleCase((profile?.fullName ?? '').trim());
   const displayName = fullName || user?.email || 'Your profile';
   const phone = (profile?.phone ?? '').trim();
-  const city = (profile?.city ?? '').trim();
-  const stateCode = (profile?.state ?? '').trim();
+  const city = toTitleCase((profile?.city ?? '').trim());
+  const stateCode = ((profile?.state ?? '').trim()).toUpperCase();
   const location = city && stateCode ? `${city}, ${stateCode}` : city || stateCode || '';
   const initials = initialsFrom(fullName, user?.email);
 

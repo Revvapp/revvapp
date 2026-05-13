@@ -3,6 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useClientDashboard } from '@/hooks/useClientDashboard';
+import { toTitleCase } from '@/lib/format';
 import type { BookingDocument, VehicleDocument } from '@/types/firestore';
 
 const COLORS = {
@@ -20,7 +21,7 @@ const COLORS = {
 };
 
 function formatVehicleTitle(v: VehicleDocument) {
-  return `${v.year} ${v.make} ${v.model}`.trim();
+  return `${v.year} ${toTitleCase(v.make)} ${toTitleCase(v.model)}`.trim();
 }
 
 function formatLastDetailed(raw: string | null) {
@@ -68,7 +69,7 @@ export default function ClientDashboardScreen() {
             {!!c.error && <Text style={styles.err}>{c.error}</Text>}
 
             <View style={styles.welcomeCard}>
-              <Text style={styles.smallGray}>Welcome back</Text>
+              <Text style={styles.smallGray}>Welcome Back</Text>
               <Text style={styles.userName}>{c.displayName}</Text>
               <Text style={styles.smallGray}>{c.cityLine}</Text>
               <Pressable style={styles.bookBtn}>
@@ -122,7 +123,7 @@ export default function ClientDashboardScreen() {
                     <View style={styles.greenDot} />
                     <Text style={styles.bookingStatusText}>Confirmed</Text>
                   </View>
-                  <Text style={styles.bookingTitle}>{b.service}</Text>
+                  <Text style={styles.bookingTitle}>{toTitleCase(b.service)}</Text>
                   <Text style={styles.bookingMeta}>
                     {b.date} · {b.time}
                   </Text>

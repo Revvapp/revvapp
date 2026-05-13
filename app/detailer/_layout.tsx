@@ -11,6 +11,7 @@ export default function DetailerLayout() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="onboarding" />
+        <Stack.Screen name="edit-profile" />
       </Stack>
     </ProtectedRoute>
   );

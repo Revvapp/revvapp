@@ -14,6 +14,7 @@ import { auth, db } from '@/firebaseConfig';
 
 export type OnboardingState = {
   fullName: string;
+  businessName: string;
   phone: string;
   city: string;
   state: string;
@@ -32,6 +33,7 @@ export type OnboardingState = {
 
 const initialState = (): OnboardingState => ({
   fullName: '',
+  businessName: '',
   phone: '',
   city: '',
   state: '',
@@ -87,6 +89,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
         {
           uid,
           fullName: state.fullName.trim(),
+          businessName: state.businessName.trim(),
           phone: state.phone.trim(),
           city: state.city.trim(),
           state: state.state.trim().toUpperCase(),

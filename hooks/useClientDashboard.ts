@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { db } from '@/firebaseConfig';
 import { useAuth } from '@/hooks/useAuth';
+import { toTitleCase } from '@/lib/format';
 import type { BookingDocument, VehicleDocument } from '@/types/firestore';
 
 export type ClientDashboardModel = {
@@ -90,10 +91,12 @@ export function useClientDashboard(): ClientDashboardModel {
       const activeBookings = bookingsRaw.filter((b) => b.status === 'confirmed');
 
       const displayName = fullName.trim()
-        ? fullName.trim().toUpperCase()
-        : (user.email ?? 'CLIENT').toUpperCase();
+        ? toTitleCase(fullName.trim())
+        : (user.email ?? 'Client');
 
-      const cityLine = city && state ? `${city}, ${state}` : city || state || '';
+      const cityLine = city && state
+        ? `${toTitleCase(city)}, ${state.toUpperCase()}`
+        : toTitleCase(city) || state.toUpperCase() || '';
 
       setModel({
         displayName,

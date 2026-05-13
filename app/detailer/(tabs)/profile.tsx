@@ -1,10 +1,12 @@
 import { Image } from 'expo-image';
+import { router } from 'expo-router';
 import { doc, getDoc } from 'firebase/firestore';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { db } from '@/firebaseConfig';
 import { useAuth } from '@/hooks/useAuth';
+import { toTitleCase } from '@/lib/format';
 import type { DetailerDocument } from '@/types/firestore';
 
 const COLORS = {
@@ -68,13 +70,14 @@ export default function DetailerProfileScreen() {
     );
   }
 
-  const fullName = (profile?.fullName ?? '').trim();
+  const fullName = toTitleCase((profile?.fullName ?? '').trim());
+  const businessName = toTitleCase((profile?.businessName ?? '').trim());
   const displayName = fullName || user?.email || 'Your profile';
   const rating = typeof profile?.rating === 'number' ? profile.rating : 0;
   const reviewCount = typeof profile?.reviewCount === 'number' ? profile.reviewCount : 0;
   const services = Array.isArray(profile?.services) ? profile?.services : [];
-  const city = (profile?.city ?? '').trim();
-  const stateCode = (profile?.state ?? '').trim();
+  const city = toTitleCase((profile?.city ?? '').trim());
+  const stateCode = ((profile?.state ?? '').trim()).toUpperCase();
   const location = city && stateCode ? `${city}, ${stateCode}` : city || stateCode || '';
   const initials = initialsFrom(fullName, user?.email);
   const photoUrl = (profile?.profilePhotoUrl ?? '').trim();
@@ -94,6 +97,7 @@ export default function DetailerProfileScreen() {
           )}
         </View>
         <Text style={styles.name}>{displayName}</Text>
+        {!!businessName && <Text style={styles.businessName}>{businessName}</Text>}
         {!!location && <Text style={styles.location}>{location}</Text>}
         <Text style={styles.rating}>
           {reviewCount > 0 ? `${rating.toFixed(1)} ★ • ${reviewCount} reviews` : 'No reviews yet'}
@@ -108,14 +112,14 @@ export default function DetailerProfileScreen() {
           <View style={styles.servicesList}>
             {services.map((service: string) => (
               <View key={service} style={styles.servicePill}>
-                <Text style={styles.serviceText}>{service}</Text>
+                <Text style={styles.serviceText}>{toTitleCase(service)}</Text>
               </View>
             ))}
           </View>
         )}
       </View>
 
-      <Pressable style={styles.editButton}>
+      <Pressable style={styles.editButton} onPress={() => router.push('/detailer/edit-profile')}>
         <Text style={styles.editButtonText}>Edit Profile</Text>
       </Pressable>
 
@@ -173,6 +177,13 @@ const styles = StyleSheet.create({
     color: COLORS.blue,
     fontSize: 22,
     fontWeight: '800',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  businessName: {
+    color: COLORS.gold,
+    fontSize: 14,
+    fontWeight: '700',
     marginBottom: 4,
     textAlign: 'center',
   },

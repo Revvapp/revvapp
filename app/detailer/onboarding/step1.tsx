@@ -149,6 +149,22 @@ export default function DetailerOnboardingStep1() {
                 </View>
 
                 <View style={styles.field}>
+                  <Text style={styles.label}>BUSINESS NAME</Text>
+                  <TextInput
+                    value={onboarding.businessName}
+                    onChangeText={(t) => updateField('businessName', t)}
+                    placeholder="Elite Auto Detailing (optional)"
+                    placeholderTextColor="#7B8794"
+                    style={styles.input}
+                    autoCapitalize="words"
+                    returnKeyType="next"
+                  />
+                  <Text style={styles.fieldHint}>
+                    This is what clients see when browsing detailers.
+                  </Text>
+                </View>
+
+                <View style={styles.field}>
                   <Text style={styles.label}>
                     PHONE NUMBER <Text style={styles.asterisk}>*</Text>
                   </Text>
@@ -372,6 +388,12 @@ const styles = StyleSheet.create({
     color: COLORS.error,
     fontSize: 12,
     fontWeight: '600',
+  },
+  fieldHint: {
+    marginTop: 5,
+    color: '#7B8794',
+    fontSize: 12,
+    fontWeight: '500',
   },
   nextButton: {
     marginTop: 10,

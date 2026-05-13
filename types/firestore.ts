@@ -17,6 +17,7 @@ export type UserDocument = {
 export type DetailerDocument = {
   uid: string;
   fullName: string;
+  businessName?: string;
   phone: string;
   city: string;
   state: string;
