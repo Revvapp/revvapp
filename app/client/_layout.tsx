@@ -10,6 +10,9 @@ export default function ClientLayout() {
         <Stack.Screen name="welcome" />
         <Stack.Screen name="signup" />
         <Stack.Screen name="onboarding" />
+        <Stack.Screen name="detailer/[id]" />
+        <Stack.Screen name="book" />
+        <Stack.Screen name="vir/[id]" />
       </Stack>
     </ProtectedRoute>
   );

@@ -34,6 +34,9 @@ export type DetailerDocument = {
   incomeGoal: { daily: number; weekly: number };
   rating: number;
   reviewCount: number;
+  lat?: number;
+  lng?: number;
+  isFoundingPro?: boolean;
   isActive: boolean;
   profileComplete: boolean;
 };
@@ -68,5 +71,14 @@ export type BookingDocument = {
   date: string;
   time: string;
   vehicleId: string;
+  clientName?: string;
+  detailerName?: string;
+  vehicleLabel?: string;
+  address?: string;
+  notes?: string;
+  virSubmittedAt?: Timestamp | null;
+  virSignedAt?: Timestamp | null;
+  jobStartedAt?: Timestamp | null;
+  virPanels?: Record<string, { photoUrl: string; notes: string }>;
   createdAt: Timestamp | null;
 };

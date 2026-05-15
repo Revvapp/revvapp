@@ -32,6 +32,12 @@
     "plugins": [
       "expo-router",
       [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Revv needs your location to find detailers near you."
+        }
+      ],
+      [
         "expo-image-picker",
         {
           "photosPermission": "Allow Revv to access your photos to upload your profile and portfolio."

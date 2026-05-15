@@ -12,6 +12,8 @@ export default function DetailerLayout() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="onboarding" />
         <Stack.Screen name="edit-profile" />
+        <Stack.Screen name="job/[id]" />
+        <Stack.Screen name="vir/[id]" />
       </Stack>
     </ProtectedRoute>
   );

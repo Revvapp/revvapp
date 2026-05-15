@@ -42,3 +42,15 @@ export function dateKeyInRange(key: string, start: Date, end: Date): boolean {
 export function formatDisplayDate(d: Date): string {
   return d.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
 }
+
+export function formatJobDate(dateKey: string): string {
+  const now = new Date();
+  const todayKey = getLocalDateKey(now);
+  const tom = new Date(now);
+  tom.setDate(tom.getDate() + 1);
+  const tomorrowKey = getLocalDateKey(tom);
+  if (dateKey === todayKey) return 'Today';
+  if (dateKey === tomorrowKey) return 'Tomorrow';
+  const [y, m, d] = dateKey.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+}
