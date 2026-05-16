@@ -35,12 +35,16 @@ const COLORS = {
 type TabType = 'upcoming' | 'history';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  pending:   { label: 'Awaiting Acceptance', color: COLORS.orange, bg: '#FEF3E2' },
-  active:    { label: 'In Progress',         color: COLORS.blue,   bg: '#E8F0FB' },
-  confirmed: { label: 'Confirmed',           color: COLORS.green,  bg: '#E8F8EF' },
-  completed: { label: 'Completed',           color: COLORS.green,  bg: '#E8F8EF' },
-  declined:  { label: 'Declined',            color: COLORS.red,    bg: '#FDECEA' },
-  cancelled: { label: 'Cancelled',           color: COLORS.muted,  bg: '#F0F2F5' },
+  pending:       { label: 'Awaiting Acceptance',  color: COLORS.orange, bg: '#FEF3E2' },
+  active:        { label: 'Accepted',             color: COLORS.blue,   bg: '#E8F0FB' },
+  confirmed:     { label: 'Confirmed',            color: COLORS.green,  bg: '#E8F8EF' },
+  vir_submitted: { label: 'Sign Inspection ✍️',   color: '#7B3F00',     bg: '#FFF3E0' },
+  vir_signed:    { label: 'Job Starting Soon',    color: COLORS.blue,   bg: '#E8F0FB' },
+  in_progress:   { label: 'In Progress',          color: COLORS.green,  bg: '#E8F8EF' },
+  paused:        { label: 'Paused',               color: COLORS.orange, bg: '#FEF3E2' },
+  completed:     { label: 'Completed',            color: COLORS.green,  bg: '#E8F8EF' },
+  declined:      { label: 'Declined',             color: COLORS.red,    bg: '#FDECEA' },
+  cancelled:     { label: 'Cancelled',            color: COLORS.muted,  bg: '#F0F2F5' },
 };
 
 function StatusBadge({ status }: { status: string }) {
@@ -168,7 +172,7 @@ export default function ClientBookingsScreen() {
     return () => unsub();
   }, [user?.uid]);
 
-  const upcoming = bookings.filter((b) => ['pending', 'active', 'confirmed'].includes(b.status));
+  const upcoming = bookings.filter((b) => ['pending', 'active', 'confirmed', 'vir_submitted', 'vir_signed', 'in_progress', 'paused'].includes(b.status));
   const history = bookings.filter((b) => ['completed', 'declined', 'cancelled'].includes(b.status));
   const displayed = tab === 'upcoming' ? upcoming : history;
 

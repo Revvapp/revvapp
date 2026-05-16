@@ -88,7 +88,7 @@ export function useDetailerJobs(): DetailerJobsModel {
     .sort((a, b) => a.date.localeCompare(b.date));
 
   const active = bookings
-    .filter((b) => b.status === 'active')
+    .filter((b) => ['active', 'vir_submitted', 'vir_signed', 'in_progress', 'paused'].includes(b.status))
     .sort((a, b) => a.date.localeCompare(b.date));
 
   const completed = bookings

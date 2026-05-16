@@ -111,22 +111,13 @@ export default function DetailerOnboardingStep4() {
                 Verified detailers get 3x more bookings. Complete these to earn your Revv Pro badge.
               </Text>
 
-              <View style={styles.uploadRow}>
-                <View style={styles.placeholderBox}>
-                  <Text style={styles.placeholderText}>Photo upload coming soon</Text>
-                </View>
-                <View style={styles.placeholderBoxSecondary}>
-                  <Text style={styles.placeholderTextSecondary}>Photo upload coming soon</Text>
-                </View>
-              </View>
-
               <View style={styles.list}>
                 {ITEMS.map((item) => {
                   const done = item.badge === 'Done';
                   return (
                     <View key={item.title} style={styles.item}>
                       <View style={styles.iconWrap}>
-                        <Ionicons name={item.icon} size={18} color={done ? COLORS.green : COLORS.darkNavyButton} />
+                        <Ionicons name={item.icon} size={22} color={done ? COLORS.green : COLORS.darkNavyButton} />
                       </View>
                       <View style={styles.itemText}>
                         <Text style={styles.itemTitle}>{item.title}</Text>
@@ -207,39 +198,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   subtitle: { color: COLORS.muted, fontSize: 13, lineHeight: 20, marginBottom: 14 },
-  uploadRow: { gap: 10, marginBottom: 12 },
-  placeholderBox: {
-    backgroundColor: '#EEF2F7',
-    borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: '#C5CED8',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  placeholderBoxSecondary: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 12,
-    borderWidth: 1.5,
-    borderColor: COLORS.darkNavyButton,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  placeholderText: {
-    color: COLORS.darkNavyButton,
-    fontWeight: '700',
-    fontSize: 14,
-    textAlign: 'center',
-  },
-  placeholderTextSecondary: {
-    color: COLORS.muted,
-    fontWeight: '700',
-    fontSize: 14,
-    textAlign: 'center',
-  },
   list: { gap: 10 },
   item: {
     flexDirection: 'row',
@@ -247,17 +205,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#DCE2EA',
-    borderRadius: 12,
-    padding: 10,
+    borderRadius: 14,
+    padding: 14,
   },
   iconWrap: {
-    width: 30,
-    height: 30,
-    borderRadius: 8,
+    width: 44,
+    height: 44,
+    borderRadius: 12,
     backgroundColor: '#EEF2F7',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 10,
+    marginRight: 12,
   },
   itemText: { flex: 1 },
   itemTitle: { color: '#15222F', fontSize: 14, fontWeight: '800', marginBottom: 2 },

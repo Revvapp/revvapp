@@ -61,8 +61,14 @@ const defaultPanel = (): PanelState => ({
 });
 
 async function uploadPanelPhoto(bookingId: string, panel: string, localUri: string): Promise<string> {
-  const response = await fetch(localUri);
-  const blob = await response.blob();
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.onload = () => resolve(xhr.response);
+    xhr.onerror = () => reject(new Error('Network error creating blob'));
+    xhr.responseType = 'blob';
+    xhr.open('GET', localUri, true);
+    xhr.send(null);
+  });
   const ref = storageRef(storage, `vir/${bookingId}/${panel}.jpg`);
   await uploadBytes(ref, blob);
   return getDownloadURL(ref);
@@ -98,9 +104,10 @@ export default function VIRCaptureScreen() {
     try {
       const url = await uploadPanelPhoto(id!, key, localUri);
       updatePanel(key, { photoUrl: url, uploading: false });
-    } catch {
+    } catch (err) {
       updatePanel(key, { uploading: false });
-      Alert.alert('Upload failed', 'Could not upload photo. Please try again.');
+      const msg = err instanceof Error ? err.message : String(err);
+      Alert.alert('Upload failed', msg);
     }
   }
 

@@ -55,9 +55,12 @@ export default function DetailerOnboardingComplete() {
 
               <View style={styles.nextCard}>
                 <Text style={styles.nextTitle}>WHAT&apos;S NEXT</Text>
-                <Text style={styles.bullet}>• Share your Revv Pro link with clients</Text>
-                <Text style={styles.bullet}>• Set your first income goal</Text>
-                <Text style={styles.bullet}>• Connect Instagram &amp; TikTok</Text>
+                {['Share your Revv Pro link with clients', 'Set your first income goal', 'Connect Instagram & TikTok'].map((item) => (
+                  <View key={item} style={styles.bulletRow}>
+                    <View style={styles.bulletDot} />
+                    <Text style={styles.bulletText}>{item}</Text>
+                  </View>
+                ))}
               </View>
             </View>
 
@@ -147,12 +150,26 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     marginBottom: 8,
   },
-  bullet: {
-    color: COLORS.gold,
-    fontSize: 13,
+  bulletRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 10,
+    gap: 10,
+  },
+  bulletDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: COLORS.gold,
+    marginTop: 6,
+    flexShrink: 0,
+  },
+  bulletText: {
+    color: COLORS.gray,
+    fontSize: 14,
     lineHeight: 20,
-    marginBottom: 4,
-    fontWeight: '600',
+    fontWeight: '500',
+    flex: 1,
   },
   cta: {
     backgroundColor: COLORS.gold,

@@ -123,12 +123,14 @@ export default function JobDetailScreen() {
   const isPending = booking.status === 'pending';
   const isActive = booking.status === 'active';
   const isVirSubmitted = booking.status === 'vir_submitted';
+  const isVirSigned = booking.status === 'vir_signed';
   const isInProgress = booking.status === 'in_progress';
+  const isPaused = booking.status === 'paused';
   const isCompleted = booking.status === 'completed';
 
-  const statusColor = isPending ? '#856404' : isActive ? COLORS.blue : isVirSubmitted ? '#856404' : isInProgress ? COLORS.green : COLORS.muted;
-  const statusBg = isPending ? '#FFF3CD' : isActive ? '#E8F0FB' : isVirSubmitted ? '#FFF3CD' : isInProgress ? '#D4EDDA' : '#E8F4FD';
-  const statusLabel = isPending ? 'Pending' : isActive ? 'Accepted' : isVirSubmitted ? 'Awaiting Signature' : isInProgress ? 'In Progress' : isCompleted ? 'Completed' : toTitleCase(booking.status);
+  const statusColor = isPending ? '#856404' : isActive ? COLORS.blue : isVirSubmitted ? '#856404' : isVirSigned ? COLORS.green : isInProgress ? COLORS.green : isPaused ? '#856404' : COLORS.muted;
+  const statusBg = isPending ? '#FFF3CD' : isActive ? '#E8F0FB' : isVirSubmitted ? '#FFF3CD' : isVirSigned ? '#D4EDDA' : isInProgress ? '#D4EDDA' : isPaused ? '#FFF3CD' : '#E8F4FD';
+  const statusLabel = isPending ? 'Pending' : isActive ? 'Accepted' : isVirSubmitted ? 'Awaiting Signature' : isVirSigned ? 'Ready to Start' : isInProgress ? 'In Progress' : isPaused ? 'Paused' : isCompleted ? 'Completed' : toTitleCase(booking.status);
 
   return (
     <SafeAreaView edges={['top']} style={styles.safe}>
@@ -221,21 +223,23 @@ export default function JobDetailScreen() {
           </View>
         )}
 
-        {isInProgress && (
+        {isVirSigned && (
           <Pressable
-            style={[styles.btnComplete, actioning && styles.btnDisabled]}
-            onPress={() => runAction('completed')}
-            disabled={actioning}
+            style={styles.btnInspect}
+            onPress={() => router.push({ pathname: '/detailer/timer/[id]', params: { id: id! } })}
           >
-            {actioning
-              ? <ActivityIndicator size="small" color={COLORS.white} />
-              : (
-                <>
-                  <Ionicons name="checkmark-circle-outline" size={18} color={COLORS.white} />
-                  <Text style={styles.btnCompleteText}>Mark Job Complete</Text>
-                </>
-              )
-            }
+            <Ionicons name="timer-outline" size={18} color={COLORS.blue} />
+            <Text style={styles.btnInspectText}>Start Job Timer</Text>
+          </Pressable>
+        )}
+
+        {(isInProgress || isPaused) && (
+          <Pressable
+            style={styles.btnInspect}
+            onPress={() => router.push({ pathname: '/detailer/timer/[id]', params: { id: id! } })}
+          >
+            <Ionicons name="timer-outline" size={18} color={COLORS.blue} />
+            <Text style={styles.btnInspectText}>{isPaused ? 'Resume Timer' : 'Open Timer'}</Text>
           </Pressable>
         )}
 

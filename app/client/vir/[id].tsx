@@ -72,13 +72,12 @@ export default function ClientVIRSignScreen() {
             setSigning(true);
             try {
               await updateDoc(doc(db, 'bookings', id!), {
-                status: 'in_progress',
+                status: 'vir_signed',
                 virSignedAt: serverTimestamp(),
-                jobStartedAt: serverTimestamp(),
               });
               Alert.alert(
-                'Job Started!',
-                'You\'ve signed the inspection report. The job timer has started.',
+                'Inspection Signed!',
+                'Your detailer has been notified and can now start the job timer.',
                 [{ text: 'OK', onPress: () => router.back() }]
               );
             } catch (e) {

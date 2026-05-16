@@ -7,11 +7,13 @@ type UserType = 'detailer' | 'client' | null;
 
 const COLORS = {
   background: '#0D1B2A',
-  card: '#1A2B3C',
+  card: '#111E2B',
+  cardClient: '#0F1C2E',
   gold: '#C9A227',
   white: '#FFFFFF',
-  lightGray: '#B7C1CC',
-  iconBackground: '#132231',
+  lightGray: '#8FA3B1',
+  detailerIconBg: '#2A2510',
+  clientIconBg: '#0F2744',
 };
 
 const LETTER_SPACING_WIDE = 2.2;
@@ -20,10 +22,7 @@ export default function OnboardingScreen() {
   const [selectedType, setSelectedType] = useState<UserType>(null);
 
   const handleContinue = () => {
-    if (!selectedType) {
-      return;
-    }
-
+    if (!selectedType) return;
     if (selectedType === 'detailer') {
       router.push('/detailer/onboarding/welcome');
       return;
@@ -33,18 +32,18 @@ export default function OnboardingScreen() {
 
   return (
     <View style={styles.container}>
-      <View>
+      <View style={styles.headerBlock}>
         <Text style={styles.header}>I AM A...</Text>
         <Text style={styles.subheader}>Choose how you want to use Revv</Text>
       </View>
 
-      <View style={styles.cardsRow}>
+      <View style={styles.cardsStack}>
         <Pressable
           style={[styles.typeCard, selectedType === 'detailer' && styles.selectedCard]}
           onPress={() => setSelectedType('detailer')}
         >
-          <View style={styles.iconBox}>
-            <Ionicons name="person-outline" size={18} color={COLORS.white} />
+          <View style={[styles.iconBox, styles.detailerIconBox]}>
+            <Ionicons name="person" size={24} color={COLORS.gold} />
           </View>
           <Text style={styles.cardTitle}>DETAILER</Text>
           <Text style={styles.cardDescription}>
@@ -54,11 +53,11 @@ export default function OnboardingScreen() {
         </Pressable>
 
         <Pressable
-          style={[styles.typeCard, selectedType === 'client' && styles.selectedCard]}
+          style={[styles.typeCard, styles.cardClient, selectedType === 'client' && styles.selectedCard]}
           onPress={() => setSelectedType('client')}
         >
-          <View style={styles.iconBox}>
-            <Ionicons name="car-outline" size={18} color={COLORS.white} />
+          <View style={[styles.iconBox, styles.clientIconBox]}>
+            <Ionicons name="terminal" size={22} color="#5A9FD4" />
           </View>
           <Text style={styles.cardTitle}>CAR OWNER</Text>
           <Text style={styles.cardDescription}>
@@ -67,18 +66,22 @@ export default function OnboardingScreen() {
         </Pressable>
       </View>
 
-      <Pressable
-        style={[styles.continueButton, !selectedType && styles.continueButtonDisabled]}
-        onPress={handleContinue}
-        disabled={!selectedType}
-      >
-        <Text style={[styles.continueText, !selectedType && styles.continueTextDisabled]}>CONTINUE</Text>
-      </Pressable>
+      <View style={styles.bottomBlock}>
+        <Pressable
+          style={[styles.continueButton, !selectedType && styles.continueButtonDisabled]}
+          onPress={handleContinue}
+          disabled={!selectedType}
+        >
+          <Text style={[styles.continueText, !selectedType && styles.continueTextDisabled]}>
+            CONTINUE
+          </Text>
+        </Pressable>
 
-      <Pressable style={styles.loginRow} onPress={() => router.push('/login')}>
-        <Text style={styles.loginMuted}>Already have an account? </Text>
-        <Text style={styles.loginGold}>Log in</Text>
-      </Pressable>
+        <Pressable style={styles.loginRow} onPress={() => router.push('/login')}>
+          <Text style={styles.loginMuted}>Already have an account? </Text>
+          <Text style={styles.loginGold}>Log in</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -87,69 +90,83 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
-    paddingHorizontal: 20,
-    paddingTop: 72,
-    paddingBottom: 40,
+    paddingHorizontal: 24,
+    paddingTop: 80,
+    paddingBottom: 48,
     justifyContent: 'space-between',
   },
+  headerBlock: {
+    alignItems: 'center',
+    marginBottom: 8,
+  },
   header: {
-    color: COLORS.gold,
+    color: COLORS.white,
     textTransform: 'uppercase',
     letterSpacing: LETTER_SPACING_WIDE,
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: '800',
     marginBottom: 8,
   },
   subheader: {
     color: COLORS.lightGray,
     fontSize: 15,
-    fontWeight: '500',
+    fontWeight: '400',
   },
-  cardsRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 24,
-    marginBottom: 24,
+  cardsStack: {
+    flex: 1,
+    gap: 14,
+    marginTop: 32,
+    marginBottom: 32,
   },
   typeCard: {
     flex: 1,
     backgroundColor: COLORS.card,
-    borderRadius: 16,
-    borderWidth: 1,
+    borderRadius: 18,
+    borderWidth: 1.5,
     borderColor: 'transparent',
-    padding: 14,
-    minHeight: 260,
+    padding: 22,
+  },
+  cardClient: {
+    backgroundColor: COLORS.cardClient,
   },
   selectedCard: {
     borderColor: COLORS.gold,
   },
   iconBox: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    backgroundColor: COLORS.iconBackground,
+    width: 52,
+    height: 52,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 14,
+    marginBottom: 18,
+  },
+  detailerIconBox: {
+    backgroundColor: COLORS.detailerIconBg,
+  },
+  clientIconBox: {
+    backgroundColor: COLORS.clientIconBg,
   },
   cardTitle: {
     color: COLORS.white,
     textTransform: 'uppercase',
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '800',
     letterSpacing: 1.4,
     marginBottom: 10,
   },
   cardDescription: {
     color: COLORS.lightGray,
-    fontSize: 13,
-    lineHeight: 20,
-    fontWeight: '500',
+    fontSize: 14,
+    lineHeight: 22,
+    fontWeight: '400',
+  },
+  bottomBlock: {
+    gap: 16,
   },
   continueButton: {
     backgroundColor: COLORS.gold,
     borderRadius: 14,
-    paddingVertical: 16,
+    paddingVertical: 18,
     alignItems: 'center',
   },
   continueButtonDisabled: {
@@ -159,7 +176,7 @@ const styles = StyleSheet.create({
     color: COLORS.background,
     textTransform: 'uppercase',
     letterSpacing: LETTER_SPACING_WIDE,
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '800',
   },
   continueTextDisabled: {
@@ -170,12 +187,11 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 18,
   },
   loginMuted: {
     color: COLORS.lightGray,
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '400',
   },
   loginGold: {
     color: COLORS.gold,
