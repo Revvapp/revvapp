@@ -17,7 +17,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { db, storage } from '@/firebaseConfig';
-import { toTitleCase } from '@/lib/format';
 
 const COLORS = {
   bg: '#0D1B2A',

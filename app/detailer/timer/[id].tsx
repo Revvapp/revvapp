@@ -181,7 +181,7 @@ export default function TimerScreen() {
         timerAccumulatedSeconds: 0,
         serviceChecklist: checklist,
       });
-    } catch (e) {
+    } catch {
       Alert.alert('Error', 'Could not start timer.');
     } finally {
       setSaving(false);

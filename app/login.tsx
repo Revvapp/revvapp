@@ -73,7 +73,6 @@ export default function LoginScreen() {
       await signInWithEmailAndPassword(auth, email.trim(), password);
     } catch (e) {
       const code = (e as { code?: string })?.code;
-      console.log('[Login] error code:', code, e);
       if (isNetworkError(e)) {
         setNetworkBanner(true);
         return;

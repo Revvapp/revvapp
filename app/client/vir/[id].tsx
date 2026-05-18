@@ -125,7 +125,7 @@ export default function ClientVIRSignScreen() {
           <View style={{ flex: 1 }}>
             <Text style={styles.infoTitle}>Vehicle Pre-Inspection</Text>
             <Text style={styles.infoBody}>
-              Review the photos your detailer took of each panel. These document the vehicle's condition before work begins. Sign to start the job timer.
+              Review the photos your detailer took of each panel. These document the vehicle&apos;s condition before work begins. Sign to start the job timer.
             </Text>
           </View>
         </View>

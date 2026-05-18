@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import { collection, deleteDoc, doc, getDocs, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
+import { Redirect, router } from 'expo-router';
+import { deleteDoc, doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { useState } from 'react';
 import {
   ActivityIndicator,
@@ -217,6 +217,13 @@ async function seedScenario(uid: string, scenario: Scenario): Promise<void> {
 }
 
 export default function DevToolsScreen() {
+  if (!__DEV__) {
+    return <Redirect href="/detailer/dashboard" />;
+  }
+  return <DevToolsContent />;
+}
+
+function DevToolsContent() {
   const { user } = useAuth();
   const [loading, setLoading] = useState<string | null>(null);
 

@@ -133,7 +133,7 @@ export default function BookConfirmScreen() {
           </View>
           <Text style={styles.successTitle}>Booking Sent!</Text>
           <Text style={styles.successBody}>
-            Your request has been sent to {toTitleCase(params.detailerName ?? '')}. You'll be notified once they accept.
+            Your request has been sent to {toTitleCase(params.detailerName ?? '')}. You&apos;ll be notified once they accept.
           </Text>
           <Pressable
             style={styles.doneBtn}

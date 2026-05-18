@@ -59,6 +59,7 @@ export default function DetailerDashboardScreen() {
     } finally {
       setRefreshing(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [d.refetch]);
 
   function goalFooterText(): string {
@@ -178,7 +179,7 @@ export default function DetailerDashboardScreen() {
                 </Text>
               </View>
               <View style={styles.viewJobsRow}>
-                <Text style={styles.viewJobsText}>View Today's Jobs</Text>
+                <Text style={styles.viewJobsText}>View Today&apos;s Jobs</Text>
                 <Ionicons name="chevron-forward" size={13} color={COLORS.gold} />
               </View>
             </Pressable>
