@@ -111,6 +111,16 @@ function BookingCard({ booking }: { booking: BookingDocument }) {
           <Text style={styles.signCTAText}>Review & Sign Inspection</Text>
         </Pressable>
       )}
+
+      {booking.status === 'completed' && (
+        <Pressable
+          style={styles.invoiceCTA}
+          onPress={() => router.push({ pathname: '/client/invoice/[id]', params: { id: booking.id } })}
+        >
+          <Ionicons name="document-text-outline" size={15} color={COLORS.green} />
+          <Text style={styles.invoiceCTAText}>View Receipt</Text>
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -321,4 +331,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   signCTAText: { color: COLORS.blue, fontSize: 13, fontWeight: '900' },
+  invoiceCTA: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1.5,
+    borderColor: COLORS.green,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    marginTop: 10,
+    justifyContent: 'center',
+  },
+  invoiceCTAText: { color: COLORS.green, fontSize: 13, fontWeight: '900' },
 });

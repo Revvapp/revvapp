@@ -13,6 +13,7 @@ export default function ClientLayout() {
         <Stack.Screen name="detailer/[id]" />
         <Stack.Screen name="book" />
         <Stack.Screen name="vir/[id]" />
+        <Stack.Screen name="invoice/[id]" />
       </Stack>
     </ProtectedRoute>
   );

@@ -47,8 +47,6 @@ const PANEL_GRID = [
   { key: 'interior', label: 'Interior' },
 ] as const;
 
-type PanelKey = typeof PANEL_GRID[number]['key'];
-
 interface ChecklistItem {
   name: string;
   estimatedMinutes: number;
@@ -244,7 +242,7 @@ export default function TimerScreen() {
                 timerAccumulatedSeconds: elapsed,
                 completedAt: serverTimestamp(),
               });
-              router.back();
+              router.replace({ pathname: '/detailer/before-after/[id]', params: { id: id! } });
             } catch {
               Alert.alert('Error', 'Could not end job.');
             } finally {

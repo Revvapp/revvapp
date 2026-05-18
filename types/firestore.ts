@@ -79,6 +79,29 @@ export type BookingDocument = {
   virSubmittedAt?: Timestamp | null;
   virSignedAt?: Timestamp | null;
   jobStartedAt?: Timestamp | null;
+  completedAt?: Timestamp | null;
   virPanels?: Record<string, { photoUrl: string; notes: string }>;
+  timerAccumulatedSeconds?: number;
+  afterPhotos?: string[];
+  serviceChecklist?: Array<{ name: string; estimatedMinutes: number; completed: boolean; completedMinutes?: number }>;
+  createdAt: Timestamp | null;
+};
+
+export type InvoiceDocument = {
+  id: string;
+  bookingId: string;
+  clientId: string;
+  detailerId: string;
+  clientName: string;
+  detailerName: string;
+  businessName?: string;
+  vehicleLabel: string;
+  service: string;
+  date: string;
+  price: number;
+  platformFee: number;
+  detailerPayout: number;
+  status: 'pending_release' | 'released' | 'disputed';
+  afterPhotos: string[];
   createdAt: Timestamp | null;
 };

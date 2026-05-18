@@ -244,10 +244,19 @@ export default function JobDetailScreen() {
         )}
 
         {isCompleted && (
-          <View style={styles.completedBanner}>
-            <Ionicons name="checkmark-circle" size={20} color={COLORS.green} />
-            <Text style={styles.completedBannerText}>This job has been completed.</Text>
-          </View>
+          <>
+            <View style={styles.completedBanner}>
+              <Ionicons name="checkmark-circle" size={20} color={COLORS.green} />
+              <Text style={styles.completedBannerText}>This job has been completed.</Text>
+            </View>
+            <Pressable
+              style={styles.btnInspect}
+              onPress={() => router.push({ pathname: '/detailer/invoice/[id]', params: { id: id! } })}
+            >
+              <Ionicons name="document-text-outline" size={18} color={COLORS.blue} />
+              <Text style={styles.btnInspectText}>View Invoice</Text>
+            </Pressable>
+          </>
         )}
       </ScrollView>
     </SafeAreaView>

@@ -76,6 +76,11 @@ export default function DetailerDashboardScreen() {
             <Text style={styles.brandGold}>VV</Text>
           </Text>
           <View style={styles.headerRight}>
+            {__DEV__ && (
+              <Pressable style={styles.devBtn} onPress={() => router.push('/detailer/dev-tools')}>
+                <Text style={styles.devBtnText}>DEV</Text>
+              </Pressable>
+            )}
             <View style={styles.notificationWrap}>
               <Ionicons name="notifications-outline" size={22} color={COLORS.white} />
               <View style={styles.notificationDot} />
@@ -376,4 +381,12 @@ const styles = StyleSheet.create({
   statTitle: { color: '#5A6978', fontSize: 11, fontWeight: '800', marginBottom: 6 },
   statValue: { color: COLORS.darkText, fontSize: 27, fontWeight: '900', marginBottom: 4 },
   statMuted: { color: '#6B7885', fontSize: 12, fontWeight: '600' },
+  devBtn: {
+    backgroundColor: '#C0392B',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginRight: 8,
+  },
+  devBtnText: { color: '#FFFFFF', fontSize: 11, fontWeight: '900', letterSpacing: 0.5 },
 });
