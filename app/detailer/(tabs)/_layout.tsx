@@ -56,6 +56,13 @@ export default function DetailerTabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="reach"
+        options={{
+          title: 'Reach',
+          tabBarIcon: ({ color, size }) => <Ionicons name="megaphone" size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="profile"
         options={{
           href: null,

@@ -5,6 +5,9 @@ import {
   updatePassword,
 } from 'firebase/auth';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { getDownloadURL, ref as storageRef, uploadBytes } from 'firebase/storage';
+import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
@@ -20,7 +23,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { auth, db } from '@/firebaseConfig';
+import { auth, db, storage } from '@/firebaseConfig';
 import { useAuth } from '@/hooks/useAuth';
 
 const COLORS = {
@@ -63,9 +66,25 @@ export default function EditProfileScreen() {
   // Profile fields
   const [businessName, setBusinessName] = useState('');
   const [bio, setBio] = useState('');
+  const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
+  const [photoUploading, setPhotoUploading] = useState(false);
   const [profileLoading, setProfileLoading] = useState(true);
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileStatus, setProfileStatus] = useState<SectionStatus>(null);
+
+  // Services & rates
+  const [services, setServices] = useState<string[]>([]);
+  const [rates, setRates] = useState<Record<string, string>>({});
+  const [servicesSaving, setServicesSaving] = useState(false);
+  const [servicesStatus, setServicesStatus] = useState<SectionStatus>(null);
+
+  // Availability
+  const [workingDays, setWorkingDays] = useState<string[]>([]);
+  const [hoursFrom, setHoursFrom] = useState('');
+  const [hoursTo, setHoursTo] = useState('');
+  const [maxJobs, setMaxJobs] = useState('');
+  const [availSaving, setAvailSaving] = useState(false);
+  const [availStatus, setAvailStatus] = useState<SectionStatus>(null);
 
   // Email change
   const [newEmail, setNewEmail] = useState('');
@@ -88,13 +107,103 @@ export default function EditProfileScreen() {
         const d = snap.data();
         setBusinessName(String(d.businessName ?? ''));
         setBio(String(d.bio ?? ''));
+        setProfilePhotoUrl(d.profilePhotoUrl ? String(d.profilePhotoUrl) : null);
+        const svcList: string[] = Array.isArray(d.services) ? d.services : [];
+        setServices(svcList);
+        const ratesRaw = d.rates && typeof d.rates === 'object' ? d.rates as Record<string, number> : {};
+        const ratesStr: Record<string, string> = {};
+        svcList.forEach((s) => { ratesStr[s] = ratesRaw[s] != null ? String(ratesRaw[s]) : ''; });
+        setRates(ratesStr);
+        const wh = d.workingHours && typeof d.workingHours === 'object' ? d.workingHours as Record<string, string> : {};
+        setWorkingDays(Array.isArray(d.workingDays) ? d.workingDays : []);
+        setHoursFrom(String(wh.from ?? ''));
+        setHoursTo(String(wh.to ?? ''));
+        setMaxJobs(d.maxJobsPerDay != null ? String(d.maxJobsPerDay) : '');
       }
     } finally {
       setProfileLoading(false);
     }
   }, [user?.uid]);
 
+  async function pickAndUploadPhoto() {
+    if (!user?.uid) return;
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.8,
+      allowsEditing: true,
+      aspect: [1, 1],
+    });
+    if (result.canceled || !result.assets[0]) return;
+    const localUri = result.assets[0].uri;
+    setPhotoUploading(true);
+    try {
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.onload = () => resolve(xhr.response);
+        xhr.onerror = () => reject(new Error('Upload failed'));
+        xhr.responseType = 'blob';
+        xhr.open('GET', localUri, true);
+        xhr.send(null);
+      });
+      const ref = storageRef(storage, `detailers/${user.uid}/profile.jpg`);
+      await uploadBytes(ref, blob);
+      const url = await getDownloadURL(ref);
+      await updateDoc(doc(db, 'detailers', user.uid), { profilePhotoUrl: url });
+      setProfilePhotoUrl(url);
+      setProfileStatus({ ok: true, message: 'Profile photo updated.' });
+    } catch {
+      Alert.alert('Error', 'Could not upload photo. Try again.');
+    } finally {
+      setPhotoUploading(false);
+    }
+  }
+
   useEffect(() => { void loadProfile(); }, [loadProfile]);
+
+  const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+  function toggleDay(day: string) {
+    setWorkingDays((prev) =>
+      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]
+    );
+  }
+
+  async function saveServices() {
+    if (!user?.uid) return;
+    setServicesSaving(true);
+    setServicesStatus(null);
+    try {
+      const numericRates: Record<string, number> = {};
+      services.forEach((s) => {
+        const n = parseFloat(rates[s] ?? '0');
+        numericRates[s] = isNaN(n) ? 0 : n;
+      });
+      await updateDoc(doc(db, 'detailers', user.uid), { rates: numericRates });
+      setServicesStatus({ ok: true, message: 'Rates updated.' });
+    } catch {
+      setServicesStatus({ ok: false, message: 'Could not save rates. Try again.' });
+    } finally {
+      setServicesSaving(false);
+    }
+  }
+
+  async function saveAvailability() {
+    if (!user?.uid) return;
+    setAvailSaving(true);
+    setAvailStatus(null);
+    try {
+      await updateDoc(doc(db, 'detailers', user.uid), {
+        workingDays,
+        workingHours: { from: hoursFrom.trim(), to: hoursTo.trim() },
+        maxJobsPerDay: parseInt(maxJobs, 10) || 0,
+      });
+      setAvailStatus({ ok: true, message: 'Availability updated.' });
+    } catch {
+      setAvailStatus({ ok: false, message: 'Could not save availability. Try again.' });
+    } finally {
+      setAvailSaving(false);
+    }
+  }
 
   // ── Save profile info ────────────────────────────────────────────────────────
   const saveProfile = async () => {
@@ -225,6 +334,24 @@ export default function EditProfileScreen() {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>PROFILE INFO</Text>
 
+              <Pressable style={styles.photoWrap} onPress={pickAndUploadPhoto} disabled={photoUploading}>
+                {profilePhotoUrl ? (
+                  <Image source={{ uri: profilePhotoUrl }} style={styles.photoImage} />
+                ) : (
+                  <View style={styles.photoPlaceholder}>
+                    <Text style={styles.photoInitial}>
+                      {(auth.currentUser?.email ?? 'D')[0].toUpperCase()}
+                    </Text>
+                  </View>
+                )}
+                <View style={styles.photoBadge}>
+                  {photoUploading
+                    ? <ActivityIndicator size="small" color={COLORS.white} />
+                    : <Text style={styles.photoBadgeText}>Edit</Text>
+                  }
+                </View>
+              </Pressable>
+
               <Label text="BUSINESS NAME" optional />
               <TextInput
                 value={businessName}
@@ -258,6 +385,117 @@ export default function EditProfileScreen() {
                 {profileSaving
                   ? <ActivityIndicator color={COLORS.darkText} />
                   : <Text style={styles.saveBtnText}>SAVE PROFILE</Text>}
+              </Pressable>
+            </View>
+
+            {/* ── Services & Rates ──────────────────────────────────────── */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>SERVICES & RATES</Text>
+              {services.length === 0 ? (
+                <Text style={styles.sectionHint}>No services set up. Complete onboarding to add services.</Text>
+              ) : (
+                services.map((svc) => (
+                  <View key={svc}>
+                    <Label text={svc.toUpperCase()} />
+                    <View style={styles.rateRow}>
+                      <Text style={styles.rateDollar}>$</Text>
+                      <TextInput
+                        value={rates[svc] ?? ''}
+                        onChangeText={(v) => setRates((prev) => ({ ...prev, [svc]: v }))}
+                        placeholder="0"
+                        placeholderTextColor="#9AA5B1"
+                        style={[styles.input, styles.rateInput]}
+                        keyboardType="numeric"
+                        onFocus={() => setServicesStatus(null)}
+                      />
+                    </View>
+                  </View>
+                ))
+              )}
+              <StatusBanner status={servicesStatus} />
+              {services.length > 0 && (
+                <Pressable
+                  style={[styles.saveBtn, servicesSaving && styles.saveBtnDisabled]}
+                  onPress={saveServices}
+                  disabled={servicesSaving}
+                >
+                  {servicesSaving
+                    ? <ActivityIndicator color={COLORS.darkText} />
+                    : <Text style={styles.saveBtnText}>SAVE RATES</Text>}
+                </Pressable>
+              )}
+            </View>
+
+            {/* ── Availability ──────────────────────────────────────────── */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>AVAILABILITY</Text>
+
+              <Label text="WORKING DAYS" />
+              <View style={styles.daysRow}>
+                {DAYS.map((day) => (
+                  <Pressable
+                    key={day}
+                    style={[styles.dayChip, workingDays.includes(day) && styles.dayChipActive]}
+                    onPress={() => toggleDay(day)}
+                  >
+                    <Text style={[styles.dayChipText, workingDays.includes(day) && styles.dayChipTextActive]}>
+                      {day[0]}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+
+              <View style={styles.hoursRow}>
+                <View style={styles.hourField}>
+                  <Label text="FROM" />
+                  <TextInput
+                    value={hoursFrom}
+                    onChangeText={setHoursFrom}
+                    placeholder="9:00 AM"
+                    placeholderTextColor="#9AA5B1"
+                    style={styles.input}
+                    onFocus={() => setAvailStatus(null)}
+                  />
+                </View>
+                <View style={styles.hourField}>
+                  <Label text="TO" />
+                  <TextInput
+                    value={hoursTo}
+                    onChangeText={setHoursTo}
+                    placeholder="6:00 PM"
+                    placeholderTextColor="#9AA5B1"
+                    style={styles.input}
+                    onFocus={() => setAvailStatus(null)}
+                  />
+                </View>
+              </View>
+
+              <Label text="MAX JOBS PER DAY" />
+              <View style={styles.stepperRow}>
+                <Pressable
+                  style={styles.stepperBtn}
+                  onPress={() => setMaxJobs((v) => String(Math.max(1, parseInt(v || '1', 10) - 1)))}
+                >
+                  <Text style={styles.stepperBtnText}>−</Text>
+                </Pressable>
+                <Text style={styles.stepperValue}>{maxJobs || '0'}</Text>
+                <Pressable
+                  style={styles.stepperBtn}
+                  onPress={() => setMaxJobs((v) => String(Math.min(20, parseInt(v || '0', 10) + 1)))}
+                >
+                  <Text style={styles.stepperBtnText}>+</Text>
+                </Pressable>
+              </View>
+
+              <StatusBanner status={availStatus} />
+              <Pressable
+                style={[styles.saveBtn, availSaving && styles.saveBtnDisabled]}
+                onPress={saveAvailability}
+                disabled={availSaving}
+              >
+                {availSaving
+                  ? <ActivityIndicator color={COLORS.darkText} />
+                  : <Text style={styles.saveBtnText}>SAVE AVAILABILITY</Text>}
               </Pressable>
             </View>
 
@@ -455,4 +693,51 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: 1.4,
   },
+  photoWrap: {
+    alignSelf: 'center',
+    marginBottom: 20,
+    marginTop: 6,
+  },
+  photoImage: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+  },
+  photoPlaceholder: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: COLORS.gold,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  photoInitial: { color: COLORS.darkText, fontSize: 32, fontWeight: '900' },
+  photoBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    backgroundColor: COLORS.navy,
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderWidth: 2,
+    borderColor: COLORS.card,
+    minWidth: 36,
+    alignItems: 'center',
+  },
+  photoBadgeText: { color: COLORS.white, fontSize: 11, fontWeight: '800' },
+  rateRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.white, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, paddingLeft: 13 },
+  rateDollar: { color: COLORS.darkText, fontSize: 15, fontWeight: '700' },
+  rateInput: { flex: 1, borderWidth: 0, borderRadius: 0, paddingLeft: 4 },
+  daysRow: { flexDirection: 'row', gap: 8, marginTop: 4, flexWrap: 'wrap' },
+  dayChip: { width: 38, height: 38, borderRadius: 19, backgroundColor: COLORS.white, borderWidth: 1.5, borderColor: COLORS.border, alignItems: 'center', justifyContent: 'center' },
+  dayChipActive: { backgroundColor: COLORS.navy, borderColor: COLORS.navy },
+  dayChipText: { color: COLORS.muted, fontSize: 12, fontWeight: '800' },
+  dayChipTextActive: { color: COLORS.white },
+  hoursRow: { flexDirection: 'row', gap: 12 },
+  hourField: { flex: 1 },
+  stepperRow: { flexDirection: 'row', alignItems: 'center', gap: 16, marginTop: 8 },
+  stepperBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: COLORS.white, borderWidth: 1.5, borderColor: COLORS.border, alignItems: 'center', justifyContent: 'center' },
+  stepperBtnText: { color: COLORS.navy, fontSize: 20, fontWeight: '700', lineHeight: 24 },
+  stepperValue: { color: COLORS.darkText, fontSize: 22, fontWeight: '900', minWidth: 30, textAlign: 'center' },
 });

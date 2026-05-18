@@ -1,18 +1,25 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
+import { doc, updateDoc } from 'firebase/firestore';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   Animated,
+  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { db } from '@/firebaseConfig';
+import { useAuth } from '@/hooks/useAuth';
 import { useDetailerDashboard } from '@/hooks/useDetailerDashboard';
 
 const COLORS = {
@@ -36,8 +43,33 @@ function SkeletonBlock({ style }: { style?: object }) {
 
 export default function DetailerDashboardScreen() {
   const d = useDetailerDashboard();
+  const { user } = useAuth();
   const progressAnim = useRef(new Animated.Value(0)).current;
   const [refreshing, setRefreshing] = useState(false);
+  const [goalModalVisible, setGoalModalVisible] = useState(false);
+  const [goalInput, setGoalInput] = useState('');
+  const [savingGoal, setSavingGoal] = useState(false);
+
+  async function handleSaveGoal() {
+    const amount = parseInt(goalInput.replace(/[^0-9]/g, ''), 10);
+    if (isNaN(amount) || amount < 0) return;
+    if (!user?.uid) return;
+    setSavingGoal(true);
+    try {
+      await updateDoc(doc(db, 'detailers', user.uid), { 'incomeGoal.daily': amount });
+      await d.refetch();
+      setGoalModalVisible(false);
+    } catch {
+      Alert.alert('Error', 'Could not save goal. Try again.');
+    } finally {
+      setSavingGoal(false);
+    }
+  }
+
+  function openGoalModal() {
+    setGoalInput(d.dailyGoal > 0 ? String(d.dailyGoal) : '');
+    setGoalModalVisible(true);
+  }
 
   useEffect(() => {
     Animated.timing(progressAnim, {
@@ -153,7 +185,7 @@ export default function DetailerDashboardScreen() {
             >
               <View style={styles.goalTopRow}>
                 <Text style={styles.smallLabel}>Today&apos;s Income</Text>
-                <Pressable style={styles.editGoalBtn}>
+                <Pressable style={styles.editGoalBtn} onPress={openGoalModal}>
                   <Text style={styles.editGoalText}>
                     {d.dailyGoal > 0 ? 'Edit Goal' : 'Set Your First Goal'}
                   </Text>
@@ -219,6 +251,39 @@ export default function DetailerDashboardScreen() {
           </ScrollView>
         )}
       </View>
+
+      <Modal visible={goalModalVisible} transparent animationType="fade" onRequestClose={() => setGoalModalVisible(false)}>
+        <Pressable style={styles.modalOverlay} onPress={() => setGoalModalVisible(false)}>
+          <Pressable style={styles.modalBox} onPress={() => {}}>
+            <Text style={styles.modalTitle}>Daily Income Goal</Text>
+            <Text style={styles.modalSub}>How much do you want to earn today?</Text>
+            <View style={styles.modalInputRow}>
+              <Text style={styles.modalDollar}>$</Text>
+              <TextInput
+                style={styles.modalInput}
+                value={goalInput}
+                onChangeText={setGoalInput}
+                keyboardType="number-pad"
+                placeholder="0"
+                placeholderTextColor={COLORS.gray}
+                autoFocus
+                maxLength={6}
+              />
+            </View>
+            <View style={styles.modalBtnRow}>
+              <Pressable style={styles.modalCancel} onPress={() => setGoalModalVisible(false)}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </Pressable>
+              <Pressable style={styles.modalSave} onPress={handleSaveGoal} disabled={savingGoal}>
+                {savingGoal
+                  ? <ActivityIndicator size="small" color={COLORS.darkText} />
+                  : <Text style={styles.modalSaveText}>Save Goal</Text>
+                }
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -390,4 +455,53 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   devBtnText: { color: '#FFFFFF', fontSize: 11, fontWeight: '900', letterSpacing: 0.5 },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  modalBox: {
+    backgroundColor: COLORS.white,
+    borderRadius: 20,
+    padding: 24,
+    width: '100%',
+  },
+  modalTitle: { color: COLORS.darkText, fontSize: 18, fontWeight: '900', marginBottom: 4 },
+  modalSub: { color: COLORS.gray, fontSize: 13, fontWeight: '600', marginBottom: 20 },
+  modalInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0F4F8',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    marginBottom: 20,
+  },
+  modalDollar: { color: COLORS.darkText, fontSize: 28, fontWeight: '900', marginRight: 4 },
+  modalInput: {
+    flex: 1,
+    fontSize: 28,
+    fontWeight: '900',
+    color: COLORS.darkText,
+    paddingVertical: 14,
+  },
+  modalBtnRow: { flexDirection: 'row', gap: 10 },
+  modalCancel: {
+    flex: 1,
+    borderWidth: 1.5,
+    borderColor: '#D0D8E0',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  modalCancelText: { color: COLORS.gray, fontSize: 14, fontWeight: '700' },
+  modalSave: {
+    flex: 1,
+    backgroundColor: COLORS.gold,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  modalSaveText: { color: COLORS.darkText, fontSize: 14, fontWeight: '900' },
 });

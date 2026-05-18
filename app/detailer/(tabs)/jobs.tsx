@@ -32,31 +32,30 @@ const COLORS = {
 
 type Tab = 'Pending' | 'Active' | 'Completed';
 
-function StatusBadge({ status }: { status: string }) {
-  const s = status.toLowerCase();
-  const bg =
-    s === 'pending' ? '#FFF3CD' :
-    s === 'active' ? '#D4EDDA' :
-    s === 'completed' ? '#E8F4FD' :
-    '#F0F0F0';
-  const color =
-    s === 'pending' ? '#856404' :
-    s === 'active' ? '#155724' :
-    s === 'completed' ? '#0C5460' :
-    COLORS.muted;
+const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
+  pending:       { label: 'Pending',           color: '#856404', bg: '#FFF3CD' },
+  active:        { label: 'Accepted',          color: '#155724', bg: '#D4EDDA' },
+  vir_submitted: { label: 'Awaiting Signature', color: '#7B3F00', bg: '#FFF3E0' },
+  vir_signed:    { label: 'Ready to Start',    color: '#1A3A5C', bg: '#E8F0FB' },
+  in_progress:   { label: 'In Progress',       color: '#155724', bg: '#D4EDDA' },
+  paused:        { label: 'Paused',            color: '#856404', bg: '#FFF3CD' },
+  completed:     { label: 'Completed',         color: '#0C5460', bg: '#E8F4FD' },
+};
 
+function StatusBadge({ status }: { status: string }) {
+  const cfg = STATUS_CONFIG[status] ?? { label: toTitleCase(status), color: COLORS.muted, bg: '#F0F0F0' };
   return (
-    <View style={[styles.badge, { backgroundColor: bg }]}>
-      <Text style={[styles.badgeText, { color }]}>{toTitleCase(status)}</Text>
+    <View style={[styles.badge, { backgroundColor: cfg.bg }]}>
+      <Text style={[styles.badgeText, { color: cfg.color }]}>{cfg.label}</Text>
     </View>
   );
 }
 
 function EmptyState({ tab }: { tab: Tab }) {
   const messages: Record<Tab, { title: string; body: string; icon: string }> = {
-    Pending: { title: 'No Pending Requests', body: 'New booking requests from clients will appear here.', icon: 'time-outline' },
-    Active: { title: 'No Active Jobs', body: 'Accept a request and it will show up here.', icon: 'briefcase-outline' },
-    Completed: { title: 'No Completed Jobs Yet', body: 'Jobs you finish will be recorded here.', icon: 'checkmark-circle-outline' },
+    Pending:   { title: 'No Pending Requests',  body: 'New booking requests from clients will appear here.', icon: 'time-outline' },
+    Active:    { title: 'No Active Jobs',        body: 'Accept a request and it will show up here.',          icon: 'briefcase-outline' },
+    Completed: { title: 'No Completed Jobs Yet', body: 'Jobs you finish will be recorded here.',              icon: 'checkmark-circle-outline' },
   };
   const { title, body, icon } = messages[tab];
   return (
@@ -68,26 +67,69 @@ function EmptyState({ tab }: { tab: Tab }) {
   );
 }
 
+function ActiveAction({ job }: { job: BookingDocument }) {
+  switch (job.status) {
+    case 'active':
+      return (
+        <Pressable
+          style={styles.btnFilled}
+          onPress={() => router.push({ pathname: '/detailer/vir/[id]', params: { id: job.id } })}
+        >
+          <Text style={styles.btnFilledText}>Start Inspection</Text>
+        </Pressable>
+      );
+    case 'vir_submitted':
+      return (
+        <View style={styles.btnWaiting}>
+          <Text style={styles.btnWaitingText}>Awaiting Signature</Text>
+        </View>
+      );
+    case 'vir_signed':
+      return (
+        <Pressable
+          style={styles.btnFilled}
+          onPress={() => router.push({ pathname: '/detailer/timer/[id]', params: { id: job.id } })}
+        >
+          <Text style={styles.btnFilledText}>Start Job</Text>
+        </Pressable>
+      );
+    case 'in_progress':
+      return (
+        <Pressable
+          style={styles.btnFilled}
+          onPress={() => router.push({ pathname: '/detailer/timer/[id]', params: { id: job.id } })}
+        >
+          <Text style={styles.btnFilledText}>View Timer</Text>
+        </Pressable>
+      );
+    case 'paused':
+      return (
+        <Pressable
+          style={[styles.btnFilled, styles.btnGold]}
+          onPress={() => router.push({ pathname: '/detailer/timer/[id]', params: { id: job.id } })}
+        >
+          <Text style={styles.btnFilledText}>Resume Job</Text>
+        </Pressable>
+      );
+    default:
+      return null;
+  }
+}
+
 function JobCard({
   job,
   tab,
   onAccept,
   onDecline,
-  onComplete,
   actioning,
 }: {
   job: BookingDocument;
   tab: Tab;
-  onAccept: () => void;
-  onDecline: () => void;
-  onComplete: () => void;
-  actioning: boolean;
+  onAccept?: () => void;
+  onDecline?: () => void;
+  actioning?: boolean;
 }) {
-  const meta = [
-    formatJobDate(job.date),
-    job.time,
-    job.vehicleLabel,
-  ].filter(Boolean).join(' · ');
+  const meta = [formatJobDate(job.date), job.time, job.vehicleLabel].filter(Boolean).join(' · ');
 
   return (
     <Pressable
@@ -101,10 +143,7 @@ function JobCard({
         <StatusBadge status={job.status} />
       </View>
 
-      <Text style={styles.serviceName} numberOfLines={1}>
-        {toTitleCase(job.service)}
-      </Text>
-
+      <Text style={styles.serviceName} numberOfLines={1}>{toTitleCase(job.service)}</Text>
       <Text style={styles.metaText} numberOfLines={1}>{meta}</Text>
 
       <View style={styles.cardBottom}>
@@ -124,26 +163,22 @@ function JobCard({
               onPress={onAccept}
               disabled={actioning}
             >
-              {actioning ? (
-                <ActivityIndicator size="small" color={COLORS.blue} />
-              ) : (
-                <Text style={styles.btnFilledText}>Accept</Text>
-              )}
+              {actioning
+                ? <ActivityIndicator size="small" color={COLORS.blue} />
+                : <Text style={styles.btnFilledText}>Accept</Text>
+              }
             </Pressable>
           </View>
         )}
 
-        {tab === 'Active' && (
+        {tab === 'Active' && <ActiveAction job={job} />}
+
+        {tab === 'Completed' && (
           <Pressable
-            style={[styles.btnFilled, actioning && styles.btnDisabled]}
-            onPress={onComplete}
-            disabled={actioning}
+            style={styles.btnOutline}
+            onPress={() => router.push({ pathname: '/detailer/invoice/[id]', params: { id: job.id } })}
           >
-            {actioning ? (
-              <ActivityIndicator size="small" color={COLORS.blue} />
-            ) : (
-              <Text style={styles.btnFilledText}>Mark Complete</Text>
-            )}
+            <Text style={styles.btnOutlineText}>View Invoice</Text>
           </Pressable>
         )}
       </View>
@@ -152,8 +187,7 @@ function JobCard({
 }
 
 export default function DetailerJobsScreen() {
-  const { loading, error, pending, active, completed, acceptJob, declineJob, completeJob } =
-    useDetailerJobs();
+  const { loading, error, pending, active, completed, acceptJob, declineJob } = useDetailerJobs();
   const [selectedTab, setSelectedTab] = useState<Tab>('Pending');
   const [actioningId, setActioningId] = useState<string | null>(null);
 
@@ -168,7 +202,6 @@ export default function DetailerJobsScreen() {
 
   const tabData: Record<Tab, BookingDocument[]> = { Pending: pending, Active: active, Completed: completed };
   const jobs = tabData[selectedTab];
-
   const tabs: Tab[] = ['Pending', 'Active', 'Completed'];
 
   return (
@@ -194,8 +227,7 @@ export default function DetailerJobsScreen() {
                 onPress={() => setSelectedTab(tab)}
               >
                 <Text style={[styles.tabText, selectedTab === tab && styles.tabTextActive]}>
-                  {tab}
-                  {tab === 'Pending' && pending.length > 0 ? ` (${pending.length})` : ''}
+                  {tab}{tab === 'Pending' && pending.length > 0 ? ` (${pending.length})` : ''}
                 </Text>
               </Pressable>
             ))}
@@ -212,7 +244,6 @@ export default function DetailerJobsScreen() {
               showsVerticalScrollIndicator={false}
             >
               {!!error && <Text style={styles.errorText}>{error}</Text>}
-
               {jobs.length === 0 ? (
                 <EmptyState tab={selectedTab} />
               ) : (
@@ -224,7 +255,6 @@ export default function DetailerJobsScreen() {
                     actioning={actioningId === job.id}
                     onAccept={() => runAction(job.id, () => acceptJob(job.id))}
                     onDecline={() => runAction(job.id, () => declineJob(job.id))}
-                    onComplete={() => runAction(job.id, () => completeJob(job.id))}
                   />
                 ))
               )}
@@ -239,11 +269,7 @@ export default function DetailerJobsScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: COLORS.bg },
   container: { flex: 1, backgroundColor: COLORS.bg },
-  header: {
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 16,
-  },
+  header: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 16 },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   headerTitle: { color: COLORS.white, fontSize: 26, fontWeight: '900' },
   pendingBadge: {
@@ -309,13 +335,21 @@ const styles = StyleSheet.create({
   },
   btnOutlineText: { color: COLORS.muted, fontSize: 13, fontWeight: '700' },
   btnFilled: {
-    backgroundColor: COLORS.gold,
+    backgroundColor: COLORS.blue,
     borderRadius: 10,
     paddingVertical: 8,
     paddingHorizontal: 16,
     minWidth: 80,
     alignItems: 'center',
   },
-  btnFilledText: { color: COLORS.blue, fontSize: 13, fontWeight: '800' },
+  btnGold: { backgroundColor: COLORS.gold },
+  btnFilledText: { color: COLORS.white, fontSize: 13, fontWeight: '800' },
+  btnWaiting: {
+    backgroundColor: '#FFF3E0',
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  btnWaitingText: { color: '#7B3F00', fontSize: 12, fontWeight: '700' },
   btnDisabled: { opacity: 0.6 },
 });
