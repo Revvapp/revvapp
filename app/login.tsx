@@ -217,27 +217,20 @@ export default function LoginScreen() {
             )}
           </Pressable>
 
-          <View style={styles.dividerRow}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}> or </Text>
-            <View style={styles.dividerLine} />
+          <View style={styles.footer}>
+            <Text style={styles.footerGray}>New to Revv? </Text>
+            <Pressable onPress={() => router.push('/onboarding')} hitSlop={8}>
+              <Text style={styles.footerGold}>Create an account</Text>
+            </Pressable>
           </View>
 
-          <Pressable
-            style={styles.outlineBtn}
-            onPress={() => router.push('/detailer/onboarding/welcome')}
-            disabled={loading}
-          >
-            <Text style={styles.outlineBtnText}>Continue as Detailer</Text>
-          </Pressable>
-          <Pressable style={styles.outlineBtn} onPress={() => router.push('/client/welcome')} disabled={loading}>
-            <Text style={styles.outlineBtnText}>Continue as Car Owner</Text>
-          </Pressable>
-
-          <View style={styles.footer}>
-            <Text style={styles.footerGray}>Don&apos;t have an account? </Text>
-            <Pressable onPress={() => router.push('/onboarding')} hitSlop={8}>
-              <Text style={styles.footerGold}>Sign up</Text>
+          <View style={styles.signupLinks}>
+            <Pressable onPress={() => router.push('/detailer/onboarding/welcome')} disabled={loading} hitSlop={8}>
+              <Text style={styles.signupLink}>Join as a Detailer</Text>
+            </Pressable>
+            <Text style={styles.signupLinkDot}>·</Text>
+            <Pressable onPress={() => router.push('/client/welcome')} disabled={loading} hitSlop={8}>
+              <Text style={styles.signupLink}>Join as a Car Owner</Text>
             </Pressable>
           </View>
         </ScrollView>
@@ -385,35 +378,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     fontSize: 14,
   },
-  dividerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 22,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#2A4A6B',
-  },
-  dividerText: {
-    color: COLORS.gray,
-    fontSize: 13,
-    paddingHorizontal: 10,
-    fontWeight: '600',
-  },
-  outlineBtn: {
-    borderWidth: 1.5,
-    borderColor: COLORS.gold,
-    borderRadius: 14,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  outlineBtnText: {
-    color: COLORS.gold,
-    fontSize: 14,
-    fontWeight: '800',
-  },
   footer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -426,5 +390,21 @@ const styles = StyleSheet.create({
     color: COLORS.gold,
     fontSize: 14,
     fontWeight: '800',
+  },
+  signupLinks: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 16,
+  },
+  signupLink: {
+    color: COLORS.gray,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  signupLinkDot: {
+    color: COLORS.gray,
+    fontSize: 13,
   },
 });

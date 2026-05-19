@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { doc, getDoc } from 'firebase/firestore';
 import { useCallback, useEffect, useState } from 'react';
 import {
@@ -12,22 +13,22 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { router } from 'expo-router';
-
 import { db } from '@/firebaseConfig';
 import { useAuth } from '@/hooks/useAuth';
 import { toTitleCase } from '@/lib/format';
 import type { ClientDocument } from '@/types/firestore';
 
-const COLORS = {
-  bg: '#0D1B2A',
-  card: '#1A2B3C',
-  gold: '#C9A227',
-  white: '#FFFFFF',
-  gray: '#B7C1CC',
-  navyText: '#0D1B2A',
-  danger: '#E57373',
-  avatarBlue: '#1A3A5C',
+const C = {
+  bg:      '#0A1628',
+  content: '#F4F6F9',
+  card:    '#FFFFFF',
+  navy:    '#1A3A5C',
+  gold:    '#C9A227',
+  white:   '#FFFFFF',
+  gray:    '#8A9BB0',
+  muted:   '#6B7A8D',
+  border:  '#E8EDF4',
+  danger:  '#D93025',
 };
 
 function initialsFrom(name: string, email: string | null | undefined) {
@@ -41,6 +42,28 @@ function initialsFrom(name: string, email: string | null | undefined) {
   return 'RV';
 }
 
+function InfoRow({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ComponentProps<typeof Ionicons>['name'];
+  label: string;
+  value: string;
+}) {
+  return (
+    <View style={styles.infoRow}>
+      <View style={styles.infoIconWrap}>
+        <Ionicons name={icon} size={15} color={C.gold} />
+      </View>
+      <View style={styles.infoContent}>
+        <Text style={styles.infoLabel}>{label}</Text>
+        <Text style={styles.infoValue} numberOfLines={1}>{value || '—'}</Text>
+      </View>
+    </View>
+  );
+}
+
 export default function ClientProfileScreen() {
   const { user, signOut } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -48,10 +71,7 @@ export default function ClientProfileScreen() {
   const [error, setError] = useState('');
 
   const load = useCallback(async () => {
-    if (!user?.uid) {
-      setLoading(false);
-      return;
-    }
+    if (!user?.uid) { setLoading(false); return; }
     setLoading(true);
     setError('');
     try {
@@ -64,9 +84,7 @@ export default function ClientProfileScreen() {
     }
   }, [user?.uid]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  useEffect(() => { void load(); }, [load]);
 
   const onSignOut = () => {
     Alert.alert('Sign out?', 'You can sign back in anytime.', [
@@ -77,14 +95,16 @@ export default function ClientProfileScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.container, styles.center]}>
-        <ActivityIndicator color={COLORS.gold} />
-      </View>
+      <SafeAreaView edges={['top']} style={styles.safe}>
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator color={C.gold} size="large" />
+        </View>
+      </SafeAreaView>
     );
   }
 
   const fullName = toTitleCase((profile?.fullName ?? '').trim());
-  const displayName = fullName || user?.email || 'Your profile';
+  const displayName = fullName || 'Car Owner';
   const phone = (profile?.phone ?? '').trim();
   const city = toTitleCase((profile?.city ?? '').trim());
   const stateCode = ((profile?.state ?? '').trim()).toUpperCase();
@@ -92,44 +112,48 @@ export default function ClientProfileScreen() {
   const initials = initialsFrom(fullName, user?.email);
 
   return (
-    <SafeAreaView edges={['top']} style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Text style={styles.header}>PROFILE</Text>
-
-        {!!error && <Text style={styles.error}>{error}</Text>}
-
-        <View style={styles.profileCard}>
+    <SafeAreaView edges={['top']} style={styles.safe}>
+      <View style={styles.header}>
+        <Text style={styles.eyebrow}>REVV</Text>
+        <Text style={styles.headerTitle}>My Profile</Text>
+        <View style={styles.avatarRing}>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>{initials}</Text>
           </View>
-          <Text style={styles.name}>{displayName}</Text>
-          {!!location && <Text style={styles.detail}>{location}</Text>}
         </View>
+        <Text style={styles.displayName}>{displayName}</Text>
+        {!!location && (
+          <View style={styles.locationRow}>
+            <Ionicons name="location-outline" size={12} color={C.gray} />
+            <Text style={styles.locationText}>{location}</Text>
+          </View>
+        )}
+      </View>
 
-        <View style={styles.detailsCard}>
-          <Text style={styles.sectionTitle}>Account</Text>
-          <View style={styles.row}>
-            <Text style={styles.rowLabel}>Email</Text>
-            <Text style={styles.rowValue}>{user?.email ?? '—'}</Text>
-          </View>
-          <View style={styles.row}>
-            <Text style={styles.rowLabel}>Phone</Text>
-            <Text style={styles.rowValue}>{phone || '—'}</Text>
-          </View>
-          <View style={styles.row}>
-            <Text style={styles.rowLabel}>Location</Text>
-            <Text style={styles.rowValue}>{location || '—'}</Text>
-          </View>
+      <ScrollView
+        style={styles.content}
+        contentContainerStyle={styles.contentInner}
+        showsVerticalScrollIndicator={false}
+      >
+        {!!error && <Text style={styles.errorText}>{error}</Text>}
+
+        <Text style={styles.sectionLabel}>ACCOUNT DETAILS</Text>
+        <View style={styles.card}>
+          <InfoRow icon="mail-outline" label="Email" value={user?.email ?? ''} />
+          <View style={styles.rowDivider} />
+          <InfoRow icon="call-outline" label="Phone" value={phone} />
+          <View style={styles.rowDivider} />
+          <InfoRow icon="location-outline" label="Location" value={location} />
         </View>
 
         {__DEV__ && (
-          <Pressable style={styles.devToolsButton} onPress={() => router.push('/client/dev-tools')}>
-            <Ionicons name="construct-outline" size={16} color={COLORS.gold} />
-            <Text style={styles.devToolsText}>Dev Tools</Text>
+          <Pressable style={styles.devBtn} onPress={() => router.push('/client/dev-tools')}>
+            <Ionicons name="construct-outline" size={14} color={C.gold} />
+            <Text style={styles.devBtnText}>Dev Tools</Text>
           </Pressable>
         )}
 
-        <Pressable style={styles.signOutButton} onPress={onSignOut}>
+        <Pressable style={styles.signOutBtn} onPress={onSignOut}>
           <Text style={styles.signOutText}>Sign Out</Text>
         </Pressable>
       </ScrollView>
@@ -138,103 +162,155 @@ export default function ClientProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.bg },
-  center: { alignItems: 'center', justifyContent: 'center' },
-  content: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
+  safe: { flex: 1, backgroundColor: C.bg },
+  loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+
+  header: {
+    alignItems: 'center',
+    paddingHorizontal: 22,
+    paddingTop: 6,
     paddingBottom: 28,
   },
-  header: {
-    color: COLORS.white,
-    fontSize: 22,
-    fontWeight: '900',
-    letterSpacing: 1.8,
-    marginBottom: 16,
+  eyebrow: {
+    color: C.gold,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 2.5,
+    marginBottom: 2,
   },
-  error: { color: COLORS.danger, fontSize: 13, fontWeight: '600', marginBottom: 12 },
-  profileCard: {
-    backgroundColor: COLORS.card,
-    borderRadius: 16,
-    padding: 18,
-    alignItems: 'center',
-    marginBottom: 14,
-  },
-  avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: COLORS.avatarBlue,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 10,
-  },
-  avatarText: {
-    color: COLORS.white,
+  headerTitle: {
+    color: C.white,
     fontSize: 26,
     fontWeight: '900',
+    marginBottom: 20,
   },
-  name: {
-    color: COLORS.white,
+  avatarRing: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    borderWidth: 2.5,
+    borderColor: C.gold,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+    backgroundColor: 'rgba(201,162,39,0.08)',
+  },
+  avatar: {
+    width: 82,
+    height: 82,
+    borderRadius: 41,
+    backgroundColor: C.navy,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: {
+    color: C.gold,
+    fontSize: 28,
+    fontWeight: '900',
+  },
+  displayName: {
+    color: C.white,
     fontSize: 20,
     fontWeight: '800',
-    marginBottom: 4,
+    marginBottom: 6,
     textAlign: 'center',
   },
-  detail: {
-    color: COLORS.gray,
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  locationText: {
+    color: C.gray,
     fontSize: 13,
     fontWeight: '600',
   },
-  detailsCard: {
-    backgroundColor: COLORS.card,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 18,
+
+  content: {
+    flex: 1,
+    backgroundColor: C.content,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
   },
-  sectionTitle: {
-    color: COLORS.gold,
-    fontSize: 13,
-    fontWeight: '900',
+  contentInner: {
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 44,
+  },
+  errorText: { color: C.danger, fontSize: 13, fontWeight: '600', marginBottom: 12 },
+
+  sectionLabel: {
+    color: C.muted,
+    fontSize: 11,
+    fontWeight: '800',
     letterSpacing: 1.4,
     marginBottom: 10,
   },
-  row: {
+  card: {
+    backgroundColor: C.card,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: C.border,
+    paddingHorizontal: 16,
+    marginBottom: 24,
+  },
+  infoRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#243B54',
-  },
-  rowLabel: { color: COLORS.gray, fontSize: 13, fontWeight: '700' },
-  rowValue: { color: COLORS.white, fontSize: 13, fontWeight: '600' },
-  signOutButton: {
-    borderWidth: 1.5,
-    borderColor: COLORS.danger,
-    borderRadius: 12,
     paddingVertical: 14,
-    alignItems: 'center',
+    gap: 12,
   },
-  signOutText: {
-    color: COLORS.danger,
-    fontSize: 15,
+  infoIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: 'rgba(201,162,39,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  infoContent: { flex: 1 },
+  infoLabel: {
+    color: C.muted,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    marginBottom: 2,
+  },
+  infoValue: {
+    color: C.navy,
+    fontSize: 14,
     fontWeight: '700',
   },
-  devToolsButton: {
+  rowDivider: {
+    height: 1,
+    backgroundColor: C.border,
+    marginLeft: 44,
+  },
+
+  devBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    borderWidth: 1.5,
-    borderColor: COLORS.gold,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(201,162,39,0.35)',
     borderRadius: 12,
-    paddingVertical: 14,
-    marginBottom: 12,
+    paddingVertical: 11,
+    marginBottom: 14,
   },
-  devToolsText: {
-    color: COLORS.gold,
-    fontSize: 15,
+  devBtnText: {
+    color: C.gold,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+
+  signOutBtn: {
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  signOutText: {
+    color: C.muted,
+    fontSize: 14,
     fontWeight: '700',
   },
 });

@@ -9,6 +9,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import Animated, { FadeIn, FadeInDown, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useDetailerJobs } from '@/hooks/useDetailerJobs';
@@ -32,21 +33,22 @@ const COLORS = {
 
 type Tab = 'Pending' | 'Active' | 'Completed';
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  pending:       { label: 'Pending',           color: '#856404', bg: '#FFF3CD' },
-  active:        { label: 'Accepted',          color: '#155724', bg: '#D4EDDA' },
-  vir_submitted: { label: 'Awaiting Signature', color: '#7B3F00', bg: '#FFF3E0' },
-  vir_signed:    { label: 'Ready to Start',    color: '#1A3A5C', bg: '#E8F0FB' },
-  in_progress:   { label: 'In Progress',       color: '#155724', bg: '#D4EDDA' },
-  paused:        { label: 'Paused',            color: '#856404', bg: '#FFF3CD' },
-  completed:     { label: 'Completed',         color: '#0C5460', bg: '#E8F4FD' },
+const STATUS_CONFIG: Record<string, { label: string; dot: string }> = {
+  pending:       { label: 'Pending',            dot: COLORS.gold },
+  active:        { label: 'Accepted',           dot: '#1A3A5C' },
+  vir_submitted: { label: 'Awaiting Signature', dot: '#E67E22' },
+  vir_signed:    { label: 'Ready to Start',     dot: COLORS.green },
+  in_progress:   { label: 'In Progress',        dot: COLORS.green },
+  paused:        { label: 'Paused',             dot: COLORS.gold },
+  completed:     { label: 'Completed',          dot: COLORS.muted },
 };
 
 function StatusBadge({ status }: { status: string }) {
-  const cfg = STATUS_CONFIG[status] ?? { label: toTitleCase(status), color: COLORS.muted, bg: '#F0F0F0' };
+  const cfg = STATUS_CONFIG[status] ?? { label: toTitleCase(status), dot: COLORS.muted };
   return (
-    <View style={[styles.badge, { backgroundColor: cfg.bg }]}>
-      <Text style={[styles.badgeText, { color: cfg.color }]}>{cfg.label}</Text>
+    <View style={styles.badge}>
+      <View style={[styles.badgeDot, { backgroundColor: cfg.dot }]} />
+      <Text style={styles.badgeText}>{cfg.label}</Text>
     </View>
   );
 }
@@ -129,59 +131,64 @@ function JobCard({
   onDecline?: () => void;
   actioning?: boolean;
 }) {
+  const scale = useSharedValue(1);
+  const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   const meta = [formatJobDate(job.date), job.time, job.vehicleLabel].filter(Boolean).join(' · ');
 
   return (
     <Pressable
-      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
       onPress={() => router.push({ pathname: '/detailer/job/[id]', params: { id: job.id } })}
+      onPressIn={() => { scale.value = withSpring(0.97, { damping: 20, stiffness: 400 }); }}
+      onPressOut={() => { scale.value = withSpring(1, { damping: 15, stiffness: 300 }); }}
     >
-      <View style={styles.cardTop}>
-        <Text style={styles.clientName} numberOfLines={1}>
-          {job.clientName ? toTitleCase(job.clientName) : 'Client'}
-        </Text>
-        <StatusBadge status={job.status} />
-      </View>
+      <Animated.View style={[styles.card, animStyle]}>
+        <View style={styles.cardTop}>
+          <Text style={styles.clientName} numberOfLines={1}>
+            {job.clientName ? toTitleCase(job.clientName) : 'Client'}
+          </Text>
+          <StatusBadge status={job.status} />
+        </View>
 
-      <Text style={styles.serviceName} numberOfLines={1}>{toTitleCase(job.service)}</Text>
-      <Text style={styles.metaText} numberOfLines={1}>{meta}</Text>
+        <Text style={styles.serviceName} numberOfLines={1}>{toTitleCase(job.service)}</Text>
+        <Text style={styles.metaText} numberOfLines={1}>{meta}</Text>
 
-      <View style={styles.cardBottom}>
-        <Text style={styles.priceText}>${job.price}</Text>
+        <View style={styles.cardBottom}>
+          <Text style={styles.priceText}>${job.price}</Text>
 
-        {tab === 'Pending' && (
-          <View style={styles.actionRow}>
+          {tab === 'Pending' && (
+            <View style={styles.actionRow}>
+              <Pressable
+                style={[styles.btnOutline, actioning && styles.btnDisabled]}
+                onPress={onDecline}
+                disabled={actioning}
+              >
+                <Text style={styles.btnOutlineText}>Decline</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.btnFilled, actioning && styles.btnDisabled]}
+                onPress={onAccept}
+                disabled={actioning}
+              >
+                {actioning
+                  ? <ActivityIndicator size="small" color={COLORS.blue} />
+                  : <Text style={styles.btnFilledText}>Accept</Text>
+                }
+              </Pressable>
+            </View>
+          )}
+
+          {tab === 'Active' && <ActiveAction job={job} />}
+
+          {tab === 'Completed' && (
             <Pressable
-              style={[styles.btnOutline, actioning && styles.btnDisabled]}
-              onPress={onDecline}
-              disabled={actioning}
+              style={styles.btnOutline}
+              onPress={() => router.push({ pathname: '/detailer/invoice/[id]', params: { id: job.id } })}
             >
-              <Text style={styles.btnOutlineText}>Decline</Text>
+              <Text style={styles.btnOutlineText}>View Invoice</Text>
             </Pressable>
-            <Pressable
-              style={[styles.btnFilled, actioning && styles.btnDisabled]}
-              onPress={onAccept}
-              disabled={actioning}
-            >
-              {actioning
-                ? <ActivityIndicator size="small" color={COLORS.blue} />
-                : <Text style={styles.btnFilledText}>Accept</Text>
-              }
-            </Pressable>
-          </View>
-        )}
-
-        {tab === 'Active' && <ActiveAction job={job} />}
-
-        {tab === 'Completed' && (
-          <Pressable
-            style={styles.btnOutline}
-            onPress={() => router.push({ pathname: '/detailer/invoice/[id]', params: { id: job.id } })}
-          >
-            <Text style={styles.btnOutlineText}>View Invoice</Text>
-          </Pressable>
-        )}
-      </View>
+          )}
+        </View>
+      </Animated.View>
     </Pressable>
   );
 }
@@ -218,17 +225,14 @@ export default function DetailerJobsScreen() {
           </View>
         </View>
 
-        <View style={styles.contentArea}>
+        <Animated.View entering={FadeIn.duration(350)} style={styles.contentArea}>
           <View style={styles.tabRow}>
             {tabs.map((tab) => (
-              <Pressable
-                key={tab}
-                style={[styles.tabBtn, selectedTab === tab && styles.tabBtnActive]}
-                onPress={() => setSelectedTab(tab)}
-              >
+              <Pressable key={tab} style={styles.tabBtn} onPress={() => setSelectedTab(tab)}>
                 <Text style={[styles.tabText, selectedTab === tab && styles.tabTextActive]}>
                   {tab}{tab === 'Pending' && pending.length > 0 ? ` (${pending.length})` : ''}
                 </Text>
+                {selectedTab === tab && <View style={styles.tabUnderline} />}
               </Pressable>
             ))}
           </View>
@@ -247,20 +251,21 @@ export default function DetailerJobsScreen() {
               {jobs.length === 0 ? (
                 <EmptyState tab={selectedTab} />
               ) : (
-                jobs.map((job) => (
-                  <JobCard
-                    key={job.id}
-                    job={job}
-                    tab={selectedTab}
-                    actioning={actioningId === job.id}
-                    onAccept={() => runAction(job.id, () => acceptJob(job.id))}
-                    onDecline={() => runAction(job.id, () => declineJob(job.id))}
-                  />
+                jobs.map((job, index) => (
+                  <Animated.View key={job.id} entering={FadeInDown.delay(index * 70).springify()}>
+                    <JobCard
+                      job={job}
+                      tab={selectedTab}
+                      actioning={actioningId === job.id}
+                      onAccept={() => runAction(job.id, () => acceptJob(job.id))}
+                      onDecline={() => runAction(job.id, () => declineJob(job.id))}
+                    />
+                  </Animated.View>
                 ))
               )}
             </ScrollView>
           )}
-        </View>
+        </Animated.View>
       </View>
     </SafeAreaView>
   );
@@ -291,16 +296,23 @@ const styles = StyleSheet.create({
   },
   tabRow: {
     flexDirection: 'row',
-    backgroundColor: '#DFE7EF',
-    borderRadius: 12,
-    marginHorizontal: 20,
-    padding: 4,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
     marginBottom: 16,
   },
-  tabBtn: { flex: 1, borderRadius: 10, paddingVertical: 10, alignItems: 'center' },
-  tabBtnActive: { backgroundColor: COLORS.blue },
-  tabText: { color: COLORS.blue, fontSize: 13, fontWeight: '700' },
-  tabTextActive: { color: COLORS.white },
+  tabBtn: { marginRight: 24, paddingTop: 12, paddingBottom: 10, alignItems: 'center' },
+  tabText: { color: COLORS.muted, fontSize: 14, fontWeight: '700' },
+  tabTextActive: { color: COLORS.blue, fontWeight: '800' },
+  tabUnderline: {
+    position: 'absolute',
+    bottom: -1,
+    left: 0,
+    right: 0,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: COLORS.gold,
+  },
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 20, paddingBottom: 30 },
   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 60 },
@@ -319,8 +331,9 @@ const styles = StyleSheet.create({
   cardPressed: { opacity: 0.9 },
   cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
   clientName: { color: COLORS.blue, fontSize: 16, fontWeight: '800', flex: 1, marginRight: 8 },
-  badge: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
-  badgeText: { fontSize: 11, fontWeight: '800' },
+  badge: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  badgeDot: { width: 7, height: 7, borderRadius: 3.5 },
+  badgeText: { color: COLORS.muted, fontSize: 12, fontWeight: '700' },
   serviceName: { color: COLORS.muted, fontSize: 13, fontWeight: '600', marginBottom: 4 },
   metaText: { color: COLORS.gray, fontSize: 12, fontWeight: '600', marginBottom: 12 },
   cardBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },

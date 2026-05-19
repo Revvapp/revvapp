@@ -1,10 +1,10 @@
+import * as Sentry from '@sentry/react-native';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import * as Sentry from '@sentry/react-native';
-import { ActivityIndicator, View } from 'react-native';
 import 'react-native-reanimated';
 
+import { BrandSplash } from '@/components/BrandSplash';
 import { AuthProvider } from '@/context/AuthContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/hooks/useAuth';
@@ -23,19 +23,7 @@ function RootNavigator() {
   const { initialized } = useAuth();
 
   if (!initialized) {
-    return (
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: '#0D1B2A',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <StatusBar style="light" />
-        <ActivityIndicator size="large" color="#C9A227" />
-      </View>
-    );
+    return <BrandSplash />;
   }
 
   return (
@@ -47,6 +35,7 @@ function RootNavigator() {
         <Stack.Screen name="signup" />
         <Stack.Screen name="detailer" />
         <Stack.Screen name="client" />
+        <Stack.Screen name="preview-splash" />
         <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
       </Stack>
       <StatusBar style="auto" />

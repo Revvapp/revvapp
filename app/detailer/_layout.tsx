@@ -17,6 +17,7 @@ export default function DetailerLayout() {
         <Stack.Screen name="timer/[id]" />
         <Stack.Screen name="before-after/[id]" />
         <Stack.Screen name="invoice/[id]" />
+        <Stack.Screen name="conversation/[id]" />
         <Stack.Screen name="dev-tools" />
       </Stack>
     </ProtectedRoute>

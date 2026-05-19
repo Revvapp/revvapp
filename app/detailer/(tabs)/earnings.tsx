@@ -21,17 +21,20 @@ import {
 } from '@/lib/dateKeys';
 
 const COLORS = {
-  bg: '#0D1B2A',
-  content: '#F5F5F5',
+  bg: '#0A1628',
+  content: '#F4F6F9',
   card: '#FFFFFF',
-  blue: '#1A3A5C',
+  navy: '#1A3A5C',
   gold: '#C9A227',
-  gray: '#B7C1CC',
-  muted: '#6B7885',
-  border: '#E2E8F0',
+  goldLight: 'rgba(201,162,39,0.1)',
+  goldBorder: 'rgba(201,162,39,0.3)',
   white: '#FFFFFF',
+  gray: '#8A9BB0',
+  muted: '#6B7A8D',
+  border: '#E8EDF4',
   green: '#27AE60',
-  darkText: '#0D1B2A',
+  red: '#D93025',
+  darkText: '#0A1628',
 };
 
 type InvoiceRow = {
@@ -105,6 +108,7 @@ export default function DetailerEarningsScreen() {
     <SafeAreaView edges={['top']} style={styles.safe}>
       <View style={styles.container}>
         <View style={styles.header}>
+          <Text style={styles.headerEyebrow}>REVV</Text>
           <Text style={styles.headerTitle}>Earnings</Text>
         </View>
 
@@ -158,7 +162,9 @@ export default function DetailerEarningsScreen() {
 
               {invoices.length === 0 ? (
                 <View style={styles.emptyWrap}>
-                  <Ionicons name="receipt-outline" size={40} color={COLORS.gray} />
+                  <View style={styles.emptyIconRing}>
+                    <Ionicons name="receipt-outline" size={28} color={COLORS.gold} />
+                  </View>
                   <Text style={styles.emptyTitle}>No invoices yet</Text>
                   <Text style={styles.emptyBody}>Completed jobs will generate invoices that appear here.</Text>
                 </View>
@@ -172,16 +178,9 @@ export default function DetailerEarningsScreen() {
                     </View>
                     <View style={styles.invoiceRight}>
                       <Text style={styles.invoiceAmount}>{fmt(inv.detailerPayout)}</Text>
-                      <View style={[
-                        styles.statusPill,
-                        { backgroundColor: inv.status === 'released' ? '#E8F8EF' : '#FFF3E0' }
-                      ]}>
-                        <Text style={[
-                          styles.statusPillText,
-                          { color: inv.status === 'released' ? COLORS.green : '#7B3F00' }
-                        ]}>
-                          {inv.status === 'released' ? 'Paid Out' : 'Pending'}
-                        </Text>
+                      <View style={styles.badge}>
+                        <View style={[styles.badgeDot, { backgroundColor: inv.status === 'released' ? '#27AE60' : '#C9A227' }]} />
+                        <Text style={styles.badgeText}>{inv.status === 'released' ? 'Paid Out' : 'Pending'}</Text>
                       </View>
                     </View>
                   </View>
@@ -198,17 +197,15 @@ export default function DetailerEarningsScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: COLORS.bg },
   container: { flex: 1, backgroundColor: COLORS.bg },
-  header: {
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 16,
-  },
-  headerTitle: { color: COLORS.white, fontSize: 26, fontWeight: '900' },
+  header: { paddingHorizontal: 22, paddingTop: 10, paddingBottom: 18 },
+  headerEyebrow: { color: '#C9A227', fontSize: 10, fontWeight: '900', letterSpacing: 3, marginBottom: 2 },
+  headerTitle: { color: '#FFFFFF', fontSize: 28, fontWeight: '900', letterSpacing: -0.5 },
   body: {
     flex: 1,
-    backgroundColor: COLORS.content,
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
+    backgroundColor: '#F4F6F9',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    overflow: 'hidden',
   },
   bodyInner: { padding: 20, paddingBottom: 40 },
   loadingWrap: { paddingTop: 60, alignItems: 'center' },
@@ -233,12 +230,23 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   statLabel: { color: COLORS.muted, fontSize: 11, fontWeight: '800', letterSpacing: 0.5, marginBottom: 6 },
-  statValue: { color: COLORS.blue, fontSize: 22, fontWeight: '900', marginBottom: 2 },
+  statValue: { color: COLORS.navy, fontSize: 22, fontWeight: '900', marginBottom: 2 },
   statSub: { color: COLORS.muted, fontSize: 11, fontWeight: '600' },
-  sectionTitle: { color: COLORS.blue, fontSize: 16, fontWeight: '800', marginBottom: 12 },
-  emptyWrap: { alignItems: 'center', paddingTop: 30, gap: 8 },
-  emptyTitle: { color: COLORS.blue, fontSize: 15, fontWeight: '800' },
-  emptyBody: { color: COLORS.muted, fontSize: 13, textAlign: 'center', lineHeight: 18 },
+  sectionTitle: { color: COLORS.navy, fontSize: 16, fontWeight: '800', marginBottom: 12 },
+  emptyWrap: { alignItems: 'center', paddingTop: 60, gap: 14, paddingHorizontal: 32 },
+  emptyIconRing: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: 'rgba(201,162,39,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(201,162,39,0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  emptyTitle: { color: '#1A3A5C', fontSize: 17, fontWeight: '800', textAlign: 'center' },
+  emptyBody: { color: '#6B7A8D', fontSize: 14, textAlign: 'center', lineHeight: 21 },
   invoiceCard: {
     backgroundColor: COLORS.card,
     borderRadius: 14,
@@ -251,11 +259,12 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   invoiceLeft: { flex: 1, marginRight: 12 },
-  invoiceClient: { color: COLORS.blue, fontSize: 14, fontWeight: '800', marginBottom: 2 },
+  invoiceClient: { color: COLORS.navy, fontSize: 14, fontWeight: '800', marginBottom: 2 },
   invoiceService: { color: COLORS.muted, fontSize: 12, fontWeight: '600', marginBottom: 2 },
   invoiceDate: { color: COLORS.gray, fontSize: 11, fontWeight: '600' },
   invoiceRight: { alignItems: 'flex-end', gap: 6 },
   invoiceAmount: { color: COLORS.green, fontSize: 18, fontWeight: '900' },
-  statusPill: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
-  statusPillText: { fontSize: 10, fontWeight: '800' },
+  badge: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  badgeDot: { width: 7, height: 7, borderRadius: 3.5 },
+  badgeText: { color: '#6B7A8D', fontSize: 12, fontWeight: '700' },
 });

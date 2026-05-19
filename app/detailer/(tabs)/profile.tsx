@@ -1,20 +1,36 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { doc, getDoc } from 'firebase/firestore';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { db } from '@/firebaseConfig';
 import { useAuth } from '@/hooks/useAuth';
 import { toTitleCase } from '@/lib/format';
 import type { DetailerDocument } from '@/types/firestore';
 
-const COLORS = {
-  blue: '#1A3A5C',
-  gold: '#C9A227',
-  mutedBlue: '#6E8299',
-  bg: '#F5F7FA',
-  danger: '#C0392B',
+const C = {
+  bg:      '#0A1628',
+  content: '#F4F6F9',
+  card:    '#FFFFFF',
+  navy:    '#1A3A5C',
+  gold:    '#C9A227',
+  white:   '#FFFFFF',
+  gray:    '#8A9BB0',
+  muted:   '#6B7A8D',
+  border:  '#E8EDF4',
+  danger:  '#D93025',
+  green:   '#27AE60',
 };
 
 function initialsFrom(name: string, email: string | null | undefined) {
@@ -28,6 +44,37 @@ function initialsFrom(name: string, email: string | null | undefined) {
   return 'RV';
 }
 
+function InfoRow({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ComponentProps<typeof Ionicons>['name'];
+  label: string;
+  value: string;
+}) {
+  return (
+    <View style={styles.infoRow}>
+      <View style={styles.infoIconWrap}>
+        <Ionicons name={icon} size={15} color={C.gold} />
+      </View>
+      <View style={styles.infoContent}>
+        <Text style={styles.infoLabel}>{label}</Text>
+        <Text style={styles.infoValue} numberOfLines={1}>{value || '—'}</Text>
+      </View>
+    </View>
+  );
+}
+
+function StatCol({ value, label }: { value: string; label: string }) {
+  return (
+    <View style={styles.statCol}>
+      <Text style={styles.statValue}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
+    </View>
+  );
+}
+
 export default function DetailerProfileScreen() {
   const { user, signOut } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -35,10 +82,7 @@ export default function DetailerProfileScreen() {
   const [error, setError] = useState('');
 
   const load = useCallback(async () => {
-    if (!user?.uid) {
-      setLoading(false);
-      return;
-    }
+    if (!user?.uid) { setLoading(false); return; }
     setLoading(true);
     setError('');
     try {
@@ -51,9 +95,7 @@ export default function DetailerProfileScreen() {
     }
   }, [user?.uid]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  useEffect(() => { void load(); }, [load]);
 
   const onSignOut = () => {
     Alert.alert('Sign out?', 'You can sign back in anytime.', [
@@ -64,193 +106,321 @@ export default function DetailerProfileScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.container, styles.center]}>
-        <ActivityIndicator color={COLORS.gold} />
-      </View>
+      <SafeAreaView edges={['top']} style={styles.safe}>
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator color={C.gold} size="large" />
+        </View>
+      </SafeAreaView>
     );
   }
 
   const fullName = toTitleCase((profile?.fullName ?? '').trim());
   const businessName = toTitleCase((profile?.businessName ?? '').trim());
-  const displayName = fullName || user?.email || 'Your profile';
-  const rating = typeof profile?.rating === 'number' ? profile.rating : 0;
-  const reviewCount = typeof profile?.reviewCount === 'number' ? profile.reviewCount : 0;
-  const services = Array.isArray(profile?.services) ? profile?.services : [];
+  const displayName = fullName || 'Your Profile';
+  const phone = (profile?.phone ?? '').trim();
   const city = toTitleCase((profile?.city ?? '').trim());
   const stateCode = ((profile?.state ?? '').trim()).toUpperCase();
   const location = city && stateCode ? `${city}, ${stateCode}` : city || stateCode || '';
+  const rating = typeof profile?.rating === 'number' ? profile.rating : null;
+  const reviewCount = typeof profile?.reviewCount === 'number' ? profile.reviewCount : 0;
+  const services = Array.isArray(profile?.services) ? (profile?.services as string[]) : [];
   const initials = initialsFrom(fullName, user?.email);
   const photoUrl = (profile?.profilePhotoUrl ?? '').trim();
 
+  const ratingDisplay = rating !== null ? rating.toFixed(1) : '—';
+  const reviewDisplay = reviewCount > 0 ? String(reviewCount) : '0';
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.header}>My Profile</Text>
+    <SafeAreaView edges={['top']} style={styles.safe}>
+      <View style={styles.header}>
+        <Text style={styles.eyebrow}>REVV</Text>
+        <Text style={styles.headerTitle}>My Profile</Text>
 
-      {!!error && <Text style={styles.error}>{error}</Text>}
-
-      <View style={styles.profileCard}>
-        <View style={styles.avatar}>
+        <View style={styles.avatarRing}>
           {photoUrl ? (
             <Image source={{ uri: photoUrl }} style={styles.avatarImage} />
           ) : (
-            <Text style={styles.avatarText}>{initials}</Text>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>{initials}</Text>
+            </View>
           )}
         </View>
-        <Text style={styles.name}>{displayName}</Text>
-        {!!businessName && <Text style={styles.businessName}>{businessName}</Text>}
-        {!!location && <Text style={styles.location}>{location}</Text>}
-        <Text style={styles.rating}>
-          {reviewCount > 0 ? `${rating.toFixed(1)} ★ • ${reviewCount} reviews` : 'No reviews yet'}
-        </Text>
-      </View>
 
-      <View style={styles.servicesCard}>
-        <Text style={styles.sectionTitle}>Services Offered</Text>
-        {services.length === 0 ? (
-          <Text style={styles.emptyText}>No services added yet.</Text>
-        ) : (
-          <View style={styles.servicesList}>
-            {services.map((service: string) => (
-              <View key={service} style={styles.servicePill}>
-                <Text style={styles.serviceText}>{toTitleCase(service)}</Text>
-              </View>
-            ))}
+        <Text style={styles.displayName}>{displayName}</Text>
+        {!!businessName && <Text style={styles.businessName}>{businessName}</Text>}
+        {!!location && (
+          <View style={styles.locationRow}>
+            <Ionicons name="location-outline" size={12} color={C.gray} />
+            <Text style={styles.locationText}>{location}</Text>
           </View>
         )}
       </View>
 
-      <Pressable style={styles.editButton} onPress={() => router.push('/detailer/edit-profile')}>
-        <Text style={styles.editButtonText}>Edit Profile</Text>
-      </Pressable>
+      <ScrollView
+        style={styles.content}
+        contentContainerStyle={styles.contentInner}
+        showsVerticalScrollIndicator={false}
+      >
+        {!!error && <Text style={styles.errorText}>{error}</Text>}
 
-      <Pressable style={styles.signOutButton} onPress={onSignOut}>
-        <Text style={styles.signOutText}>Sign Out</Text>
-      </Pressable>
-    </ScrollView>
+        {/* Stats strip */}
+        <View style={styles.statsCard}>
+          <StatCol value={ratingDisplay} label="Rating" />
+          <View style={styles.statDivider} />
+          <StatCol value={reviewDisplay} label="Reviews" />
+          <View style={styles.statDivider} />
+          <StatCol
+            value={profile?.isActive ? 'Active' : 'Inactive'}
+            label="Status"
+          />
+        </View>
+
+        <Text style={styles.sectionLabel}>ACCOUNT DETAILS</Text>
+        <View style={styles.card}>
+          <InfoRow icon="mail-outline" label="Email" value={user?.email ?? ''} />
+          <View style={styles.rowDivider} />
+          <InfoRow icon="call-outline" label="Phone" value={phone} />
+          <View style={styles.rowDivider} />
+          <InfoRow icon="location-outline" label="Location" value={location} />
+        </View>
+
+        {services.length > 0 && (
+          <>
+            <Text style={styles.sectionLabel}>SERVICES OFFERED</Text>
+            <View style={styles.servicesWrap}>
+              {services.map((s) => (
+                <View key={s} style={styles.serviceChip}>
+                  <Text style={styles.serviceChipText}>{toTitleCase(s)}</Text>
+                </View>
+              ))}
+            </View>
+          </>
+        )}
+
+        <Pressable style={styles.editBtn} onPress={() => router.push('/detailer/edit-profile')}>
+          <Ionicons name="pencil-outline" size={16} color={C.navy} />
+          <Text style={styles.editBtnText}>Edit Profile</Text>
+        </Pressable>
+
+        <Pressable style={styles.signOutBtn} onPress={onSignOut}>
+          <Text style={styles.signOutText}>Sign Out</Text>
+        </Pressable>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.bg,
-  },
-  center: { alignItems: 'center', justifyContent: 'center' },
-  content: {
-    paddingTop: 64,
-    paddingHorizontal: 20,
+  safe: { flex: 1, backgroundColor: C.bg },
+  loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+
+  header: {
+    alignItems: 'center',
+    paddingHorizontal: 22,
+    paddingTop: 6,
     paddingBottom: 28,
   },
-  header: {
-    fontSize: 28,
+  eyebrow: {
+    color: C.gold,
+    fontSize: 11,
     fontWeight: '800',
-    color: COLORS.blue,
-    marginBottom: 16,
+    letterSpacing: 2.5,
+    marginBottom: 2,
   },
-  error: { color: COLORS.danger, fontSize: 13, fontWeight: '600', marginBottom: 12 },
-  profileCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    alignItems: 'center',
-    padding: 20,
-    marginBottom: 14,
+  headerTitle: {
+    color: C.white,
+    fontSize: 26,
+    fontWeight: '900',
+    marginBottom: 20,
   },
-  avatar: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
-    backgroundColor: COLORS.gold,
+  avatarRing: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    borderWidth: 2.5,
+    borderColor: C.gold,
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 14,
+    backgroundColor: 'rgba(201,162,39,0.08)',
     overflow: 'hidden',
-    marginBottom: 12,
   },
   avatarImage: { width: '100%', height: '100%' },
-  avatarText: {
-    color: COLORS.blue,
-    fontSize: 28,
-    fontWeight: '800',
+  avatar: {
+    width: 91,
+    height: 91,
+    borderRadius: 45.5,
+    backgroundColor: C.navy,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  name: {
-    color: COLORS.blue,
-    fontSize: 22,
+  avatarText: {
+    color: C.gold,
+    fontSize: 28,
+    fontWeight: '900',
+  },
+  displayName: {
+    color: C.white,
+    fontSize: 20,
     fontWeight: '800',
     marginBottom: 4,
     textAlign: 'center',
   },
   businessName: {
-    color: COLORS.gold,
-    fontSize: 14,
+    color: C.gold,
+    fontSize: 13,
     fontWeight: '700',
-    marginBottom: 4,
+    letterSpacing: 0.4,
+    marginBottom: 6,
     textAlign: 'center',
   },
-  location: {
-    color: COLORS.mutedBlue,
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 6,
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
-  rating: {
-    color: COLORS.mutedBlue,
-    fontSize: 14,
+  locationText: {
+    color: C.gray,
+    fontSize: 13,
     fontWeight: '600',
   },
-  servicesCard: {
-    backgroundColor: '#FFFFFF',
+
+  content: {
+    flex: 1,
+    backgroundColor: C.content,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+  },
+  contentInner: {
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 44,
+  },
+  errorText: { color: C.danger, fontSize: 13, fontWeight: '600', marginBottom: 12 },
+
+  statsCard: {
+    flexDirection: 'row',
+    backgroundColor: C.card,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    padding: 16,
-    marginBottom: 16,
+    borderColor: C.border,
+    paddingVertical: 18,
+    marginBottom: 22,
   },
-  sectionTitle: {
-    color: COLORS.blue,
-    fontSize: 18,
+  statCol: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statValue: {
+    color: C.navy,
+    fontSize: 20,
+    fontWeight: '900',
+    marginBottom: 3,
+  },
+  statLabel: {
+    color: C.muted,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  statDivider: {
+    width: 1,
+    backgroundColor: C.border,
+    marginVertical: 4,
+  },
+
+  sectionLabel: {
+    color: C.muted,
+    fontSize: 11,
     fontWeight: '800',
+    letterSpacing: 1.4,
     marginBottom: 10,
   },
-  emptyText: { color: COLORS.mutedBlue, fontSize: 14, fontWeight: '600' },
-  servicesList: {
-    gap: 10,
-  },
-  servicePill: {
-    borderRadius: 10,
-    backgroundColor: '#F2F6FB',
+  card: {
+    backgroundColor: C.card,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#D9E3EE',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    borderColor: C.border,
+    paddingHorizontal: 16,
+    marginBottom: 22,
   },
-  serviceText: {
-    color: COLORS.blue,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  editButton: {
-    backgroundColor: COLORS.blue,
-    borderRadius: 12,
-    paddingVertical: 14,
+  infoRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    paddingVertical: 14,
+    gap: 12,
   },
-  editButtonText: {
-    color: '#FFFFFF',
-    fontSize: 15,
+  infoIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: 'rgba(201,162,39,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  infoContent: { flex: 1 },
+  infoLabel: {
+    color: C.muted,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    marginBottom: 2,
+  },
+  infoValue: {
+    color: C.navy,
+    fontSize: 14,
     fontWeight: '700',
   },
-  signOutButton: {
-    borderWidth: 1.5,
-    borderColor: COLORS.danger,
-    borderRadius: 12,
-    paddingVertical: 14,
+  rowDivider: {
+    height: 1,
+    backgroundColor: C.border,
+    marginLeft: 44,
+  },
+
+  servicesWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 24,
+  },
+  serviceChip: {
+    backgroundColor: C.card,
+    borderWidth: 1,
+    borderColor: 'rgba(201,162,39,0.4)',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+  },
+  serviceChipText: {
+    color: C.navy,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+
+  editBtn: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: C.gold,
+    borderRadius: 14,
+    paddingVertical: 15,
+    marginBottom: 14,
+  },
+  editBtnText: {
+    color: C.navy,
+    fontSize: 14,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+
+  signOutBtn: {
+    alignItems: 'center',
+    paddingVertical: 12,
   },
   signOutText: {
-    color: COLORS.danger,
-    fontSize: 15,
+    color: C.muted,
+    fontSize: 14,
     fontWeight: '700',
   },
 });

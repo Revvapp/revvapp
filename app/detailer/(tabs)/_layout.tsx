@@ -1,65 +1,84 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
+import { View } from 'react-native';
 
-const COLORS = {
-  blue: '#1A3A5C',
-  gold: '#C9A227',
-  mutedBlue: '#6E8299',
-};
+const NAVY = '#1A3A5C';
+const GOLD = '#C9A227';
+const MUTED = '#A0AEC0';
+
+function TabIcon({
+  name,
+  nameFocused,
+  focused,
+}: {
+  name: React.ComponentProps<typeof Ionicons>['name'];
+  nameFocused: React.ComponentProps<typeof Ionicons>['name'];
+  focused: boolean;
+}) {
+  return (
+    <View style={{ alignItems: 'center', gap: 5 }}>
+      <Ionicons name={focused ? nameFocused : name} size={23} color={focused ? NAVY : MUTED} />
+      {focused && (
+        <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: GOLD }} />
+      )}
+    </View>
+  );
+}
 
 export default function DetailerTabsLayout() {
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: COLORS.gold,
-        tabBarInactiveTintColor: COLORS.mutedBlue,
+        tabBarShowLabel: false,
         tabBarStyle: {
           backgroundColor: '#FFFFFF',
-          borderTopColor: '#DFE5EC',
-          height: 78,
-          paddingBottom: 10,
-          paddingTop: 8,
-        },
-        tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '700',
+          borderTopWidth: 1,
+          borderTopColor: '#EDF0F5',
+          height: 72,
+          paddingBottom: 0,
+          paddingTop: 0,
         },
       }}
     >
       <Tabs.Screen
         name="dashboard"
         options={{
-          title: 'Dashboard',
-          tabBarIcon: ({ color, size }) => <Ionicons name="grid" size={size} color={color} />,
+          tabBarIcon: ({ focused }) => (
+            <TabIcon name="grid-outline" nameFocused="grid" focused={focused} />
+          ),
         }}
       />
       <Tabs.Screen
         name="jobs"
         options={{
-          title: 'Jobs',
-          tabBarIcon: ({ color, size }) => <Ionicons name="briefcase" size={size} color={color} />,
+          tabBarIcon: ({ focused }) => (
+            <TabIcon name="briefcase-outline" nameFocused="briefcase" focused={focused} />
+          ),
         }}
       />
       <Tabs.Screen
         name="clients"
         options={{
-          title: 'Clients',
-          tabBarIcon: ({ color, size }) => <Ionicons name="people" size={size} color={color} />,
+          tabBarIcon: ({ focused }) => (
+            <TabIcon name="people-outline" nameFocused="people" focused={focused} />
+          ),
         }}
       />
       <Tabs.Screen
         name="earnings"
         options={{
-          title: 'Earnings',
-          tabBarIcon: ({ color, size }) => <Ionicons name="cash" size={size} color={color} />,
+          tabBarIcon: ({ focused }) => (
+            <TabIcon name="cash-outline" nameFocused="cash" focused={focused} />
+          ),
         }}
       />
       <Tabs.Screen
         name="reach"
         options={{
-          title: 'Reach',
-          tabBarIcon: ({ color, size }) => <Ionicons name="megaphone" size={size} color={color} />,
+          tabBarIcon: ({ focused }) => (
+            <TabIcon name="megaphone-outline" nameFocused="megaphone" focused={focused} />
+          ),
         }}
       />
       <Tabs.Screen

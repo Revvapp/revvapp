@@ -296,7 +296,6 @@ export default function TimerScreen() {
     : '4 — JOB COMPLETE';
 
   const statusBadgeLabel = isNotStarted ? 'Ready' : isRunning ? 'In progress' : isPaused ? 'Paused' : 'Done';
-  const statusBadgeBg = isNotStarted ? '#2A3E52' : isRunning ? '#1A4A35' : isPaused ? '#4A1A1A' : '#1A4A35';
   const statusBadgeColor = isNotStarted ? COLORS.gray : isRunning ? COLORS.teal : isPaused ? '#E57373' : COLORS.teal;
 
   const virPanels = booking.virPanels ?? {};
@@ -310,12 +309,11 @@ export default function TimerScreen() {
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={20} color={COLORS.gray} />
-          <Text style={styles.backLabel}>Dashboard</Text>
         </Pressable>
-        <Text style={styles.brand}>
-          <Text style={styles.brandRe}>RE</Text>
-          <Text style={styles.brandVV}>VV</Text>
-        </Text>
+        <View style={styles.headerCenter}>
+          <Text style={styles.eyebrow}>REVV</Text>
+          <Text style={styles.headerTitle}>Job Timer</Text>
+        </View>
         <View style={styles.headerRight} />
       </View>
 
@@ -333,8 +331,9 @@ export default function TimerScreen() {
               <Text style={styles.vehicleLabel}>{booking.vehicleLabel}</Text>
               <Text style={styles.serviceLabel}>{toTitleCase(booking.service)}</Text>
             </View>
-            <View style={[styles.statusBadge, { backgroundColor: statusBadgeBg }]}>
-              <Text style={[styles.statusBadgeText, { color: statusBadgeColor }]}>{statusBadgeLabel}</Text>
+            <View style={styles.statusDotWrap}>
+              <View style={[styles.statusDotCircle, { backgroundColor: statusBadgeColor }]} />
+              <Text style={styles.statusDotText}>{statusBadgeLabel}</Text>
             </View>
           </View>
 
@@ -526,12 +525,11 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 6,
   },
-  backBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  backLabel: { color: COLORS.gray, fontSize: 15, fontWeight: '600' },
-  brand: { fontSize: 20, fontWeight: '900', letterSpacing: 2 },
-  brandRe: { color: COLORS.white },
-  brandVV: { color: COLORS.gold },
-  headerRight: { width: 80 },
+  backBtn: { padding: 4 },
+  headerCenter: { alignItems: 'center' },
+  eyebrow: { color: COLORS.gold, fontSize: 10, fontWeight: '800', letterSpacing: 2.5 },
+  headerTitle: { color: COLORS.white, fontSize: 16, fontWeight: '800' },
+  headerRight: { width: 40 },
 
   stepLabel: {
     color: COLORS.gray,
@@ -562,17 +560,18 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: COLORS.gold,
+    backgroundColor: COLORS.blue,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarText: { color: COLORS.blue, fontSize: 16, fontWeight: '900' },
+  avatarText: { color: COLORS.gold, fontSize: 16, fontWeight: '900' },
   jobInfo: { flex: 1 },
   clientName: { color: COLORS.white, fontSize: 16, fontWeight: '800', marginBottom: 2 },
   vehicleLabel: { color: COLORS.gray, fontSize: 13, fontWeight: '500', marginBottom: 1 },
   serviceLabel: { color: COLORS.gray, fontSize: 13, fontWeight: '500' },
-  statusBadge: { borderRadius: 999, paddingHorizontal: 12, paddingVertical: 5 },
-  statusBadgeText: { fontSize: 12, fontWeight: '700' },
+  statusDotWrap: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  statusDotCircle: { width: 7, height: 7, borderRadius: 3.5 },
+  statusDotText: { color: COLORS.gray, fontSize: 12, fontWeight: '700' },
 
   // Timer states
   timerNotStartedBlock: { alignItems: 'center', paddingVertical: 10, gap: 6 },
@@ -616,13 +615,13 @@ const styles = StyleSheet.create({
   actionRow: { flexDirection: 'row', gap: 10, marginTop: 16 },
   btnStart: {
     flex: 2,
-    backgroundColor: '#2A3E52',
+    backgroundColor: COLORS.gold,
     borderRadius: 14,
     paddingVertical: 16,
     alignItems: 'center',
   },
   btnDisabledStyle: { opacity: 0.7 },
-  btnStartText: { color: COLORS.gray, fontSize: 14, fontWeight: '800', letterSpacing: 1 },
+  btnStartText: { color: COLORS.blue, fontSize: 14, fontWeight: '900', letterSpacing: 1 },
   btnPause: {
     flex: 2,
     backgroundColor: COLORS.teal,
@@ -657,6 +656,12 @@ const styles = StyleSheet.create({
   btnNotesText: { color: COLORS.gray, fontSize: 14, fontWeight: '600' },
 
   // Sections
+  lightArea: {
+    backgroundColor: '#F4F6F9',
+    borderRadius: 20,
+    padding: 4,
+    marginBottom: 12,
+  },
   section: {
     backgroundColor: COLORS.white,
     borderRadius: 18,

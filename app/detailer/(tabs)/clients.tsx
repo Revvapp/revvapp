@@ -15,16 +15,19 @@ import { useAuth } from '@/hooks/useAuth';
 import { toTitleCase } from '@/lib/format';
 
 const COLORS = {
-  bg: '#0D1B2A',
-  content: '#F5F5F5',
+  bg: '#0A1628',
+  content: '#F4F6F9',
   card: '#FFFFFF',
-  blue: '#1A3A5C',
+  navy: '#1A3A5C',
   gold: '#C9A227',
-  gray: '#B7C1CC',
-  muted: '#6B7885',
-  border: '#E2E8F0',
+  goldLight: 'rgba(201,162,39,0.1)',
+  goldBorder: 'rgba(201,162,39,0.3)',
   white: '#FFFFFF',
+  gray: '#8A9BB0',
+  muted: '#6B7A8D',
+  border: '#E8EDF4',
   green: '#27AE60',
+  red: '#D93025',
 };
 
 type ClientSummary = {
@@ -87,12 +90,15 @@ export default function DetailerClientsScreen() {
     <SafeAreaView edges={['top']} style={styles.safe}>
       <View style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Clients</Text>
-          {!loading && clients.length > 0 && (
-            <View style={styles.countBadge}>
-              <Text style={styles.countText}>{clients.length}</Text>
-            </View>
-          )}
+          <Text style={styles.headerEyebrow}>REVV</Text>
+          <View style={styles.headerRow}>
+            <Text style={styles.headerTitle}>Clients</Text>
+            {!loading && clients.length > 0 && (
+              <View style={styles.countPill}>
+                <Text style={styles.countText}>{clients.length}</Text>
+              </View>
+            )}
+          </View>
         </View>
 
         <View style={styles.body}>
@@ -102,7 +108,9 @@ export default function DetailerClientsScreen() {
             </View>
           ) : clients.length === 0 ? (
             <View style={styles.emptyWrap}>
-              <Ionicons name="people-outline" size={48} color={COLORS.gray} />
+              <View style={styles.emptyIconRing}>
+                <Ionicons name="people-outline" size={28} color={COLORS.gold} />
+              </View>
               <Text style={styles.emptyTitle}>No clients yet</Text>
               <Text style={styles.emptyBody}>Clients will appear here once you accept and complete bookings.</Text>
             </View>
@@ -142,36 +150,42 @@ export default function DetailerClientsScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: COLORS.bg },
   container: { flex: 1, backgroundColor: COLORS.bg },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 16,
-  },
-  headerTitle: { color: COLORS.white, fontSize: 26, fontWeight: '900' },
-  countBadge: {
-    backgroundColor: COLORS.gold,
+  header: { paddingHorizontal: 22, paddingTop: 10, paddingBottom: 18 },
+  headerEyebrow: { color: '#C9A227', fontSize: 10, fontWeight: '900', letterSpacing: 3, marginBottom: 2 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  headerTitle: { color: '#FFFFFF', fontSize: 28, fontWeight: '900', letterSpacing: -0.5 },
+  countPill: {
+    backgroundColor: '#C9A227',
     borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
     minWidth: 22,
-    height: 22,
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 6,
   },
-  countText: { color: COLORS.blue, fontSize: 12, fontWeight: '900' },
+  countText: { color: '#1A3A5C', fontSize: 12, fontWeight: '900' },
   body: {
     flex: 1,
-    backgroundColor: COLORS.content,
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
+    backgroundColor: '#F4F6F9',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    overflow: 'hidden',
     paddingTop: 16,
   },
   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  emptyWrap: { alignItems: 'center', paddingTop: 60, gap: 10, paddingHorizontal: 24 },
-  emptyTitle: { color: COLORS.blue, fontSize: 17, fontWeight: '800' },
-  emptyBody: { color: COLORS.muted, fontSize: 14, textAlign: 'center', lineHeight: 20 },
+  emptyWrap: { alignItems: 'center', paddingTop: 60, gap: 14, paddingHorizontal: 32 },
+  emptyIconRing: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: 'rgba(201,162,39,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(201,162,39,0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  emptyTitle: { color: '#1A3A5C', fontSize: 17, fontWeight: '800', textAlign: 'center' },
+  emptyBody: { color: '#6B7A8D', fontSize: 14, textAlign: 'center', lineHeight: 21 },
   list: { paddingHorizontal: 20, paddingBottom: 30, gap: 10 },
   card: {
     backgroundColor: COLORS.card,
@@ -187,16 +201,16 @@ const styles = StyleSheet.create({
     width: 46,
     height: 46,
     borderRadius: 23,
-    backgroundColor: COLORS.gold,
+    backgroundColor: '#1A3A5C',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarText: { color: COLORS.blue, fontSize: 16, fontWeight: '900' },
+  avatarText: { color: '#C9A227', fontSize: 16, fontWeight: '900' },
   info: { flex: 1 },
-  clientName: { color: COLORS.blue, fontSize: 15, fontWeight: '800', marginBottom: 3 },
+  clientName: { color: COLORS.navy, fontSize: 15, fontWeight: '800', marginBottom: 3 },
   clientMeta: { color: COLORS.muted, fontSize: 12, fontWeight: '600' },
   clientActive: { color: COLORS.green, fontSize: 11, fontWeight: '700', marginTop: 2 },
   jobsBadge: { alignItems: 'center' },
-  jobsBadgeNum: { color: COLORS.blue, fontSize: 20, fontWeight: '900' },
+  jobsBadgeNum: { color: COLORS.navy, fontSize: 20, fontWeight: '900' },
   jobsBadgeLabel: { color: COLORS.muted, fontSize: 10, fontWeight: '700' },
 });

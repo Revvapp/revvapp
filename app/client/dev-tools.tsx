@@ -402,6 +402,22 @@ function ClientDevToolsContent() {
         <View style={styles.divider} />
 
         <Pressable
+          style={styles.card}
+          onPress={() => router.push('/preview-splash')}
+        >
+          <View style={[styles.iconWrap, { backgroundColor: '#C9A22722' }]}>
+            <Ionicons name="sparkles-outline" size={22} color={COLORS.gold} />
+          </View>
+          <View style={styles.cardText}>
+            <Text style={styles.cardLabel}>Preview Brand Splash</Text>
+            <Text style={styles.cardDesc}>See the launch animation</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={COLORS.muted} />
+        </Pressable>
+
+        <View style={styles.divider} />
+
+        <Pressable
           style={styles.clearBtn}
           onPress={handleClear}
           disabled={!!loading}

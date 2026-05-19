@@ -1,69 +1,84 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
+import { View } from 'react-native';
 
-const COLORS = {
-  bg: '#0D1B2A',
-  gold: '#C9A227',
-  muted: '#7D8795',
-};
+const NAVY = '#1A3A5C';
+const GOLD = '#C9A227';
+const MUTED = '#A0AEC0';
+
+function TabIcon({
+  name,
+  nameFocused,
+  focused,
+}: {
+  name: React.ComponentProps<typeof Ionicons>['name'];
+  nameFocused: React.ComponentProps<typeof Ionicons>['name'];
+  focused: boolean;
+}) {
+  return (
+    <View style={{ alignItems: 'center', gap: 5 }}>
+      <Ionicons name={focused ? nameFocused : name} size={23} color={focused ? NAVY : MUTED} />
+      {focused && (
+        <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: GOLD }} />
+      )}
+    </View>
+  );
+}
 
 export default function ClientTabsLayout() {
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: COLORS.gold,
-        tabBarInactiveTintColor: COLORS.muted,
+        tabBarShowLabel: false,
         tabBarStyle: {
           backgroundColor: '#FFFFFF',
-          borderTopColor: '#E2E8F0',
-          height: 76,
-          paddingTop: 8,
-          paddingBottom: 10,
-        },
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: '700',
+          borderTopWidth: 1,
+          borderTopColor: '#EDF0F5',
+          height: 72,
+          paddingBottom: 0,
+          paddingTop: 0,
         },
       }}
     >
       <Tabs.Screen
         name="dashboard"
         options={{
-          title: 'Home',
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons name={focused ? 'ellipse' : 'ellipse-outline'} size={size - 1} color={color} />
+          tabBarIcon: ({ focused }) => (
+            <TabIcon name="home-outline" nameFocused="home" focused={focused} />
           ),
         }}
       />
       <Tabs.Screen
         name="find"
         options={{
-          title: 'Find',
-          tabBarIcon: ({ color, size }) => <Ionicons name="search" size={size} color={color} />,
+          tabBarIcon: ({ focused }) => (
+            <TabIcon name="search-outline" nameFocused="search" focused={focused} />
+          ),
         }}
       />
       <Tabs.Screen
         name="bookings"
         options={{
-          title: 'Bookings',
-          tabBarIcon: ({ color, size }) => <Ionicons name="calendar" size={size} color={color} />,
+          tabBarIcon: ({ focused }) => (
+            <TabIcon name="calendar-outline" nameFocused="calendar" focused={focused} />
+          ),
         }}
       />
       <Tabs.Screen
         name="messages"
         options={{
-          title: 'Messages',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="chatbubble-ellipses" size={size} color={color} />
+          tabBarIcon: ({ focused }) => (
+            <TabIcon name="chatbubble-outline" nameFocused="chatbubble" focused={focused} />
           ),
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Profile',
-          tabBarIcon: ({ color, size }) => <Ionicons name="person" size={size} color={color} />,
+          tabBarIcon: ({ focused }) => (
+            <TabIcon name="person-outline" nameFocused="person" focused={focused} />
+          ),
         }}
       />
       <Tabs.Screen name="search" options={{ href: null }} />

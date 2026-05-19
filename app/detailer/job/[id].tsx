@@ -128,8 +128,7 @@ export default function JobDetailScreen() {
   const isPaused = booking.status === 'paused';
   const isCompleted = booking.status === 'completed';
 
-  const statusColor = isPending ? '#856404' : isActive ? COLORS.blue : isVirSubmitted ? '#856404' : isVirSigned ? COLORS.green : isInProgress ? COLORS.green : isPaused ? '#856404' : COLORS.muted;
-  const statusBg = isPending ? '#FFF3CD' : isActive ? '#E8F0FB' : isVirSubmitted ? '#FFF3CD' : isVirSigned ? '#D4EDDA' : isInProgress ? '#D4EDDA' : isPaused ? '#FFF3CD' : '#E8F4FD';
+  const statusColor = isPending ? COLORS.gold : isActive ? COLORS.blue : isVirSubmitted ? '#E67E22' : isVirSigned ? COLORS.green : isInProgress ? COLORS.green : isPaused ? COLORS.gold : COLORS.muted;
   const statusLabel = isPending ? 'Pending' : isActive ? 'Accepted' : isVirSubmitted ? 'Awaiting Signature' : isVirSigned ? 'Ready to Start' : isInProgress ? 'In Progress' : isPaused ? 'Paused' : isCompleted ? 'Completed' : toTitleCase(booking.status);
 
   return (
@@ -139,10 +138,9 @@ export default function JobDetailScreen() {
           <Ionicons name="arrow-back" size={22} color={COLORS.white} />
         </Pressable>
         <Text style={styles.headerTitle}>Job Details</Text>
-        <View style={[styles.statusPill, { backgroundColor: statusBg }]}>
-          <Text style={[styles.statusPillText, { color: statusColor }]}>
-            {statusLabel}
-          </Text>
+        <View style={styles.statusDotWrap}>
+          <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+          <Text style={styles.statusDotLabel}>{statusLabel}</Text>
         </View>
       </View>
 
@@ -258,6 +256,16 @@ export default function JobDetailScreen() {
             </Pressable>
           </>
         )}
+
+        {!isPending && (
+          <Pressable
+            style={styles.btnMessage}
+            onPress={() => router.push({ pathname: '/detailer/conversation/[id]', params: { id: id! } })}
+          >
+            <Ionicons name="chatbubble-outline" size={16} color={COLORS.muted} />
+            <Text style={styles.btnMessageText}>Message Client</Text>
+          </Pressable>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -276,8 +284,9 @@ const styles = StyleSheet.create({
   },
   backBtn: { padding: 4 },
   headerTitle: { color: COLORS.white, fontSize: 20, fontWeight: '800', flex: 1 },
-  statusPill: { borderRadius: 999, paddingHorizontal: 12, paddingVertical: 5 },
-  statusPillText: { fontSize: 12, fontWeight: '800' },
+  statusDotWrap: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  statusDot: { width: 7, height: 7, borderRadius: 3.5 },
+  statusDotLabel: { color: COLORS.muted, fontSize: 12, fontWeight: '700' },
   content: { flex: 1, backgroundColor: COLORS.content, borderTopLeftRadius: 22, borderTopRightRadius: 22 },
   contentInner: { padding: 20, paddingBottom: 40 },
   clientCard: {
@@ -295,11 +304,11 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: COLORS.gold,
+    backgroundColor: COLORS.blue,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  clientAvatarText: { color: COLORS.blue, fontSize: 20, fontWeight: '900' },
+  clientAvatarText: { color: COLORS.gold, fontSize: 20, fontWeight: '900' },
   clientLabel: { color: COLORS.muted, fontSize: 12, fontWeight: '600', marginBottom: 2 },
   clientName: { color: COLORS.blue, fontSize: 18, fontWeight: '800' },
   detailCard: {
@@ -371,21 +380,34 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: '#FFF3CD',
+    backgroundColor: '#1A2B3C',
     borderRadius: 12,
     padding: 14,
     marginBottom: 12,
   },
-  waitingText: { color: '#856404', fontSize: 13, fontWeight: '700', flex: 1 },
+  waitingText: { color: COLORS.gold, fontSize: 13, fontWeight: '700', flex: 1 },
   btnDisabled: { opacity: 0.6 },
   completedBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#D4EDDA',
+    backgroundColor: '#1A2B3C',
     borderRadius: 12,
     padding: 14,
+    marginBottom: 12,
   },
-  completedBannerText: { color: '#155724', fontSize: 14, fontWeight: '700' },
+  completedBannerText: { color: COLORS.green, fontSize: 14, fontWeight: '700' },
   errorText: { color: '#D93025', fontSize: 13, fontWeight: '600', marginBottom: 12 },
+  btnMessage: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#C0CBD6',
+    borderRadius: 14,
+    paddingVertical: 14,
+    marginBottom: 12,
+  },
+  btnMessageText: { color: COLORS.muted, fontSize: 14, fontWeight: '700' },
 });

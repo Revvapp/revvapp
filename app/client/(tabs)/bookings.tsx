@@ -10,6 +10,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import Animated, { FadeIn, FadeInDown, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { db } from '@/firebaseConfig';
@@ -17,57 +18,60 @@ import { useAuth } from '@/hooks/useAuth';
 import { toTitleCase } from '@/lib/format';
 import type { BookingDocument } from '@/types/firestore';
 
-const COLORS = {
-  bg: '#0D1B2A',
-  content: '#F5F5F5',
-  card: '#FFFFFF',
-  blue: '#1A3A5C',
-  gold: '#C9A227',
-  gray: '#B7C1CC',
-  muted: '#6B7885',
-  border: '#E2E8F0',
-  white: '#FFFFFF',
-  green: '#27AE60',
-  red: '#D93025',
-  orange: '#E67E22',
+const C = {
+  bg:      '#0A1628',
+  content: '#F4F6F9',
+  card:    '#FFFFFF',
+  navy:    '#1A3A5C',
+  gold:    '#C9A227',
+  gray:    '#8A9BB0',
+  muted:   '#6B7A8D',
+  border:  '#E8EDF4',
+  green:   '#27AE60',
+  red:     '#D93025',
+  white:   '#FFFFFF',
 };
 
 type TabType = 'upcoming' | 'history';
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  pending:       { label: 'Awaiting Acceptance',  color: COLORS.orange, bg: '#FEF3E2' },
-  active:        { label: 'Accepted',             color: COLORS.blue,   bg: '#E8F0FB' },
-  confirmed:     { label: 'Confirmed',            color: COLORS.green,  bg: '#E8F8EF' },
-  vir_submitted: { label: 'Sign Inspection ✍️',   color: '#7B3F00',     bg: '#FFF3E0' },
-  vir_signed:    { label: 'Job Starting Soon',    color: COLORS.blue,   bg: '#E8F0FB' },
-  in_progress:   { label: 'In Progress',          color: COLORS.green,  bg: '#E8F8EF' },
-  paused:        { label: 'Paused',               color: COLORS.orange, bg: '#FEF3E2' },
-  completed:     { label: 'Completed',            color: COLORS.green,  bg: '#E8F8EF' },
-  declined:      { label: 'Declined',             color: COLORS.red,    bg: '#FDECEA' },
-  cancelled:     { label: 'Cancelled',            color: COLORS.muted,  bg: '#F0F2F5' },
+const STATUS_CONFIG: Record<string, { label: string; dot: string }> = {
+  pending:       { label: 'Awaiting Acceptance', dot: C.gold },
+  active:        { label: 'Confirmed',           dot: C.navy },
+  confirmed:     { label: 'Confirmed',           dot: C.navy },
+  vir_submitted: { label: 'Sign Inspection',     dot: '#E67E22' },
+  vir_signed:    { label: 'Starting Soon',       dot: C.green },
+  in_progress:   { label: 'In Progress',         dot: C.green },
+  paused:        { label: 'Paused',              dot: C.gold },
+  completed:     { label: 'Completed',           dot: C.green },
+  declined:      { label: 'Declined',            dot: C.red },
+  cancelled:     { label: 'Cancelled',           dot: C.gray },
 };
 
 function StatusBadge({ status }: { status: string }) {
-  const cfg = STATUS_CONFIG[status] ?? { label: toTitleCase(status), color: COLORS.muted, bg: '#F0F2F5' };
+  const cfg = STATUS_CONFIG[status] ?? { label: toTitleCase(status), dot: C.gray };
   return (
-    <View style={[styles.badge, { backgroundColor: cfg.bg }]}>
-      <Text style={[styles.badgeText, { color: cfg.color }]}>{cfg.label}</Text>
+    <View style={styles.badge}>
+      <View style={[styles.badgeDot, { backgroundColor: cfg.dot }]} />
+      <Text style={styles.badgeText}>{cfg.label}</Text>
     </View>
   );
 }
 
 function BookingCard({ booking }: { booking: BookingDocument }) {
-  const detailerLabel = booking.detailerName
-    ? toTitleCase(booking.detailerName)
-    : 'Your Detailer';
-
+  const scale = useSharedValue(1);
+  const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  const detailerLabel = booking.detailerName ? toTitleCase(booking.detailerName) : 'Your Detailer';
   const [y, m, d] = (booking.date ?? '').split('-').map(Number);
   const dateLabel = !isNaN(y)
     ? new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
     : booking.date;
 
   return (
-    <View style={styles.card}>
+    <Pressable
+      onPressIn={() => { scale.value = withSpring(0.97, { damping: 20, stiffness: 400 }); }}
+      onPressOut={() => { scale.value = withSpring(1, { damping: 15, stiffness: 300 }); }}
+    >
+    <Animated.View style={[styles.card, animStyle]}>
       <View style={styles.cardTop}>
         <StatusBadge status={booking.status} />
         <Text style={styles.price}>
@@ -80,59 +84,58 @@ function BookingCard({ booking }: { booking: BookingDocument }) {
       <Text style={styles.serviceName}>{toTitleCase(booking.service ?? '')}</Text>
       <Text style={styles.detailerName}>with {detailerLabel}</Text>
 
-      <View style={styles.metaRow}>
-        <Ionicons name="calendar-outline" size={13} color={COLORS.muted} />
-        <Text style={styles.metaText}>{dateLabel}</Text>
-        <Text style={styles.dot}>·</Text>
-        <Ionicons name="time-outline" size={13} color={COLORS.muted} />
-        <Text style={styles.metaText}>{booking.time}</Text>
-      </View>
-
-      {booking.vehicleLabel && (
-        <View style={styles.metaRow}>
-          <Ionicons name="car-sport-outline" size={13} color={COLORS.muted} />
-          <Text style={styles.metaText}>{booking.vehicleLabel}</Text>
-        </View>
-      )}
+      <Text style={styles.metaText}>
+        {[dateLabel, booking.time, booking.vehicleLabel].filter(Boolean).join(' · ')}
+      </Text>
 
       {booking.address && (
-        <View style={styles.metaRow}>
-          <Ionicons name="location-outline" size={13} color={COLORS.muted} />
-          <Text style={styles.metaText} numberOfLines={1}>{booking.address}</Text>
-        </View>
+        <Text style={styles.addressText} numberOfLines={1}>{booking.address}</Text>
       )}
 
       {booking.status === 'vir_submitted' && (
         <Pressable
-          style={styles.signCTA}
+          style={styles.ctaPrimary}
           onPress={() => router.push({ pathname: '/client/vir/[id]', params: { id: booking.id } })}
         >
-          <Ionicons name="pencil-outline" size={15} color={COLORS.blue} />
-          <Text style={styles.signCTAText}>Review & Sign Inspection</Text>
+          <Ionicons name="pencil-outline" size={15} color={C.navy} />
+          <Text style={styles.ctaPrimaryText}>Review & Sign Inspection</Text>
         </Pressable>
       )}
 
       {booking.status === 'completed' && (
         <Pressable
-          style={styles.invoiceCTA}
+          style={styles.ctaSecondary}
           onPress={() => router.push({ pathname: '/client/invoice/[id]', params: { id: booking.id } })}
         >
-          <Ionicons name="document-text-outline" size={15} color={COLORS.green} />
-          <Text style={styles.invoiceCTAText}>View Receipt</Text>
+          <Text style={styles.ctaSecondaryText}>View Receipt</Text>
+          <Ionicons name="arrow-forward" size={13} color={C.navy} />
         </Pressable>
       )}
-    </View>
+
+      {['active', 'confirmed', 'vir_submitted', 'vir_signed', 'in_progress', 'paused'].includes(booking.status) && (
+        <Pressable
+          style={styles.ctaMessage}
+          onPress={() => router.push({ pathname: '/client/conversation/[id]', params: { id: booking.id } })}
+        >
+          <Ionicons name="chatbubble-outline" size={13} color={C.muted} />
+          <Text style={styles.ctaMessageText}>Message Detailer</Text>
+        </Pressable>
+      )}
+    </Animated.View>
+    </Pressable>
   );
 }
 
 function EmptyState({ tab }: { tab: TabType }) {
   return (
     <View style={styles.emptyWrap}>
-      <Ionicons
-        name={tab === 'upcoming' ? 'calendar-outline' : 'checkmark-done-circle-outline'}
-        size={48}
-        color={COLORS.gray}
-      />
+      <View style={styles.emptyIconRing}>
+        <Ionicons
+          name={tab === 'upcoming' ? 'calendar-outline' : 'checkmark-circle-outline'}
+          size={28}
+          color={C.gold}
+        />
+      </View>
       <Text style={styles.emptyTitle}>
         {tab === 'upcoming' ? 'No upcoming bookings' : 'No past bookings'}
       </Text>
@@ -182,166 +185,191 @@ export default function ClientBookingsScreen() {
     return () => unsub();
   }, [user?.uid]);
 
-  const upcoming = bookings.filter((b) => ['pending', 'active', 'confirmed', 'vir_submitted', 'vir_signed', 'in_progress', 'paused'].includes(b.status));
-  const history = bookings.filter((b) => ['completed', 'declined', 'cancelled'].includes(b.status));
+  const upcoming = bookings.filter((b) =>
+    ['pending', 'active', 'confirmed', 'vir_submitted', 'vir_signed', 'in_progress', 'paused'].includes(b.status)
+  );
+  const history = bookings.filter((b) =>
+    ['completed', 'declined', 'cancelled'].includes(b.status)
+  );
   const displayed = tab === 'upcoming' ? upcoming : history;
 
   return (
     <SafeAreaView edges={['top']} style={styles.safe}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>My Bookings</Text>
-        {!loading && (
-          <View style={styles.countBadge}>
-            <Text style={styles.countText}>{upcoming.length}</Text>
-          </View>
-        )}
+        <View style={styles.headerRow}>
+          <Text style={styles.headerTitle}>My Bookings</Text>
+          {!loading && upcoming.length > 0 && (
+            <View style={styles.countPill}>
+              <Text style={styles.countText}>{upcoming.length}</Text>
+            </View>
+          )}
+        </View>
       </View>
 
-      <View style={styles.body}>
+      <Animated.View entering={FadeIn.duration(350)} style={styles.contentArea}>
+        {/* Underline tab row */}
         <View style={styles.tabRow}>
-          <Pressable
-            style={[styles.tabBtn, tab === 'upcoming' && styles.tabBtnActive]}
-            onPress={() => setTab('upcoming')}
-          >
-            <Text style={[styles.tabBtnText, tab === 'upcoming' && styles.tabBtnTextActive]}>
-              Upcoming {upcoming.length > 0 ? `(${upcoming.length})` : ''}
-            </Text>
-          </Pressable>
-          <Pressable
-            style={[styles.tabBtn, tab === 'history' && styles.tabBtnActive]}
-            onPress={() => setTab('history')}
-          >
-            <Text style={[styles.tabBtnText, tab === 'history' && styles.tabBtnTextActive]}>
-              History {history.length > 0 ? `(${history.length})` : ''}
-            </Text>
-          </Pressable>
+          {(['upcoming', 'history'] as TabType[]).map((t) => (
+            <Pressable key={t} style={styles.tabBtn} onPress={() => setTab(t)}>
+              <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>
+                {t === 'upcoming' ? `Upcoming${upcoming.length > 0 ? ` (${upcoming.length})` : ''}` : 'History'}
+              </Text>
+              {tab === t && <View style={styles.tabUnderline} />}
+            </Pressable>
+          ))}
         </View>
 
         {loading ? (
           <View style={styles.loadingWrap}>
-            <ActivityIndicator size="large" color={COLORS.gold} />
+            <ActivityIndicator size="large" color={C.gold} />
           </View>
         ) : (
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.list}
-          >
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.list}>
             {displayed.length === 0 ? (
               <EmptyState tab={tab} />
             ) : (
-              displayed.map((b) => <BookingCard key={b.id} booking={b} />)
+              displayed.map((b, index) => (
+                <Animated.View key={b.id} entering={FadeInDown.delay(index * 70).springify()}>
+                  <BookingCard booking={b} />
+                </Animated.View>
+              ))
             )}
           </ScrollView>
         )}
-      </View>
+      </Animated.View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: COLORS.bg },
+  safe: { flex: 1, backgroundColor: C.bg },
+
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 20,
+    paddingHorizontal: 22,
     paddingTop: 10,
-    paddingBottom: 14,
+    paddingBottom: 18,
   },
-  headerTitle: { color: COLORS.white, fontSize: 26, fontWeight: '900' },
-  countBadge: {
-    backgroundColor: COLORS.gold,
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  headerTitle: { color: C.white, fontSize: 28, fontWeight: '900', letterSpacing: -0.5 },
+  countPill: {
+    backgroundColor: C.gold,
     borderRadius: 999,
     paddingHorizontal: 8,
     paddingVertical: 2,
     minWidth: 22,
     alignItems: 'center',
   },
-  countText: { color: COLORS.blue, fontSize: 12, fontWeight: '900' },
-  body: {
+  countText: { color: C.navy, fontSize: 12, fontWeight: '900' },
+
+  contentArea: {
     flex: 1,
-    backgroundColor: COLORS.content,
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
-    paddingTop: 16,
+    backgroundColor: C.content,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
   },
+
   tabRow: {
     flexDirection: 'row',
-    paddingHorizontal: 16,
-    gap: 8,
-    marginBottom: 14,
+    paddingHorizontal: 22,
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
+    marginBottom: 16,
   },
   tabBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 10,
+    marginRight: 28,
+    paddingTop: 14,
+    paddingBottom: 12,
     alignItems: 'center',
-    backgroundColor: COLORS.white,
-    borderWidth: 1.5,
-    borderColor: COLORS.border,
   },
-  tabBtnActive: { backgroundColor: COLORS.blue, borderColor: COLORS.blue },
-  tabBtnText: { color: COLORS.muted, fontSize: 13, fontWeight: '800' },
-  tabBtnTextActive: { color: COLORS.white },
+  tabText: { color: C.gray, fontSize: 14, fontWeight: '700' },
+  tabTextActive: { color: C.navy, fontWeight: '800' },
+  tabUnderline: {
+    position: 'absolute',
+    bottom: -1,
+    left: 0,
+    right: 0,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: C.gold,
+  },
+
   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  list: { paddingHorizontal: 16, paddingBottom: 30 },
+  list: { paddingHorizontal: 16, paddingBottom: 36, gap: 12 },
+
   card: {
-    backgroundColor: COLORS.card,
-    borderRadius: 16,
+    backgroundColor: C.card,
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: COLORS.border,
-    padding: 16,
-    marginBottom: 12,
+    borderColor: C.border,
+    padding: 18,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
   },
   cardTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
   },
-  badge: {
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  badgeText: { fontSize: 11, fontWeight: '800' },
-  price: { color: COLORS.blue, fontSize: 20, fontWeight: '900' },
-  serviceName: { color: COLORS.blue, fontSize: 17, fontWeight: '900', marginBottom: 2 },
-  detailerName: { color: COLORS.muted, fontSize: 13, fontWeight: '600', marginBottom: 10 },
-  metaRow: {
+
+  badge: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  badgeDot: { width: 7, height: 7, borderRadius: 3.5 },
+  badgeText: { color: C.muted, fontSize: 12, fontWeight: '700' },
+
+  price: { color: C.navy, fontSize: 22, fontWeight: '900' },
+  serviceName: { color: C.navy, fontSize: 17, fontWeight: '800', marginBottom: 3 },
+  detailerName: { color: C.muted, fontSize: 13, fontWeight: '600', marginBottom: 10 },
+  metaText: { color: C.gray, fontSize: 13, fontWeight: '600', marginBottom: 4 },
+  addressText: { color: C.gray, fontSize: 12, fontWeight: '500' },
+
+  ctaPrimary: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    marginBottom: 5,
-  },
-  metaText: { color: COLORS.muted, fontSize: 13, fontWeight: '600', flex: 1 },
-  dot: { color: COLORS.gray },
-  emptyWrap: { alignItems: 'center', paddingTop: 60, gap: 10, paddingHorizontal: 20 },
-  emptyTitle: { color: COLORS.blue, fontSize: 17, fontWeight: '800', textAlign: 'center' },
-  emptyBody: { color: COLORS.muted, fontSize: 14, textAlign: 'center', lineHeight: 20 },
-  signCTA: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: COLORS.gold,
-    borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    marginTop: 10,
     justifyContent: 'center',
+    gap: 6,
+    backgroundColor: C.gold,
+    borderRadius: 12,
+    paddingVertical: 12,
+    marginTop: 14,
   },
-  signCTAText: { color: COLORS.blue, fontSize: 13, fontWeight: '900' },
-  invoiceCTA: {
+  ctaPrimaryText: { color: C.navy, fontSize: 13, fontWeight: '900' },
+
+  ctaSecondary: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    borderWidth: 1.5,
-    borderColor: COLORS.green,
-    borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    marginTop: 10,
     justifyContent: 'center',
+    gap: 6,
+    marginTop: 14,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: C.border,
   },
-  invoiceCTAText: { color: COLORS.green, fontSize: 13, fontWeight: '900' },
+  ctaSecondaryText: { color: C.navy, fontSize: 13, fontWeight: '700' },
+  ctaMessage: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 8,
+    paddingVertical: 10,
+  },
+  ctaMessageText: { color: C.muted, fontSize: 13, fontWeight: '600' },
+
+  emptyWrap: { alignItems: 'center', paddingTop: 60, gap: 14, paddingHorizontal: 32 },
+  emptyIconRing: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: 'rgba(201,162,39,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(201,162,39,0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  emptyTitle: { color: C.navy, fontSize: 17, fontWeight: '800', textAlign: 'center' },
+  emptyBody: { color: C.muted, fontSize: 14, textAlign: 'center', lineHeight: 21 },
 });

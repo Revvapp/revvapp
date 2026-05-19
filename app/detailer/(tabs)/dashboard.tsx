@@ -195,12 +195,6 @@ export default function DetailerDashboardScreen() {
               <Text style={styles.goalSub}>
                 {d.dailyGoal > 0 ? `Daily Goal: ${fmt(d.dailyGoal)}` : 'No Daily Goal Set'}
               </Text>
-              <View style={styles.goalScaleRow}>
-                <Text style={styles.scaleText}>$0</Text>
-                <Text style={styles.scaleText}>
-                  {d.dailyGoal > 0 ? fmt(d.dailyGoal) : '—'}
-                </Text>
-              </View>
               <View style={styles.goalTrack}>
                 <Animated.View style={[styles.goalFill, { width: progressWidth }]} />
               </View>
@@ -415,8 +409,6 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   goalSub: { color: COLORS.gray, fontSize: 12, fontWeight: '600', marginBottom: 10 },
-  goalScaleRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  scaleText: { color: COLORS.gray, fontSize: 11, fontWeight: '700' },
   goalTrack: {
     height: 10,
     borderRadius: 10,
