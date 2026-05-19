@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { doc, getDoc } from 'firebase/firestore';
 import { useCallback, useEffect, useState } from 'react';
 import {
@@ -10,6 +11,8 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { router } from 'expo-router';
 
 import { db } from '@/firebaseConfig';
 import { useAuth } from '@/hooks/useAuth';
@@ -119,6 +122,13 @@ export default function ClientProfileScreen() {
           </View>
         </View>
 
+        {__DEV__ && (
+          <Pressable style={styles.devToolsButton} onPress={() => router.push('/client/dev-tools')}>
+            <Ionicons name="construct-outline" size={16} color={COLORS.gold} />
+            <Text style={styles.devToolsText}>Dev Tools</Text>
+          </Pressable>
+        )}
+
         <Pressable style={styles.signOutButton} onPress={onSignOut}>
           <Text style={styles.signOutText}>Sign Out</Text>
         </Pressable>
@@ -208,6 +218,22 @@ const styles = StyleSheet.create({
   },
   signOutText: {
     color: COLORS.danger,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  devToolsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderWidth: 1.5,
+    borderColor: COLORS.gold,
+    borderRadius: 12,
+    paddingVertical: 14,
+    marginBottom: 12,
+  },
+  devToolsText: {
+    color: COLORS.gold,
     fontSize: 15,
     fontWeight: '700',
   },

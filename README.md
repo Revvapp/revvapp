@@ -110,7 +110,7 @@ Revv Reach → AI-assisted social content creation
 | Detailer public profile screen | ✅ Done |
 | VIR sign screen — client signs off on the inspection | ✅ Done |
 | Client Invoice — luxury receipt layout with dispute window logic | ✅ Done |
-| Find Detailers — map + list (main entry point) | ❌ Not built |
+| Find Detailers — map + list (main entry point) | ✅ Done |
 | Garage tab | ❌ Not built |
 | Stripe card pre-auth on booking (money into escrow) | ❌ Not built |
 | 24hr Dispute — raise a dispute screen (`/dispute/[id]`) | ❌ Not built |
