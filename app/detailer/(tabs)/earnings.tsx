@@ -125,7 +125,7 @@ export default function DetailerEarningsScreen() {
             <>
               {/* Month hero card */}
               <View style={styles.heroCard}>
-                <Text style={styles.heroLabel}>This Month's Payout</Text>
+                <Text style={styles.heroLabel}>This Month&apos;s Payout</Text>
                 <Text style={styles.heroAmount}>{fmt(monthTotal)}</Text>
                 {monthChange !== null ? (
                   <View style={styles.changeRow}>

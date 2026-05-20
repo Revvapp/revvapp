@@ -267,7 +267,7 @@ export default function RevvReachScreen() {
             </View>
           ))}
         </View>
-        <Text style={styles.platformHint}>Opens your device's native share sheet — post to any platform</Text>
+        <Text style={styles.platformHint}>Opens your device&apos;s native share sheet — post to any platform</Text>
 
         {/* Share CTA */}
         <Pressable

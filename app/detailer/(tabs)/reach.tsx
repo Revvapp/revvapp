@@ -340,7 +340,7 @@ export default function ReachTab() {
           <View style={styles.emptyWrap}>
             <Ionicons name="images-outline" size={38} color={C.gray} />
             <Text style={styles.emptyTitle}>No content yet</Text>
-            <Text style={styles.emptyBody}>Complete a job and upload after photos — they'll appear here ready to share.</Text>
+            <Text style={styles.emptyBody}>Complete a job and upload after photos — they&apos;ll appear here ready to share.</Text>
           </View>
         ) : (
           jobs.map((job) => (
