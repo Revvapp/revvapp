@@ -4,6 +4,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -28,6 +29,7 @@ const COLORS = {
   border: '#E2E8F0',
   white: '#FFFFFF',
   green: '#27AE60',
+  red: '#D93025',
 };
 
 function DetailRow({ icon, label, value }: { icon: string; label: string; value: string }) {
@@ -266,6 +268,30 @@ export default function JobDetailScreen() {
             <Text style={styles.btnMessageText}>Message Client</Text>
           </Pressable>
         )}
+
+        {!isCompleted && (
+          <Pressable
+            style={styles.reportBtn}
+            onPress={() =>
+              Alert.alert(
+                'Report Off-Platform Request',
+                'Did your client ask to pay outside of REVV? This protects your Revv Care coverage and keeps your account in good standing.',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Submit Report',
+                    style: 'destructive',
+                    onPress: () =>
+                      Alert.alert('Report Submitted', 'Thank you. Our team will review this booking.'),
+                  },
+                ]
+              )
+            }
+          >
+            <Ionicons name="flag-outline" size={13} color={COLORS.red} />
+            <Text style={styles.reportBtnText}>Report Off-Platform Request</Text>
+          </Pressable>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -410,4 +436,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   btnMessageText: { color: COLORS.muted, fontSize: 14, fontWeight: '700' },
+  reportBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    marginTop: 6,
+    paddingVertical: 10,
+  },
+  reportBtnText: { color: COLORS.red, fontSize: 12, fontWeight: '700' },
 });

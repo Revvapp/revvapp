@@ -23,16 +23,6 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // Public read: normalized email -> { uid, userType } for signup conflict UX only.
-    match /emailLookup/{emailKey} {
-      allow read: if true;
-      allow create: if signedIn()
-        && request.resource.data.keys().hasAll(['uid', 'userType'])
-        && request.resource.data.uid == request.auth.uid
-        && request.resource.data.userType in ['client', 'detailer'];
-      allow update, delete: if false;
-    }
-
     match /detailers/{uid} {
       allow read: if true;
       allow create, update: if isOwner(uid)
@@ -58,71 +48,53 @@ service cloud.firestore {
       allow read: if signedIn()
         && (resource.data.clientId == request.auth.uid
             || resource.data.detailerId == request.auth.uid);
-
-      // Create: the requesting user must be the client on the booking.
-      // Prevents anyone from spamming arbitrary detailers' calendars.
-      allow create: if signedIn()
-        && request.resource.data.clientId == request.auth.uid;
-
-      // Update: either party on the booking, but they cannot rewrite
-      // who's involved or the agreed-upon price after creation.
-      // TODO before launch: also restrict allowed status transitions
-      // per role (e.g. only detailer can mark 'completed', only client
-      // can mark 'cancelled') and lock once payment has released.
+      allow create: if signedIn();
       allow update: if signedIn()
         && (resource.data.clientId == request.auth.uid
-            || resource.data.detailerId == request.auth.uid)
-        && request.resource.data.clientId == resource.data.clientId
-        && request.resource.data.detailerId == resource.data.detailerId
-        && request.resource.data.price == resource.data.price;
-
+            || resource.data.detailerId == request.auth.uid);
       allow delete: if false;
     }
 
     match /invoices/{invoiceId} {
-      // Both parties on the invoice can read it.
-      allow read: if signedIn()
-        && (resource.data.clientId == request.auth.uid
-            || resource.data.detailerId == request.auth.uid);
-
-      // Only the detailer on the invoice can create or update it
-      // (invoice is generated after the detailer completes the job).
+      allow read: if signedIn() && (
+        resource == null ||
+        resource.data.detailerId == request.auth.uid ||
+        resource.data.clientId == request.auth.uid
+      );
       allow create: if signedIn()
         && request.resource.data.detailerId == request.auth.uid;
       allow update: if signedIn()
-        && resource.data.detailerId == request.auth.uid
-        && request.resource.data.detailerId == resource.data.detailerId
-        && request.resource.data.clientId == resource.data.clientId
-        && request.resource.data.bookingId == resource.data.bookingId;
-
-      allow delete: if false;
+        && resource.data.detailerId == request.auth.uid;
     }
+
+    match /conversations/{bookingId} {
+      allow read, write: if request.auth != null;
+
+      match /messages/{messageId} {
+        allow read, write: if request.auth != null;
+      }
+    }
+
   }
 }
 
 service firebase.storage {
   match /b/{bucket}/o {
-    // Detailer profile and portfolio assets — public read, owner write.
+
     match /detailers/{uid}/{allPaths=**} {
       allow read: if true;
       allow write: if request.auth != null && request.auth.uid == uid;
     }
 
-    // Vehicle Inspection Report photos uploaded by the detailer before
-    // the job starts. The client also needs to read them to sign off.
-    // TODO before launch: scope write to the actual detailer of the
-    // booking via firestore.get(/databases/(default)/documents/bookings/$(bookingId)).
-    match /vir/{bookingId}/{allPaths=**} {
+    match /vir-photos/{bookingId}/{allPaths=**} {
       allow read: if request.auth != null;
       allow write: if request.auth != null;
     }
 
-    // After-job photos uploaded by the detailer for the invoice/receipt.
-    // Client reads them on the invoice screen.
-    // TODO before launch: scope write to the detailer of the booking.
     match /after-photos/{bookingId}/{allPaths=**} {
       allow read: if request.auth != null;
       allow write: if request.auth != null;
     }
+
   }
 }

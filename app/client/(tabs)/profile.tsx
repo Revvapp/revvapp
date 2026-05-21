@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { doc, getDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -42,6 +42,15 @@ function initialsFrom(name: string, email: string | null | undefined) {
   return 'RV';
 }
 
+function StatCol({ value, label }: { value: string; label: string }) {
+  return (
+    <View style={styles.statCol}>
+      <Text style={styles.statValue}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
+    </View>
+  );
+}
+
 function InfoRow({
   icon,
   label,
@@ -69,14 +78,21 @@ export default function ClientProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<Partial<ClientDocument> | null>(null);
   const [error, setError] = useState('');
+  const [completedJobs, setCompletedJobs] = useState(0);
+  const [totalSpent, setTotalSpent] = useState(0);
 
   const load = useCallback(async () => {
     if (!user?.uid) { setLoading(false); return; }
     setLoading(true);
     setError('');
     try {
-      const snap = await getDoc(doc(db, 'clients', user.uid));
-      setProfile(snap.exists() ? (snap.data() as ClientDocument) : null);
+      const [profileSnap, bookingsSnap] = await Promise.all([
+        getDoc(doc(db, 'clients', user.uid)),
+        getDocs(query(collection(db, 'bookings'), where('clientId', '==', user.uid), where('status', '==', 'completed'))),
+      ]);
+      setProfile(profileSnap.exists() ? (profileSnap.data() as ClientDocument) : null);
+      setCompletedJobs(bookingsSnap.size);
+      setTotalSpent(bookingsSnap.docs.reduce((sum, d) => sum + Number(d.data().price ?? 0), 0));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not load your profile.');
     } finally {
@@ -137,6 +153,14 @@ export default function ClientProfileScreen() {
       >
         {!!error && <Text style={styles.errorText}>{error}</Text>}
 
+        <View style={styles.statsCard}>
+          <StatCol value={String(completedJobs)} label="Jobs Done" />
+          <View style={styles.statDivider} />
+          <StatCol value={totalSpent > 0 ? `$${Math.round(totalSpent).toLocaleString()}` : '$0'} label="Total Spent" />
+          <View style={styles.statDivider} />
+          <StatCol value={completedJobs > 0 ? '⭐ Verified' : 'New'} label="Status" />
+        </View>
+
         <Text style={styles.sectionLabel}>ACCOUNT DETAILS</Text>
         <View style={styles.card}>
           <InfoRow icon="mail-outline" label="Email" value={user?.email ?? ''} />
@@ -145,6 +169,11 @@ export default function ClientProfileScreen() {
           <View style={styles.rowDivider} />
           <InfoRow icon="location-outline" label="Location" value={location} />
         </View>
+
+        <Pressable style={styles.editBtn} onPress={() => router.push('/client/edit-profile')}>
+          <Ionicons name="pencil-outline" size={16} color={C.navy} />
+          <Text style={styles.editBtnText}>Edit Profile</Text>
+        </Pressable>
 
         {__DEV__ && (
           <Pressable style={styles.devBtn} onPress={() => router.push('/client/dev-tools')}>
@@ -286,6 +315,32 @@ const styles = StyleSheet.create({
     backgroundColor: C.border,
     marginLeft: 44,
   },
+
+  statsCard: {
+    flexDirection: 'row',
+    backgroundColor: C.card,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: C.border,
+    paddingVertical: 18,
+    marginBottom: 22,
+  },
+  statCol: { flex: 1, alignItems: 'center' },
+  statValue: { color: C.navy, fontSize: 20, fontWeight: '900', marginBottom: 3 },
+  statLabel: { color: C.muted, fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
+  statDivider: { width: 1, backgroundColor: C.border, marginVertical: 4 },
+
+  editBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: C.gold,
+    borderRadius: 14,
+    paddingVertical: 15,
+    marginBottom: 14,
+  },
+  editBtnText: { color: C.navy, fontSize: 14, fontWeight: '900', letterSpacing: 0.5 },
 
   devBtn: {
     flexDirection: 'row',

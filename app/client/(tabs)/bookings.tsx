@@ -4,6 +4,7 @@ import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -103,13 +104,22 @@ function BookingCard({ booking }: { booking: BookingDocument }) {
       )}
 
       {booking.status === 'completed' && (
-        <Pressable
-          style={styles.ctaSecondary}
-          onPress={() => router.push({ pathname: '/client/invoice/[id]', params: { id: booking.id } })}
-        >
-          <Text style={styles.ctaSecondaryText}>View Receipt</Text>
-          <Ionicons name="arrow-forward" size={13} color={C.navy} />
-        </Pressable>
+        <>
+          <Pressable
+            style={styles.ctaPrimary}
+            onPress={() => router.push({ pathname: '/client/review/[id]', params: { id: booking.id } })}
+          >
+            <Ionicons name="star-outline" size={15} color={C.navy} />
+            <Text style={styles.ctaPrimaryText}>Leave a Review</Text>
+          </Pressable>
+          <Pressable
+            style={styles.ctaSecondary}
+            onPress={() => router.push({ pathname: '/client/invoice/[id]', params: { id: booking.id } })}
+          >
+            <Text style={styles.ctaSecondaryText}>View Receipt</Text>
+            <Ionicons name="arrow-forward" size={13} color={C.navy} />
+          </Pressable>
+        </>
       )}
 
       {['active', 'confirmed', 'vir_submitted', 'vir_signed', 'in_progress', 'paused'].includes(booking.status) && (
@@ -119,6 +129,30 @@ function BookingCard({ booking }: { booking: BookingDocument }) {
         >
           <Ionicons name="chatbubble-outline" size={13} color={C.muted} />
           <Text style={styles.ctaMessageText}>Message Detailer</Text>
+        </Pressable>
+      )}
+
+      {['pending', 'active', 'confirmed', 'vir_submitted', 'vir_signed', 'in_progress', 'paused'].includes(booking.status) && (
+        <Pressable
+          style={styles.reportBtn}
+          onPress={() =>
+            Alert.alert(
+              'Report Off-Platform Request',
+              'Did your detailer ask you to pay outside of REVV (cash, Venmo, Zelle, etc.)?\n\nThis violates our terms and removes your payment protection.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Submit Report',
+                  style: 'destructive',
+                  onPress: () =>
+                    Alert.alert('Report Submitted', 'Thank you. Our team will review this booking.'),
+                },
+              ]
+            )
+          }
+        >
+          <Ionicons name="flag-outline" size={12} color={C.red} />
+          <Text style={styles.reportBtnText}>Report Off-Platform Request</Text>
         </Pressable>
       )}
     </Animated.View>
@@ -357,6 +391,15 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   ctaMessageText: { color: C.muted, fontSize: 13, fontWeight: '600' },
+  reportBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    marginTop: 6,
+    paddingVertical: 8,
+  },
+  reportBtnText: { color: C.red, fontSize: 11, fontWeight: '700' },
 
   emptyWrap: { alignItems: 'center', paddingTop: 60, gap: 14, paddingHorizontal: 32 },
   emptyIconRing: {

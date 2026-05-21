@@ -51,12 +51,15 @@ export type ClientDocument = {
   createdAt?: Timestamp | null;
 };
 
+export type BodyType = 'sedan' | 'suv' | 'truck' | 'coupe' | 'minivan' | 'convertible';
+
 export type VehicleDocument = {
   id: string;
   make: string;
   model: string;
   year: number;
   color?: string;
+  bodyType?: BodyType;
   lastDetailedDate: string | null;
   ownerId: string;
 };

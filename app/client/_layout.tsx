@@ -16,6 +16,8 @@ export default function ClientLayout() {
         <Stack.Screen name="invoice/[id]" />
         <Stack.Screen name="conversation/[id]" />
         <Stack.Screen name="dev-tools" />
+        <Stack.Screen name="review/[id]" />
+        <Stack.Screen name="edit-profile" />
       </Stack>
     </ProtectedRoute>
   );

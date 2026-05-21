@@ -73,14 +73,7 @@ export default function ClientTabsLayout() {
           ),
         }}
       />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          tabBarIcon: ({ focused }) => (
-            <TabIcon name="person-outline" nameFocused="person" focused={focused} />
-          ),
-        }}
-      />
+      <Tabs.Screen name="profile" options={{ href: null }} />
       <Tabs.Screen name="search" options={{ href: null }} />
       <Tabs.Screen name="garage" options={{ href: null }} />
     </Tabs>

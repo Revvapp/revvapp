@@ -58,6 +58,14 @@ export default function DetailerTabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="messages"
+        options={{
+          tabBarIcon: ({ focused }) => (
+            <TabIcon name="chatbubble-outline" nameFocused="chatbubble" focused={focused} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="clients"
         options={{
           tabBarIcon: ({ focused }) => (

@@ -67,6 +67,7 @@ export function useClientDashboard(): ClientDashboardModel {
           model: String(v.model ?? ''),
           year: Number(v.year ?? 0),
           color: v.color ? String(v.color) : undefined,
+          bodyType: v.bodyType ?? undefined,
           lastDetailedDate: v.lastDetailedDate != null ? String(v.lastDetailedDate) : null,
           ownerId: user.uid,
         };
@@ -88,7 +89,8 @@ export function useClientDashboard(): ClientDashboardModel {
         } satisfies BookingDocument;
       });
 
-      const activeBookings = bookingsRaw.filter((b) => b.status === 'confirmed');
+      const activeStatuses = new Set(['pending', 'confirmed', 'in_progress', 'paused']);
+      const activeBookings = bookingsRaw.filter((b) => activeStatuses.has(b.status));
 
       const displayName = fullName.trim()
         ? toTitleCase(fullName.trim())
