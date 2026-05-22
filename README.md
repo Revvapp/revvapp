@@ -4,6 +4,8 @@ A hybrid SaaS + marketplace for professional car detailing. Detailers run their 
 
 **Stack:** Expo (React Native) · Firebase (Firestore, Storage, Functions) · Stripe Connect Express
 
+**Privacy policy:** [https://revvapp.github.io/revvapp/](https://revvapp.github.io/revvapp/)
+
 ---
 
 ## Business Model
