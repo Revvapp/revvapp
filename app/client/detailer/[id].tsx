@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { collection, doc, getDocs, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -48,11 +48,54 @@ function StarRating({ rating, size = 14 }: { rating: number; size?: number }) {
   );
 }
 
+type Review = {
+  id: string;
+  clientName: string;
+  rating: number;
+  body: string;
+  service: string;
+  createdAt: any;
+};
+
+function ReviewCard({ review }: { review: Review }) {
+  return (
+    <View style={styles.reviewCard}>
+      <View style={styles.reviewTop}>
+        <View style={styles.reviewStars}>
+          {[1,2,3,4,5].map((i) => (
+            <Ionicons key={i} name={i <= review.rating ? 'star' : 'star-outline'} size={12} color={COLORS.gold} />
+          ))}
+        </View>
+        <Text style={styles.reviewService}>{review.service}</Text>
+      </View>
+      {!!review.body && <Text style={styles.reviewBody}>{review.body}</Text>}
+      <Text style={styles.reviewAuthor}>{review.clientName || 'Verified Client'}</Text>
+    </View>
+  );
+}
+
 export default function DetailerPublicProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [detailer, setDetailer] = useState<DetailerDocument | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [reviews, setReviews] = useState<Review[]>([]);
+
+  useEffect(() => {
+    if (!id) return;
+    getDocs(
+      query(collection(db, 'reviews'), where('detailerId', '==', id), orderBy('createdAt', 'desc'), limit(10))
+    ).then((snap) => {
+      setReviews(snap.docs.map((d) => ({
+        id: d.id,
+        clientName: String(d.data().clientName ?? ''),
+        rating: Number(d.data().rating ?? 0),
+        body: String(d.data().body ?? ''),
+        service: String(d.data().service ?? ''),
+        createdAt: d.data().createdAt,
+      })));
+    }).catch(() => {});
+  }, [id]);
 
   useEffect(() => {
     if (!id) return;
@@ -224,6 +267,20 @@ export default function DetailerPublicProfileScreen() {
           </View>
         )}
 
+        {reviews.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Reviews ({reviews.length})</Text>
+            <View style={styles.sectionCard}>
+              {reviews.map((r, i) => (
+                <View key={r.id}>
+                  {i > 0 && <View style={styles.serviceRowBorder} />}
+                  <ReviewCard review={r} />
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
         <View style={{ height: 100 }} />
       </ScrollView>
 
@@ -373,4 +430,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
   },
   bookNowText: { color: COLORS.blue, fontSize: 15, fontWeight: '900' },
+
+  reviewCard:    { padding: 14 },
+  reviewTop:     { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
+  reviewStars:   { flexDirection: 'row', gap: 2 },
+  reviewService: { color: COLORS.muted, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  reviewBody:    { color: COLORS.blue, fontSize: 13, lineHeight: 19, marginBottom: 6 },
+  reviewAuthor:  { color: COLORS.muted, fontSize: 11, fontWeight: '600' },
 });

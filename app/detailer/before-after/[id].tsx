@@ -110,6 +110,15 @@ export default function BeforeAfterScreen() {
         createdAt: serverTimestamp(),
       });
 
+      const clientId = String(b.clientId ?? '');
+      const vehicleId = String(b.vehicleId ?? '');
+      const jobDate = String(b.date ?? '');
+      if (clientId && vehicleId && jobDate) {
+        await updateDoc(doc(db, 'clients', clientId, 'vehicles', vehicleId), {
+          lastDetailedDate: jobDate,
+        });
+      }
+
       router.replace({ pathname: '/detailer/invoice/[id]', params: { id } });
     } catch (err) {
       Alert.alert('Error', err instanceof Error ? err.message : String(err));

@@ -21,6 +21,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { db } from '@/firebaseConfig';
 import { useAuth } from '@/hooks/useAuth';
 import { useDetailerDashboard } from '@/hooks/useDetailerDashboard';
+import { useRegisterPushToken } from '@/hooks/useRegisterPushToken';
 
 const COLORS = {
   bg: '#0D1B2A',
@@ -44,6 +45,7 @@ function SkeletonBlock({ style }: { style?: object }) {
 export default function DetailerDashboardScreen() {
   const d = useDetailerDashboard();
   const { user } = useAuth();
+  useRegisterPushToken(user?.uid, 'detailers');
   const progressAnim = useRef(new Animated.Value(0)).current;
   const [refreshing, setRefreshing] = useState(false);
   const [goalModalVisible, setGoalModalVisible] = useState(false);

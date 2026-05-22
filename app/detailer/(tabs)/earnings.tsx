@@ -179,8 +179,8 @@ export default function DetailerEarningsScreen() {
                     <View style={styles.invoiceRight}>
                       <Text style={styles.invoiceAmount}>{fmt(inv.detailerPayout)}</Text>
                       <View style={styles.badge}>
-                        <View style={[styles.badgeDot, { backgroundColor: inv.status === 'released' ? '#27AE60' : '#C9A227' }]} />
-                        <Text style={styles.badgeText}>{inv.status === 'released' ? 'Paid Out' : 'Pending'}</Text>
+                        <View style={[styles.badgeDot, { backgroundColor: inv.status === 'released' ? '#27AE60' : inv.status === 'disputed' ? '#D93025' : '#C9A227' }]} />
+                        <Text style={styles.badgeText}>{inv.status === 'released' ? 'Paid Out' : inv.status === 'disputed' ? 'Disputed' : 'Pending'}</Text>
                       </View>
                     </View>
                   </View>

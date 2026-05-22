@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { doc, getDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -75,11 +75,14 @@ function StatCol({ value, label }: { value: string; label: string }) {
   );
 }
 
+type Review = { id: string; clientName: string; rating: number; body: string; service: string };
+
 export default function DetailerProfileScreen() {
   const { user, signOut } = useAuth();
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<Partial<DetailerDocument> | null>(null);
   const [error, setError] = useState('');
+  const [reviews, setReviews] = useState<Review[]>([]);
 
   const load = useCallback(async () => {
     if (!user?.uid) { setLoading(false); return; }
@@ -88,6 +91,16 @@ export default function DetailerProfileScreen() {
     try {
       const snap = await getDoc(doc(db, 'detailers', user.uid));
       setProfile(snap.exists() ? (snap.data() as DetailerDocument) : null);
+      const reviewsSnap = await getDocs(
+        query(collection(db, 'reviews'), where('detailerId', '==', user.uid), orderBy('createdAt', 'desc'), limit(20))
+      );
+      setReviews(reviewsSnap.docs.map((d) => ({
+        id: d.id,
+        clientName: String(d.data().clientName ?? ''),
+        rating: Number(d.data().rating ?? 0),
+        body: String(d.data().body ?? ''),
+        service: String(d.data().service ?? ''),
+      })));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not load your profile.');
     } finally {
@@ -191,6 +204,29 @@ export default function DetailerProfileScreen() {
               {services.map((s) => (
                 <View key={s} style={styles.serviceChip}>
                   <Text style={styles.serviceChipText}>{toTitleCase(s)}</Text>
+                </View>
+              ))}
+            </View>
+          </>
+        )}
+
+        {reviews.length > 0 && (
+          <>
+            <Text style={styles.sectionLabel}>CLIENT REVIEWS</Text>
+            <View style={styles.card}>
+              {reviews.map((r, i) => (
+                <View key={r.id}>
+                  {i > 0 && <View style={styles.rowDivider} />}
+                  <View style={styles.reviewRow}>
+                    <View style={styles.reviewStars}>
+                      {[1,2,3,4,5].map((s) => (
+                        <Ionicons key={s} name={s <= r.rating ? 'star' : 'star-outline'} size={12} color={C.gold} />
+                      ))}
+                    </View>
+                    <Text style={styles.reviewService}>{toTitleCase(r.service)}</Text>
+                    {!!r.body && <Text style={styles.reviewBody}>{r.body}</Text>}
+                    <Text style={styles.reviewAuthor}>{r.clientName || 'Verified Client'}</Text>
+                  </View>
                 </View>
               ))}
             </View>
@@ -423,4 +459,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
   },
+
+  reviewRow:     { padding: 14, gap: 4 },
+  reviewStars:   { flexDirection: 'row', gap: 2, marginBottom: 2 },
+  reviewService: { color: C.muted, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  reviewBody:    { color: C.navy, fontSize: 13, lineHeight: 19 },
+  reviewAuthor:  { color: C.muted, fontSize: 11, fontWeight: '600', marginTop: 2 },
 });

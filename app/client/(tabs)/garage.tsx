@@ -6,7 +6,9 @@ import {
   doc,
   onSnapshot,
   query,
+  updateDoc,
 } from 'firebase/firestore';
+
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -19,6 +21,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
@@ -65,21 +68,39 @@ type Vehicle = {
 
 const BLANK = { year: '', make: '', model: '', color: '', licensePlate: '', bodyType: 'sedan' as BodyType };
 
-function VehicleCard({ vehicle, onDelete }: { vehicle: Vehicle; onDelete: () => void }) {
+function VehicleCard({
+  vehicle, isActive, onSetActive, onDelete, onEdit,
+}: {
+  vehicle: Vehicle;
+  isActive: boolean;
+  onSetActive: () => void;
+  onDelete: () => void;
+  onEdit: () => void;
+}) {
   const label = `${vehicle.year} ${vehicle.make} ${vehicle.model}`.trim();
 
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, isActive && styles.cardActive]}>
+      <TouchableOpacity activeOpacity={0.7} style={styles.radioBtn} onPress={onSetActive}>
+        <View style={[styles.radio, isActive && styles.radioActive]}>
+          {isActive && <View style={styles.radioInner} />}
+        </View>
+      </TouchableOpacity>
       <View style={styles.cardSilhouette}>
         <CarSilhouette bodyType={vehicle.bodyType} animate={false} />
       </View>
-      <View style={styles.cardBody}>
+      <TouchableOpacity activeOpacity={0.7} style={styles.cardBody} onPress={onSetActive}>
         <Text style={styles.cardLabel} numberOfLines={1}>{label || 'Vehicle'}</Text>
         <Text style={styles.cardSub} numberOfLines={1}>
           {[vehicle.color, vehicle.licensePlate].filter(Boolean).join(' · ')}
         </Text>
-      </View>
-      <Pressable
+        {isActive && <Text style={styles.activeTag}>On Dashboard</Text>}
+      </TouchableOpacity>
+      <TouchableOpacity activeOpacity={0.6} style={styles.editBtn} onPress={onEdit}>
+        <Ionicons name="pencil-outline" size={17} color={C.muted} />
+      </TouchableOpacity>
+      <TouchableOpacity
+        activeOpacity={0.6}
         style={styles.deleteBtn}
         onPress={() =>
           Alert.alert('Remove Vehicle', `Remove ${label} from your garage?`, [
@@ -88,8 +109,8 @@ function VehicleCard({ vehicle, onDelete }: { vehicle: Vehicle; onDelete: () => 
           ])
         }
       >
-        <Ionicons name="trash-outline" size={18} color={C.muted} />
-      </Pressable>
+        <Ionicons name="trash-outline" size={17} color={C.muted} />
+      </TouchableOpacity>
     </View>
   );
 }
@@ -97,15 +118,17 @@ function VehicleCard({ vehicle, onDelete }: { vehicle: Vehicle; onDelete: () => 
 export default function ClientGarageScreen() {
   const { user } = useAuth();
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [activeVehicleId, setActiveVehicleId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(BLANK);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!user?.uid) { setLoading(false); return; }
     const q = query(collection(db, 'clients', user.uid, 'vehicles'));
-    const unsub = onSnapshot(q, (snap) => {
+    const unsubVehicles = onSnapshot(q, (snap) => {
       setVehicles(
         snap.docs.map((d) => ({
           id: d.id,
@@ -119,28 +142,53 @@ export default function ClientGarageScreen() {
       );
       setLoading(false);
     });
-    return () => unsub();
+    const unsubClient = onSnapshot(doc(db, 'clients', user.uid), (snap) => {
+      if (snap.exists()) setActiveVehicleId(snap.data().activeVehicleId ?? null);
+    });
+    return () => { unsubVehicles(); unsubClient(); };
   }, [user?.uid]);
+
+  async function setActiveVehicle(id: string) {
+    if (!user?.uid) return;
+    setActiveVehicleId(id);
+    await updateDoc(doc(db, 'clients', user.uid), { activeVehicleId: id });
+  }
 
   async function saveVehicle() {
     if (!form.make.trim() || !form.model.trim() || !user?.uid) return;
     setSaving(true);
     try {
-      await addDoc(collection(db, 'clients', user.uid, 'vehicles'), {
+      const data = {
         year: form.year.trim(),
         make: form.make.trim(),
         model: form.model.trim(),
         color: form.color.trim(),
         licensePlate: form.licensePlate.trim(),
         bodyType: form.bodyType,
-        ownerId: user.uid,
-        createdAt: new Date().toISOString(),
-      });
+      };
+      if (editingId) {
+        await updateDoc(doc(db, 'clients', user.uid, 'vehicles', editingId), data);
+      } else {
+        await addDoc(collection(db, 'clients', user.uid, 'vehicles'), {
+          ...data,
+          ownerId: user.uid,
+          createdAt: new Date().toISOString(),
+        });
+      }
       setForm(BLANK);
+      setEditingId(null);
       setModalVisible(false);
+    } catch (e) {
+      Alert.alert('Error', e instanceof Error ? e.message : 'Could not save vehicle.');
     } finally {
       setSaving(false);
     }
+  }
+
+  function openEdit(v: Vehicle) {
+    setForm({ year: v.year, make: v.make, model: v.model, color: v.color, licensePlate: v.licensePlate, bodyType: v.bodyType });
+    setEditingId(v.id);
+    setModalVisible(true);
   }
 
   async function deleteVehicle(id: string) {
@@ -157,7 +205,7 @@ export default function ClientGarageScreen() {
           <Text style={styles.eyebrow}>REVV</Text>
           <Text style={styles.headerTitle}>My Garage</Text>
         </View>
-        <Pressable style={styles.addBtn} onPress={() => { setForm(BLANK); setModalVisible(true); }}>
+        <Pressable style={styles.addBtn} onPress={() => { setForm(BLANK); setEditingId(null); setModalVisible(true); }}>
           <Ionicons name="add" size={22} color={C.navy} />
         </Pressable>
       </View>
@@ -176,7 +224,7 @@ export default function ClientGarageScreen() {
             <Text style={styles.emptyBody}>
               Add your vehicles so detailers know exactly what to expect.
             </Text>
-            <Pressable style={styles.emptyAddBtn} onPress={() => { setForm(BLANK); setModalVisible(true); }}>
+            <Pressable style={styles.emptyAddBtn} onPress={() => { setForm(BLANK); setEditingId(null); setModalVisible(true); }}>
               <Text style={styles.emptyAddBtnText}>Add Your First Vehicle</Text>
             </Pressable>
           </View>
@@ -184,7 +232,13 @@ export default function ClientGarageScreen() {
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.list}>
             {vehicles.map((v, i) => (
               <Animated.View key={v.id} entering={FadeInDown.delay(i * 60).springify()}>
-                <VehicleCard vehicle={v} onDelete={() => deleteVehicle(v.id)} />
+                <VehicleCard
+                  vehicle={v}
+                  isActive={v.id === activeVehicleId}
+                  onSetActive={() => setActiveVehicle(v.id)}
+                  onDelete={() => deleteVehicle(v.id)}
+                  onEdit={() => openEdit(v)}
+                />
               </Animated.View>
             ))}
           </ScrollView>
@@ -199,7 +253,7 @@ export default function ClientGarageScreen() {
           <Pressable style={styles.modalDismiss} onPress={() => setModalVisible(false)} />
           <View style={styles.sheet}>
             <View style={styles.sheetHandle} />
-            <Text style={styles.sheetTitle}>Add Vehicle</Text>
+            <Text style={styles.sheetTitle}>{editingId ? 'Edit Vehicle' : 'Add Vehicle'}</Text>
 
             <View style={styles.fieldRow}>
               <View style={[styles.field, { flex: 1 }]}>
@@ -293,7 +347,7 @@ export default function ClientGarageScreen() {
             >
               {saving
                 ? <ActivityIndicator color={C.navy} size="small" />
-                : <Text style={styles.saveBtnText}>Add to Garage</Text>
+                : <Text style={styles.saveBtnText}>{editingId ? 'Save Changes' : 'Add to Garage'}</Text>
               }
             </Pressable>
           </View>
@@ -370,12 +424,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 6,
     elevation: 1,
   },
+  cardActive: { borderColor: C.gold },
+  radioBtn: { padding: 4, justifyContent: 'center', alignItems: 'center' },
+  radio: {
+    width: 20, height: 20, borderRadius: 10,
+    borderWidth: 2, borderColor: C.border,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  radioActive: { borderColor: C.gold },
+  radioInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: C.gold },
   cardSilhouette: {
     width: 100,
     overflow: 'hidden',
@@ -385,6 +450,8 @@ const styles = StyleSheet.create({
   cardBody: { flex: 1 },
   cardLabel: { color: C.navy, fontSize: 15, fontWeight: '800', marginBottom: 3 },
   cardSub: { color: C.muted, fontSize: 13, fontWeight: '500' },
+  activeTag: { color: C.gold, fontSize: 11, fontWeight: '700', marginTop: 3 },
+  editBtn:   { padding: 6 },
   deleteBtn: { padding: 6 },
 
   modalOverlay: { flex: 1, justifyContent: 'flex-end' },

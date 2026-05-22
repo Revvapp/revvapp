@@ -88,6 +88,8 @@ export function useFindDetailers(): FindDetailersModel {
     return () => unsub();
   }, []);
 
+  const MAX_RADIUS_MI = 50;
+
   const detailers: DetailerWithDistance[] = rawDetailers
     .map((d) => {
       const distanceMi =
@@ -96,6 +98,7 @@ export function useFindDetailers(): FindDetailersModel {
           : null;
       return { ...d, distanceMi };
     })
+    .filter((d) => d.distanceMi == null || d.distanceMi <= MAX_RADIUS_MI)
     .sort((a, b) => {
       if (a.distanceMi == null && b.distanceMi == null) return 0;
       if (a.distanceMi == null) return 1;

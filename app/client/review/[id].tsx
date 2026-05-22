@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { addDoc, collection, doc, getDoc, serverTimestamp } from 'firebase/firestore';
-import { useState } from 'react';
+import { addDoc, collection, doc, getDoc, getDocs, onSnapshot, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -18,6 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { db } from '@/firebaseConfig';
 import { useAuth } from '@/hooks/useAuth';
+import { sendPushToUser } from '@/lib/pushNotification';
 
 const C = {
   bg:      '#0A1628',
@@ -40,6 +41,27 @@ export default function ClientReviewScreen() {
   const [hovered, setHovered] = useState(0);
   const [body, setBody] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [gateError, setGateError] = useState<string | null>(null);
+  const [gateLoading, setGateLoading] = useState(true);
+
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+    const unsub = onSnapshot(doc(db, 'bookings', id), async (snap) => {
+      if (cancelled) return;
+      if (!snap.exists() || snap.data().status !== 'completed') {
+        setGateError('Reviews can only be submitted for completed bookings.');
+        setGateLoading(false);
+        return;
+      }
+      const existing = await getDocs(query(collection(db, 'reviews'), where('bookingId', '==', id)));
+      if (!cancelled) {
+        if (existing.size > 0) setGateError('You have already reviewed this booking.');
+        setGateLoading(false);
+      }
+    });
+    return () => { cancelled = true; unsub(); };
+  }, [id]);
 
   async function submit() {
     if (rating === 0 || !user?.uid || !id) return;
@@ -63,6 +85,20 @@ export default function ClientReviewScreen() {
         createdAt: serverTimestamp(),
         verified: true,
       });
+
+      await updateDoc(doc(db, 'bookings', id), { hasReview: true });
+
+      const detailerId = String(b.detailerId ?? '');
+      if (detailerId) {
+        const detailerSnap = await getDoc(doc(db, 'detailers', detailerId));
+        if (detailerSnap.exists()) {
+          sendPushToUser(
+            detailerSnap.data().expoPushToken,
+            'New Review!',
+            `You received a ${rating}-star review. Check your profile to see what they said.`
+          );
+        }
+      }
 
       Alert.alert(
         'Review Submitted',
@@ -101,6 +137,17 @@ export default function ClientReviewScreen() {
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
         >
+          {gateLoading ? null : gateError ? (
+            <View style={styles.gateWrap}>
+              <Ionicons name="lock-closed-outline" size={36} color={C.muted} />
+              <Text style={styles.gateTitle}>Review Locked</Text>
+              <Text style={styles.gateBody}>{gateError}</Text>
+              <Pressable style={styles.gateBtn} onPress={() => router.back()}>
+                <Text style={styles.gateBtnText}>Go Back</Text>
+              </Pressable>
+            </View>
+          ) : (
+          <>
           {/* Verified badge */}
           <View style={styles.verifiedBadge}>
             <Ionicons name="shield-checkmark" size={14} color={C.gold} />
@@ -165,6 +212,8 @@ export default function ClientReviewScreen() {
           <Text style={styles.disclaimer}>
             Reviews are permanently tied to a completed Revv Pay transaction and cannot be edited after submission.
           </Text>
+          </>
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -260,4 +309,16 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 12,
   },
+
+  gateWrap: { alignItems: 'center', paddingTop: 60, gap: 12, paddingHorizontal: 24 },
+  gateTitle: { color: C.navy, fontSize: 18, fontWeight: '800' },
+  gateBody: { color: C.muted, fontSize: 14, textAlign: 'center', lineHeight: 20 },
+  gateBtn: {
+    marginTop: 8,
+    backgroundColor: C.gold,
+    borderRadius: 14,
+    paddingVertical: 13,
+    paddingHorizontal: 28,
+  },
+  gateBtnText: { color: C.navy, fontSize: 14, fontWeight: '900' },
 });

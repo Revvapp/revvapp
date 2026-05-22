@@ -10,6 +10,7 @@ import {
   Text,
   View,
 } from 'react-native';
+
 import MapView, { Marker, Region } from 'react-native-maps';
 import Animated, { FadeIn, FadeInDown, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -40,6 +41,9 @@ const C = {
 };
 
 type ViewMode = 'list' | 'map';
+
+const FILTERS = ['All', 'Wash', 'Detail', 'Ceramic', 'Polish', 'Interior', 'Exterior'] as const;
+type Filter = typeof FILTERS[number];
 
 function StarRating({ rating }: { rating: number }) {
   return (
@@ -171,7 +175,14 @@ export default function ClientFindScreen() {
   const { loading, locationDenied, error, detailers, clientLat, clientLng } = useFindDetailers();
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [activeFilter, setActiveFilter] = useState<Filter>('All');
   const mapRef = useRef<MapView>(null);
+
+  const filtered = activeFilter === 'All'
+    ? detailers
+    : detailers.filter((d) =>
+        (d.services ?? []).some((s) => s.toLowerCase().includes(activeFilter.toLowerCase()))
+      );
 
   const selected = detailers.find((d) => d.uid === selectedId) ?? null;
 
@@ -216,12 +227,24 @@ export default function ClientFindScreen() {
           <View style={styles.headerMeta}>
             <View style={styles.metaDot} />
             <Text style={styles.headerSub}>
-              {detailers.length > 0
-                ? `${detailers.length} verified detailer${detailers.length !== 1 ? 's' : ''} near you`
+              {filtered.length > 0
+                ? `${filtered.length} detailer${filtered.length !== 1 ? 's' : ''} near you`
                 : 'No detailers found nearby'}
             </Text>
           </View>
         )}
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow} contentContainerStyle={styles.filterContent}>
+          {FILTERS.map((f) => (
+            <Pressable
+              key={f}
+              style={[styles.filterChip, activeFilter === f && styles.filterChipActive]}
+              onPress={() => setActiveFilter(f)}
+            >
+              <Text style={[styles.filterChipText, activeFilter === f && styles.filterChipTextActive]}>{f}</Text>
+            </Pressable>
+          ))}
+        </ScrollView>
       </View>
 
       {/* Light content area */}
@@ -243,10 +266,10 @@ export default function ClientFindScreen() {
                 <Text style={styles.errorText}>{error}</Text>
               </View>
             )}
-            {detailers.length === 0 ? (
+            {filtered.length === 0 ? (
               <EmptyState locationDenied={locationDenied} />
             ) : (
-              detailers.map((d, index) => (
+              filtered.map((d, index) => (
                 <Animated.View key={d.uid} entering={FadeInDown.delay(index * 60).springify()}>
                   <DetailerCard detailer={d} onPress={() => goToProfile(d.uid)} />
                 </Animated.View>
@@ -262,7 +285,7 @@ export default function ClientFindScreen() {
               showsUserLocation
               showsMyLocationButton={false}
             >
-              {detailers
+              {filtered
                 .filter((d) => d.lat != null && d.lng != null)
                 .map((d) => (
                   <Marker
@@ -292,7 +315,7 @@ export default function ClientFindScreen() {
               </View>
             )}
 
-            {detailers.length === 0 && (
+            {filtered.length === 0 && (
               <View style={styles.mapEmptyOverlay}>
                 <EmptyState locationDenied={locationDenied} />
               </View>
@@ -581,4 +604,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+
+  filterRow:    { flexGrow: 0, marginTop: 10 },
+  filterContent:{ paddingHorizontal: 0, gap: 8, flexDirection: 'row' },
+  filterChip: {
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+  },
+  filterChipActive:     { backgroundColor: C.gold, borderColor: C.gold },
+  filterChipText:       { color: C.gray, fontSize: 13, fontWeight: '700' },
+  filterChipTextActive: { color: C.navy },
 });

@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
-import { doc, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { getDownloadURL, ref as storageRef, uploadBytes } from 'firebase/storage';
 import { useState } from 'react';
 import {
@@ -20,6 +20,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { db, storage } from '@/firebaseConfig';
+import { sendPushToUser } from '@/lib/pushNotification';
 
 const C = {
   bg:      '#0D1B2A',
@@ -209,6 +210,13 @@ export default function VIRCaptureScreen() {
         virPanels[p.key] = { photoUrl: panels[p.key].photoUrl!, notes: panels[p.key].notes.trim() };
       }
       await updateDoc(doc(db, 'bookings', id!), { status: 'vir_submitted', virSubmittedAt: serverTimestamp(), virPanels });
+      const bookingSnap = await getDoc(doc(db, 'bookings', id!));
+      const clientId = bookingSnap.data()?.clientId as string | undefined;
+      if (clientId) {
+        const clientSnap = await getDoc(doc(db, 'clients', clientId));
+        const token = clientSnap.data()?.expoPushToken as string | undefined;
+        await sendPushToUser(token, 'Inspection Ready to Sign', 'Your detailer has completed the pre-inspection. Please review and sign.', { bookingId: id! });
+      }
       Alert.alert(
         'Inspection Submitted',
         'The client has been notified to review and sign the inspection report.',

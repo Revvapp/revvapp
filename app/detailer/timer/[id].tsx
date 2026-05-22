@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { doc, onSnapshot, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { db } from '@/firebaseConfig';
+import { sendPushToUser } from '@/lib/pushNotification';
 import { toTitleCase } from '@/lib/format';
 
 const COLORS = {
@@ -56,6 +57,7 @@ interface ChecklistItem {
 
 interface TimerBooking {
   id: string;
+  clientId: string;
   clientName: string;
   vehicleLabel: string;
   service: string;
@@ -133,6 +135,7 @@ export default function TimerScreen() {
       const d = snap.data();
       const b: TimerBooking = {
         id: snap.id,
+        clientId: String(d.clientId ?? ''),
         clientName: String(d.clientName ?? 'Client'),
         vehicleLabel: String(d.vehicleLabel ?? ''),
         service: String(d.service ?? ''),
@@ -242,6 +245,9 @@ export default function TimerScreen() {
                 timerAccumulatedSeconds: elapsed,
                 completedAt: serverTimestamp(),
               });
+              const clientSnap = await getDoc(doc(db, 'clients', booking.clientId));
+              const token = clientSnap.data()?.expoPushToken as string | undefined;
+              await sendPushToUser(token, 'Your Detail is Complete!', 'Your detailer has finished. Check your invoice and leave a review.', { bookingId: id });
               router.replace({ pathname: '/detailer/before-after/[id]', params: { id: id! } });
             } catch {
               Alert.alert('Error', 'Could not end job.');

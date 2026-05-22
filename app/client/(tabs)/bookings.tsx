@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, doc, getDoc, onSnapshot, query, updateDoc, where } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -16,8 +16,28 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { db } from '@/firebaseConfig';
 import { useAuth } from '@/hooks/useAuth';
+import { sendPushToUser } from '@/lib/pushNotification';
 import { toTitleCase } from '@/lib/format';
 import type { BookingDocument } from '@/types/firestore';
+
+async function cancelBooking(id: string) {
+  await updateDoc(doc(db, 'bookings', id), { status: 'cancelled' });
+  const bookSnap = await getDoc(doc(db, 'bookings', id));
+  if (bookSnap.exists()) {
+    const detailerId = String(bookSnap.data().detailerId ?? '');
+    const clientName = String(bookSnap.data().clientName ?? 'A client');
+    if (detailerId) {
+      const detailerSnap = await getDoc(doc(db, 'detailers', detailerId));
+      if (detailerSnap.exists()) {
+        sendPushToUser(
+          detailerSnap.data().expoPushToken,
+          'Booking Cancelled',
+          `${clientName} has cancelled their booking.`
+        );
+      }
+    }
+  }
+}
 
 const C = {
   bg:      '#0A1628',
@@ -105,13 +125,20 @@ function BookingCard({ booking }: { booking: BookingDocument }) {
 
       {booking.status === 'completed' && (
         <>
-          <Pressable
-            style={styles.ctaPrimary}
-            onPress={() => router.push({ pathname: '/client/review/[id]', params: { id: booking.id } })}
-          >
-            <Ionicons name="star-outline" size={15} color={C.navy} />
-            <Text style={styles.ctaPrimaryText}>Leave a Review</Text>
-          </Pressable>
+          {!(booking as any).hasReview ? (
+            <Pressable
+              style={styles.ctaPrimary}
+              onPress={() => router.push({ pathname: '/client/review/[id]', params: { id: booking.id } })}
+            >
+              <Ionicons name="star-outline" size={15} color={C.navy} />
+              <Text style={styles.ctaPrimaryText}>Leave a Review</Text>
+            </Pressable>
+          ) : (
+            <View style={styles.reviewedBadge}>
+              <Ionicons name="checkmark-circle" size={14} color={C.green} />
+              <Text style={styles.reviewedText}>Review Submitted</Text>
+            </View>
+          )}
           <Pressable
             style={styles.ctaSecondary}
             onPress={() => router.push({ pathname: '/client/invoice/[id]', params: { id: booking.id } })}
@@ -129,6 +156,29 @@ function BookingCard({ booking }: { booking: BookingDocument }) {
         >
           <Ionicons name="chatbubble-outline" size={13} color={C.muted} />
           <Text style={styles.ctaMessageText}>Message Detailer</Text>
+        </Pressable>
+      )}
+
+      {['pending', 'confirmed'].includes(booking.status) && (
+        <Pressable
+          style={styles.cancelBtn}
+          onPress={() =>
+            Alert.alert(
+              'Cancel Booking',
+              'Are you sure you want to cancel this booking?',
+              [
+                { text: 'Keep Booking', style: 'cancel' },
+                {
+                  text: 'Cancel Booking',
+                  style: 'destructive',
+                  onPress: () => cancelBooking(booking.id),
+                },
+              ]
+            )
+          }
+        >
+          <Ionicons name="close-circle-outline" size={13} color={C.muted} />
+          <Text style={styles.cancelBtnText}>Cancel Booking</Text>
         </Pressable>
       )}
 
@@ -391,12 +441,21 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   ctaMessageText: { color: C.muted, fontSize: 13, fontWeight: '600' },
-  reportBtn: {
+  cancelBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 5,
     marginTop: 6,
+    paddingVertical: 8,
+  },
+  cancelBtnText: { color: C.muted, fontSize: 11, fontWeight: '700' },
+  reportBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    marginTop: 2,
     paddingVertical: 8,
   },
   reportBtnText: { color: C.red, fontSize: 11, fontWeight: '700' },
@@ -415,4 +474,7 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { color: C.navy, fontSize: 17, fontWeight: '800', textAlign: 'center' },
   emptyBody: { color: C.muted, fontSize: 14, textAlign: 'center', lineHeight: 21 },
+
+  reviewedBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8 },
+  reviewedText:  { color: C.green, fontSize: 13, fontWeight: '700' },
 });

@@ -114,6 +114,7 @@ export default function DetailerInvoiceScreen() {
 
   const invoiceNum = `REV-${invoice.date.replace(/-/g, '')}-${(id ?? '').slice(-4).toUpperCase()}`;
   const isReleased = invoice.status === 'released';
+  const isDisputed = invoice.status === 'disputed';
   const release = releaseLabel(invoice.createdAt?.seconds ?? null);
   const detailerDisplay = invoice.businessName ? toTitleCase(invoice.businessName) : toTitleCase(invoice.detailerName);
 
@@ -125,9 +126,9 @@ export default function DetailerInvoiceScreen() {
           <Ionicons name="arrow-back" size={22} color={C.white} />
         </Pressable>
         <Text style={styles.navTitle}>Invoice</Text>
-        <View style={[styles.statusPill, isReleased ? styles.pillGreen : styles.pillAmber]}>
-          <Text style={[styles.statusPillText, isReleased ? styles.pillGreenText : styles.pillAmberText]}>
-            {isReleased ? 'Paid Out' : 'Pending'}
+        <View style={[styles.statusPill, isReleased ? styles.pillGreen : isDisputed ? styles.pillRed : styles.pillAmber]}>
+          <Text style={[styles.statusPillText, isReleased ? styles.pillGreenText : isDisputed ? styles.pillRedText : styles.pillAmberText]}>
+            {isReleased ? 'Paid Out' : isDisputed ? 'Disputed' : 'Pending'}
           </Text>
         </View>
       </View>
@@ -234,6 +235,16 @@ export default function DetailerInvoiceScreen() {
           </View>
         )}
 
+        {isDisputed && (
+          <Pressable
+            style={styles.btnDispute}
+            onPress={() => router.push({ pathname: '/detailer/dispute/[id]', params: { id: id ?? '' } })}
+          >
+            <Ionicons name="alert-circle-outline" size={17} color={C.white} />
+            <Text style={styles.btnDisputeText}>View Dispute</Text>
+          </Pressable>
+        )}
+
         <Pressable style={styles.btnReach} onPress={() => router.push({ pathname: '/detailer/revv-reach/[id]', params: { id: id ?? '' } })}>
           <Ionicons name="megaphone" size={18} color={C.navy} />
           <Text style={styles.btnReachText}>Share to Social</Text>
@@ -267,9 +278,11 @@ const styles = StyleSheet.create({
   statusPill: { borderRadius: 999, paddingHorizontal: 12, paddingVertical: 5 },
   pillAmber: { backgroundColor: '#FFF3CD' },
   pillGreen: { backgroundColor: '#D4EDDA' },
+  pillRed:   { backgroundColor: '#FDECEA' },
   statusPillText: { fontSize: 12, fontWeight: '800' },
   pillAmberText: { color: '#856404' },
   pillGreenText: { color: '#155724' },
+  pillRedText:   { color: '#D93025' },
 
   body: { flex: 1, backgroundColor: C.content, borderTopLeftRadius: 22, borderTopRightRadius: 22 },
   bodyInner: { padding: 18, paddingBottom: 40 },
@@ -393,5 +406,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     alignItems: 'center',
   },
-  btnDoneText: { color: C.muted, fontSize: 14, fontWeight: '600' },
+  btnDoneText:    { color: C.muted, fontSize: 14, fontWeight: '600' },
+  btnDispute:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#D93025', borderRadius: 14, paddingVertical: 14, marginHorizontal: 0 },
+  btnDisputeText: { color: C.white, fontSize: 14, fontWeight: '900' },
 });

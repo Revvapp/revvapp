@@ -1,11 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -97,6 +96,13 @@ export default function ClientInvoiceScreen() {
     });
     return () => unsub();
   }, [id]);
+
+  useEffect(() => {
+    if (!invoice || !id) return;
+    if (invoice.status === 'pending_release' && !disputeWindowOpen(invoice.createdAt?.seconds ?? null)) {
+      updateDoc(doc(db, 'invoices', id), { status: 'released' });
+    }
+  }, [invoice, id]);
 
   if (loading) {
     return (
@@ -247,13 +253,7 @@ export default function ClientInvoiceScreen() {
         {disputeOpen && (
           <Pressable
             style={styles.btnDispute}
-            onPress={() =>
-              Alert.alert(
-                'Raise a Dispute',
-                'Dispute resolution is coming soon. For urgent issues, please contact support.',
-                [{ text: 'OK' }]
-              )
-            }
+            onPress={() => router.push({ pathname: '/client/dispute/[id]', params: { id: id! } })}
           >
             <Ionicons name="flag-outline" size={16} color={C.red} />
             <Text style={styles.btnDisputeText}>Raise a Dispute</Text>

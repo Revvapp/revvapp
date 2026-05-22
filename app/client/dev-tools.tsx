@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as Notifications from 'expo-notifications';
 import { Redirect, router } from 'expo-router';
 import { deleteDoc, doc, serverTimestamp, setDoc } from 'firebase/firestore';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 function makeTestDetailerDoc(uid: string) {
   return {
@@ -80,11 +81,11 @@ type Scenario = {
 const SCENARIOS: Scenario[] = [
   {
     id: 'client-dev-pending',
-    label: 'Upcoming Booking',
-    description: 'Booking confirmed, detailer hasn\'t arrived yet',
-    icon: 'calendar-outline',
-    color: '#856404',
-    navigate: undefined,
+    label: 'Cancel Booking',
+    description: 'Pending booking — shows the Cancel Booking button',
+    icon: 'close-circle-outline',
+    color: COLORS.red,
+    navigate: '/client/(tabs)/bookings',
   },
   {
     id: 'client-dev-active',
@@ -119,12 +120,36 @@ const SCENARIOS: Scenario[] = [
     navigate: '/client/invoice/[id]',
   },
   {
+    id: 'client-dev-dispute',
+    label: 'Raise a Dispute',
+    description: 'Opens the dispute form directly for the invoiced booking',
+    icon: 'flag-outline',
+    color: COLORS.red,
+    navigate: '/client/dispute/[id]',
+  },
+  {
     id: 'client-dev-paid',
     label: 'Invoice — Payment Released',
     description: 'Dispute window closed, payment released to detailer',
     icon: 'checkmark-circle-outline',
     color: COLORS.green,
     navigate: '/client/invoice/[id]',
+  },
+  {
+    id: 'client-dev-review',
+    label: 'Leave Review (Completed)',
+    description: 'Completed booking — review gate passes, form unlocked',
+    icon: 'star-outline',
+    color: COLORS.gold,
+    navigate: '/client/review/[id]',
+  },
+  {
+    id: 'client-dev-review-blocked',
+    label: 'Review Gate (Blocked)',
+    description: 'Pending booking — review screen shows the lock state',
+    icon: 'lock-closed-outline',
+    color: COLORS.muted,
+    navigate: '/client/review/[id]',
   },
 ];
 
@@ -215,6 +240,52 @@ async function seedScenario(uid: string, scenario: Scenario): Promise<void> {
       disputeWindowOpenUntil: new Date(Date.now() + 22 * 60 * 60 * 1000).toISOString(),
     });
 
+  } else if (id === 'client-dev-dispute') {
+    // Reuse the invoiced booking doc so the dispute screen has a real invoice to update
+    await setDoc(doc(db, 'bookings', id), {
+      ...BASE_BOOKING,
+      clientId: uid,
+      detailerId: uid,
+      status: 'completed',
+      virPanels: MOCK_VIR_PANELS,
+      completedAt: serverTimestamp(),
+      afterPhotos: [],
+    });
+    await setDoc(doc(db, 'invoices', id), {
+      bookingId: id,
+      clientId: uid,
+      detailerId: uid,
+      clientName: BASE_BOOKING.clientName,
+      detailerName: BASE_BOOKING.detailerName,
+      businessName: BASE_BOOKING.businessName,
+      vehicleLabel: BASE_BOOKING.vehicleLabel,
+      service: BASE_BOOKING.service,
+      date: BASE_BOOKING.date,
+      price: 280,
+      platformFee: 28,
+      detailerPayout: 252,
+      status: 'pending_release',
+      afterPhotos: [],
+      createdAt: serverTimestamp(),
+    });
+
+  } else if (id === 'client-dev-review') {
+    await setDoc(doc(db, 'bookings', id), {
+      ...BASE_BOOKING,
+      clientId: uid,
+      detailerId: uid,
+      status: 'completed',
+      completedAt: serverTimestamp(),
+    });
+
+  } else if (id === 'client-dev-review-blocked') {
+    await setDoc(doc(db, 'bookings', id), {
+      ...BASE_BOOKING,
+      clientId: uid,
+      detailerId: uid,
+      status: 'pending',
+    });
+
   } else if (id === 'client-dev-paid') {
     await setDoc(doc(db, 'bookings', id), {
       ...BASE_BOOKING,
@@ -257,6 +328,17 @@ export default function ClientDevToolsScreen() {
 function ClientDevToolsContent() {
   const { user } = useAuth();
   const [loading, setLoading] = useState<string | null>(null);
+  const [pushToken, setPushToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    Notifications.getPermissionsAsync().then(({ status }) => {
+      if (status === 'granted') {
+        Notifications.getExpoPushTokenAsync()
+          .then((t) => setPushToken(t.data))
+          .catch(() => setPushToken(null));
+      }
+    });
+  }, []);
 
   async function handleSeed(scenario: Scenario) {
     if (!user?.uid) return;
@@ -433,6 +515,12 @@ function ClientDevToolsContent() {
           <Text style={styles.infoTitle}>Your UID</Text>
           <Text style={styles.infoValue} selectable>{user?.uid ?? 'Not logged in'}</Text>
           <Text style={styles.infoHint}>Used as clientId on all seeded bookings.</Text>
+          <View style={styles.infoDivider} />
+          <Text style={styles.infoTitle}>Push Token</Text>
+          <Text style={styles.infoValue} selectable numberOfLines={2}>
+            {pushToken ?? 'Not registered (open app and grant permission)'}
+          </Text>
+          <Text style={styles.infoHint}>Token is saved to Firestore on dashboard load.</Text>
         </View>
 
         <View style={{ height: 40 }} />
@@ -502,4 +590,5 @@ const styles = StyleSheet.create({
   infoTitle: { color: COLORS.muted, fontSize: 11, fontWeight: '700', letterSpacing: 0.8 },
   infoValue: { color: COLORS.gold, fontSize: 12, fontWeight: '600', fontVariant: ['tabular-nums'] },
   infoHint: { color: COLORS.muted, fontSize: 11, lineHeight: 16, marginTop: 4 },
+  infoDivider: { height: 1, backgroundColor: '#243548', marginVertical: 10 },
 });

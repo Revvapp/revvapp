@@ -58,6 +58,7 @@ export function useClientDashboard(): ClientDashboardModel {
       const fullName = String(clientData?.fullName ?? '');
       const city = clientData?.city ? String(clientData.city) : '';
       const state = clientData?.state ? String(clientData.state) : '';
+      const activeVehicleId: string | null = clientData?.activeVehicleId ?? null;
 
       const vehicles: VehicleDocument[] = vehiclesSnap.docs.map((d) => {
         const v = d.data();
@@ -72,6 +73,10 @@ export function useClientDashboard(): ClientDashboardModel {
           ownerId: user.uid,
         };
       });
+
+      if (activeVehicleId) {
+        vehicles.sort((a, b) => (a.id === activeVehicleId ? -1 : b.id === activeVehicleId ? 1 : 0));
+      }
 
       const bookingsRaw = bookingsSnap.docs.map((d) => {
         const x = d.data();

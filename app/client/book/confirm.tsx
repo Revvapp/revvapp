@@ -18,6 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { db } from '@/firebaseConfig';
 import { useAuth } from '@/hooks/useAuth';
 import { toTitleCase } from '@/lib/format';
+import { sendPushToUser } from '@/lib/pushNotification';
 
 const COLORS = {
   bg: '#0D1B2A',
@@ -115,6 +116,15 @@ export default function BookConfirmScreen() {
         clientName,
         createdAt: serverTimestamp(),
       });
+
+      const detailerSnap = await getDoc(doc(db, 'detailers', params.detailerId));
+      if (detailerSnap.exists()) {
+        sendPushToUser(
+          detailerSnap.data().expoPushToken,
+          'New Booking Request!',
+          `${clientName} wants to book ${toTitleCase(params.service ?? '')} on ${params.dateLabel ?? params.date}`
+        );
+      }
 
       setSuccess(true);
     } catch (e) {

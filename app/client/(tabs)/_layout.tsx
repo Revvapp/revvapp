@@ -1,6 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
-import { View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+
+import { useUnreadMessageCount } from '@/hooks/useUnreadMessageCount';
 
 const NAVY = '#1A3A5C';
 const GOLD = '#C9A227';
@@ -10,14 +12,23 @@ function TabIcon({
   name,
   nameFocused,
   focused,
+  badge,
 }: {
   name: React.ComponentProps<typeof Ionicons>['name'];
   nameFocused: React.ComponentProps<typeof Ionicons>['name'];
   focused: boolean;
+  badge?: number;
 }) {
   return (
     <View style={{ alignItems: 'center', gap: 5 }}>
-      <Ionicons name={focused ? nameFocused : name} size={23} color={focused ? NAVY : MUTED} />
+      <View>
+        <Ionicons name={focused ? nameFocused : name} size={23} color={focused ? NAVY : MUTED} />
+        {!!badge && badge > 0 && (
+          <View style={tabStyles.badge}>
+            <Text style={tabStyles.badgeText}>{badge > 9 ? '9+' : badge}</Text>
+          </View>
+        )}
+      </View>
       {focused && (
         <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: GOLD }} />
       )}
@@ -25,7 +36,25 @@ function TabIcon({
   );
 }
 
+const tabStyles = StyleSheet.create({
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -6,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#D93025',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+  },
+  badgeText: { color: '#FFF', fontSize: 9, fontWeight: '800' },
+});
+
 export default function ClientTabsLayout() {
+  const unreadMessages = useUnreadMessageCount();
+
   return (
     <Tabs
       screenOptions={{
@@ -69,11 +98,18 @@ export default function ClientTabsLayout() {
         name="messages"
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon name="chatbubble-outline" nameFocused="chatbubble" focused={focused} />
+            <TabIcon name="chatbubble-outline" nameFocused="chatbubble" focused={focused} badge={unreadMessages} />
           ),
         }}
       />
-      <Tabs.Screen name="profile" options={{ href: null }} />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          tabBarIcon: ({ focused }) => (
+            <TabIcon name="person-outline" nameFocused="person" focused={focused} />
+          ),
+        }}
+      />
       <Tabs.Screen name="search" options={{ href: null }} />
       <Tabs.Screen name="garage" options={{ href: null }} />
     </Tabs>

@@ -16,6 +16,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -90,6 +91,7 @@ export default function BookVehicleScreen() {
         } satisfies VehicleDocument;
       });
       setVehicles(docs);
+      if (docs.length > 0) setSelectedId(docs[0].id);
       setLoadingVehicles(false);
     });
   }, [user?.uid]);
@@ -178,8 +180,9 @@ export default function BookVehicleScreen() {
                 const isSelected = v.id === selectedId;
                 const label = `${v.year} ${toTitleCase(v.make)} ${toTitleCase(v.model)}`;
                 return (
-                  <Pressable
+                  <TouchableOpacity
                     key={v.id}
+                    activeOpacity={0.75}
                     style={[styles.vehicleRow, isSelected && styles.vehicleRowSelected]}
                     onPress={() => { setSelectedId(v.id); setShowAddForm(false); }}
                   >
@@ -199,7 +202,7 @@ export default function BookVehicleScreen() {
                     <View style={[styles.radio, isSelected && styles.radioSelected]}>
                       {isSelected && <View style={styles.radioInner} />}
                     </View>
-                  </Pressable>
+                  </TouchableOpacity>
                 );
               })
             )}
