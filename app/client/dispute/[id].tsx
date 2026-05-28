@@ -21,7 +21,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { db, storage } from '@/firebaseConfig';
 import { useAuth } from '@/hooks/useAuth';
-import { sendPushToUser } from '@/lib/pushNotification';
+import { sendPushToUser } from '@/lib/pushNotifications';
 
 const C = {
   bg:      '#0A1628',
@@ -79,8 +79,8 @@ export default function ClientDisputeScreen() {
       return;
     }
     const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.8,
+      mediaTypes: ['images'],
+      quality: 0.6,
     });
     if (result.canceled) return;
     setPhotos((prev) => [...prev, result.assets[0].uri].slice(0, MAX_PHOTOS));
@@ -100,10 +100,16 @@ export default function ClientDisputeScreen() {
       );
       setUploading(false);
 
+      // Resolve the detailer up front so it can be stored on the dispute
+      // (the detailer needs it to read the dispute under security rules).
+      const invoiceSnap = await getDoc(doc(db, 'invoices', id));
+      const detailerId = invoiceSnap.exists() ? String(invoiceSnap.data().detailerId ?? '') : '';
+
       await addDoc(collection(db, 'disputes'), {
         invoiceId: id,
         bookingId: id,
         clientId: user.uid,
+        detailerId,
         category,
         description: description.trim(),
         photoUrls,
@@ -112,18 +118,15 @@ export default function ClientDisputeScreen() {
       });
       await updateDoc(doc(db, 'invoices', id), { status: 'disputed' });
 
-      const invoiceSnap = await getDoc(doc(db, 'invoices', id));
-      if (invoiceSnap.exists()) {
-        const detailerId = String(invoiceSnap.data().detailerId ?? '');
-        if (detailerId) {
-          const detailerSnap = await getDoc(doc(db, 'detailers', detailerId));
-          if (detailerSnap.exists()) {
-            sendPushToUser(
-              detailerSnap.data().expoPushToken,
-              'Dispute Raised',
-              'A client has raised a dispute on a recent job. Payment is paused pending review.'
-            );
-          }
+      if (detailerId) {
+        const detailerSnap = await getDoc(doc(db, 'detailers', detailerId));
+        if (detailerSnap.exists()) {
+          sendPushToUser(
+            detailerSnap.data().expoPushToken,
+            'Dispute Raised',
+            'A client has raised a dispute on a recent job. Payment is paused pending review.',
+            { type: 'dispute', invoiceId: id }
+          );
         }
       }
 

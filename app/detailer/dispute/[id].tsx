@@ -1,20 +1,26 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, doc, getDoc, onSnapshot, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { db } from '@/firebaseConfig';
+import { useAuth } from '@/hooks/useAuth';
 import { toTitleCase } from '@/lib/format';
+import { sendPushToUser } from '@/lib/pushNotifications';
 
 const C = {
   bg:      '#0A1628',
@@ -47,13 +53,17 @@ type DisputeData = {
   photoUrls: string[];
   status: string;
   clientId: string;
+  detailerResponse: string;
   createdAt: { seconds: number } | null;
 };
 
 export default function DetailerDisputeScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { user } = useAuth();
   const [dispute, setDispute] = useState<DisputeData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [response, setResponse] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -68,6 +78,7 @@ export default function DetailerDisputeScreen() {
           photoUrls:   Array.isArray(d.data().photoUrls) ? d.data().photoUrls : [],
           status:      String(d.data().status ?? 'open'),
           clientId:    String(d.data().clientId ?? ''),
+          detailerResponse: String(d.data().detailerResponse ?? ''),
           createdAt:   d.data().createdAt ?? null,
         });
       }
@@ -77,6 +88,66 @@ export default function DetailerDisputeScreen() {
   }, [id]);
 
   const isResolved = dispute?.status === 'resolved';
+
+  async function notifyClient(title: string, body: string) {
+    if (!dispute?.clientId) return;
+    try {
+      const clientSnap = await getDoc(doc(db, 'clients', dispute.clientId));
+      if (clientSnap.exists()) {
+        sendPushToUser(clientSnap.data().expoPushToken, title, body, { type: 'dispute', invoiceId: id ?? '' });
+      }
+    } catch {
+      // best-effort
+    }
+  }
+
+  async function submitResponse() {
+    if (!dispute || !response.trim() || submitting) return;
+    setSubmitting(true);
+    try {
+      await updateDoc(doc(db, 'disputes', dispute.id), {
+        detailerResponse: response.trim(),
+        respondedAt: serverTimestamp(),
+      });
+      await notifyClient('Detailer Responded', 'The detailer has responded to your dispute.');
+      setResponse('');
+      Alert.alert('Response Sent', 'Your response has been added to the dispute.');
+    } catch {
+      Alert.alert('Error', 'Could not send your response. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function confirmResolve() {
+    Alert.alert(
+      'Mark as Resolved?',
+      'Confirm you have settled this issue with the client. This releases the held payment and closes the dispute.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Resolve', style: 'default', onPress: () => void resolveDispute() },
+      ]
+    );
+  }
+
+  async function resolveDispute() {
+    if (!dispute || submitting) return;
+    setSubmitting(true);
+    try {
+      await updateDoc(doc(db, 'disputes', dispute.id), {
+        status: 'resolved',
+        resolvedAt: serverTimestamp(),
+        resolvedBy: user?.uid ?? '',
+      });
+      if (id) await updateDoc(doc(db, 'invoices', id), { status: 'released' });
+      await notifyClient('Dispute Resolved', 'Your dispute has been marked resolved and the payment released.');
+      Alert.alert('Dispute Resolved', 'The dispute is closed and the payment has been released.');
+    } catch {
+      Alert.alert('Error', 'Could not resolve the dispute. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   return (
     <SafeAreaView edges={['top']} style={styles.safe}>
@@ -101,10 +172,12 @@ export default function DetailerDisputeScreen() {
           <Text style={styles.noDisputeText}>No dispute found for this invoice.</Text>
         </View>
       ) : (
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
           {/* Status banner */}
           <View style={[styles.statusBanner, isResolved ? styles.statusBannerGreen : styles.statusBannerRed]}>
@@ -128,7 +201,7 @@ export default function DetailerDisputeScreen() {
           </View>
 
           {/* Description */}
-          <Text style={styles.sectionLabel}>Client's Description</Text>
+          <Text style={styles.sectionLabel}>Client&apos;s Description</Text>
           <View style={styles.descCard}>
             <Text style={styles.descText}>{dispute.description}</Text>
           </View>
@@ -145,13 +218,69 @@ export default function DetailerDisputeScreen() {
             </>
           )}
 
-          {/* Resolution note */}
-          <View style={styles.noteCard}>
-            <Ionicons name="information-circle-outline" size={16} color={C.muted} />
-            <Text style={styles.noteText}>
-              The REVV team is reviewing this dispute. Payment is paused until a resolution is reached. You will be contacted via email within 1–3 business days.
-            </Text>
-          </View>
+          {/* Existing response */}
+          {!!dispute.detailerResponse && (
+            <>
+              <Text style={styles.sectionLabel}>Your Response</Text>
+              <View style={styles.descCard}>
+                <Text style={styles.descText}>{dispute.detailerResponse}</Text>
+              </View>
+            </>
+          )}
+
+          {/* Resolution actions (open disputes only) */}
+          {!isResolved ? (
+            <>
+              <Text style={styles.sectionLabel}>
+                {dispute.detailerResponse ? 'Update Your Response' : 'Respond to the Client'}
+              </Text>
+              <TextInput
+                style={styles.responseInput}
+                placeholder="Explain your side or how you've addressed the issue…"
+                placeholderTextColor={C.muted}
+                value={response}
+                onChangeText={setResponse}
+                multiline
+                maxLength={1000}
+                textAlignVertical="top"
+              />
+
+              <Pressable
+                style={[styles.responseBtn, (!response.trim() || submitting) && styles.btnDisabled]}
+                onPress={submitResponse}
+                disabled={!response.trim() || submitting}
+              >
+                {submitting
+                  ? <ActivityIndicator color={C.white} size="small" />
+                  : (
+                    <>
+                      <Ionicons name="send" size={16} color={C.white} />
+                      <Text style={styles.responseBtnText}>Send Response</Text>
+                    </>
+                  )}
+              </Pressable>
+
+              <Pressable
+                style={[styles.resolveBtn, submitting && styles.btnDisabled]}
+                onPress={confirmResolve}
+                disabled={submitting}
+              >
+                <Ionicons name="checkmark-circle" size={17} color={C.white} />
+                <Text style={styles.resolveBtnText}>Mark as Resolved & Release Payment</Text>
+              </Pressable>
+
+              <Text style={styles.noteText}>
+                Resolving confirms you have settled the issue with the client. This releases the held payment and closes the dispute.
+              </Text>
+            </>
+          ) : (
+            <View style={styles.noteCard}>
+              <Ionicons name="checkmark-circle-outline" size={16} color={C.green} />
+              <Text style={styles.noteText}>
+                This dispute has been resolved and the payment released.
+              </Text>
+            </View>
+          )}
 
           <Pressable style={styles.backBtn2} onPress={() => router.back()}>
             <Text style={styles.backBtn2Text}>Back to Invoice</Text>
@@ -159,6 +288,7 @@ export default function DetailerDisputeScreen() {
 
           <View style={{ height: 40 }} />
         </ScrollView>
+        </KeyboardAvoidingView>
       )}
     </SafeAreaView>
   );
@@ -253,4 +383,39 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   backBtn2Text: { color: C.white, fontSize: 15, fontWeight: '800' },
+
+  responseInput: {
+    backgroundColor: C.card,
+    borderRadius: 12,
+    padding: 14,
+    fontSize: 14,
+    color: C.navy,
+    minHeight: 100,
+    borderWidth: 1,
+    borderColor: C.border,
+    lineHeight: 20,
+  },
+  responseBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: C.navy,
+    borderRadius: 14,
+    paddingVertical: 14,
+    marginTop: 10,
+  },
+  responseBtnText: { color: C.white, fontSize: 14, fontWeight: '800' },
+  resolveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: C.green,
+    borderRadius: 14,
+    paddingVertical: 14,
+    marginTop: 10,
+  },
+  resolveBtnText: { color: C.white, fontSize: 14, fontWeight: '800' },
+  btnDisabled: { opacity: 0.4 },
 });

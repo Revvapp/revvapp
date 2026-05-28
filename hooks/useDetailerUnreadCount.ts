@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 
 import { db } from '@/firebaseConfig';
 import { useAuth } from '@/hooks/useAuth';
+import { isConversationUnread } from '@/lib/conversations';
 
 export function useDetailerUnreadCount(): number {
   const { user } = useAuth();
@@ -10,14 +11,10 @@ export function useDetailerUnreadCount(): number {
 
   useEffect(() => {
     if (!user?.uid) return;
-    const q = query(collection(db, 'conversations'), where('detailerId', '==', user.uid));
+    const uid = user.uid;
+    const q = query(collection(db, 'conversations'), where('detailerId', '==', uid));
     const unsub = onSnapshot(q, (snap) => {
-      setCount(
-        snap.docs.filter((d) => {
-          const data = d.data();
-          return data.lastSenderId && data.lastSenderId !== user.uid;
-        }).length
-      );
+      setCount(snap.docs.filter((d) => isConversationUnread(d.data(), uid)).length);
     });
     return () => unsub();
   }, [user?.uid]);

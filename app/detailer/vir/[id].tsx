@@ -20,7 +20,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { db, storage } from '@/firebaseConfig';
-import { sendPushToUser } from '@/lib/pushNotification';
+import { sendPushToUser } from '@/lib/pushNotifications';
 
 const C = {
   bg:      '#0D1B2A',

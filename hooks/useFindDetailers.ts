@@ -47,6 +47,7 @@ export function useFindDetailers(): FindDetailersModel {
   const [locationDenied, setLocationDenied] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [rawDetailers, setRawDetailers] = useState<DetailerDocument[]>([]);
+  const [ratings, setRatings] = useState<Record<string, { rating: number; reviewCount: number }>>({});
   const [clientLat, setClientLat] = useState<number | null>(null);
   const [clientLng, setClientLng] = useState<number | null>(null);
 
@@ -88,6 +89,28 @@ export function useFindDetailers(): FindDetailersModel {
     return () => unsub();
   }, []);
 
+  // Live ratings aggregated from the reviews collection (single source of truth —
+  // the stored detailer.rating field is never written by clients).
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'reviews'), (snap) => {
+      const acc: Record<string, { sum: number; count: number }> = {};
+      snap.docs.forEach((d) => {
+        const detailerId = String(d.data().detailerId ?? '');
+        const r = Number(d.data().rating ?? 0);
+        if (!detailerId || !r) return;
+        acc[detailerId] = acc[detailerId]
+          ? { sum: acc[detailerId].sum + r, count: acc[detailerId].count + 1 }
+          : { sum: r, count: 1 };
+      });
+      const next: Record<string, { rating: number; reviewCount: number }> = {};
+      Object.entries(acc).forEach(([id, { sum, count }]) => {
+        next[id] = { rating: sum / count, reviewCount: count };
+      });
+      setRatings(next);
+    });
+    return () => unsub();
+  }, []);
+
   const MAX_RADIUS_MI = 50;
 
   const detailers: DetailerWithDistance[] = rawDetailers
@@ -96,7 +119,13 @@ export function useFindDetailers(): FindDetailersModel {
         clientLat != null && clientLng != null && d.lat != null && d.lng != null
           ? haversineMi(clientLat, clientLng, d.lat, d.lng)
           : null;
-      return { ...d, distanceMi };
+      const agg = ratings[d.uid];
+      return {
+        ...d,
+        rating: agg ? agg.rating : 0,
+        reviewCount: agg ? agg.reviewCount : 0,
+        distanceMi,
+      };
     })
     .filter((d) => d.distanceMi == null || d.distanceMi <= MAX_RADIUS_MI)
     .sort((a, b) => {

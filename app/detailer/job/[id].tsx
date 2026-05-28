@@ -14,7 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { db } from '@/firebaseConfig';
-import { sendPushToUser } from '@/lib/pushNotification';
+import { sendPushToUser } from '@/lib/pushNotifications';
 import { formatJobDate } from '@/lib/dateKeys';
 import { toTitleCase } from '@/lib/format';
 import type { BookingDocument } from '@/types/firestore';

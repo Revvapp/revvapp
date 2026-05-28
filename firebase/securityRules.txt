@@ -63,8 +63,49 @@ service cloud.firestore {
       );
       allow create: if signedIn()
         && request.resource.data.detailerId == request.auth.uid;
+      // Detailer may freely update their own invoices. Client may only flip the
+      // status (and nothing else) to 'disputed' (raising a dispute) or 'released'
+      // (auto-release after the dispute window closes).
+      allow update: if signedIn() && (
+        resource.data.detailerId == request.auth.uid
+        || (
+          resource.data.clientId == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+          && request.resource.data.status in ['disputed', 'released']
+        )
+      );
+    }
+
+    match /reviews/{reviewId} {
+      // Reviews are public so detailer profiles can display them.
+      allow read: if signedIn();
+      // Only the booking's own client may post, and only for a completed booking.
+      allow create: if signedIn()
+        && request.resource.data.clientId == request.auth.uid
+        && request.resource.data.bookingId is string
+        && get(/databases/$(database)/documents/bookings/$(request.resource.data.bookingId)).data.clientId == request.auth.uid
+        && get(/databases/$(database)/documents/bookings/$(request.resource.data.bookingId)).data.status == 'completed';
+      // Reviews are permanent.
+      allow update, delete: if false;
+    }
+
+    match /disputes/{disputeId} {
+      allow read: if signedIn()
+        && (resource.data.clientId == request.auth.uid
+            || resource.data.detailerId == request.auth.uid);
+      allow create: if signedIn()
+        && request.resource.data.clientId == request.auth.uid;
+      // Either party may post a response / mark resolved.
       allow update: if signedIn()
-        && resource.data.detailerId == request.auth.uid;
+        && (resource.data.clientId == request.auth.uid
+            || resource.data.detailerId == request.auth.uid);
+      allow delete: if false;
+    }
+
+    match /emailLookup/{emailId} {
+      // Readable pre-auth so signup can resolve an existing account's type.
+      allow read: if true;
+      allow write: if signedIn();
     }
 
     match /conversations/{bookingId} {
@@ -94,6 +135,11 @@ service firebase.storage {
     match /after-photos/{bookingId}/{allPaths=**} {
       allow read: if request.auth != null;
       allow write: if request.auth != null;
+    }
+
+    match /disputes/{uid}/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == uid;
     }
 
   }

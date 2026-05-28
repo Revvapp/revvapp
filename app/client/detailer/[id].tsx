@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
-import { collection, doc, getDocs, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore';
+import { collection, doc, getDocs, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -84,7 +84,7 @@ export default function DetailerPublicProfileScreen() {
   useEffect(() => {
     if (!id) return;
     getDocs(
-      query(collection(db, 'reviews'), where('detailerId', '==', id), orderBy('createdAt', 'desc'), limit(10))
+      query(collection(db, 'reviews'), where('detailerId', '==', id), orderBy('createdAt', 'desc'))
     ).then((snap) => {
       setReviews(snap.docs.map((d) => ({
         id: d.id,
@@ -141,6 +141,11 @@ export default function DetailerPublicProfileScreen() {
   const name = detailer.businessName?.trim() || detailer.fullName;
   const initials = name.slice(0, 2).toUpperCase();
   const from = lowestRate(detailer.rates ?? {});
+  // Live rating computed from the reviews collection (single source of truth).
+  const reviewCount = reviews.length;
+  const ratingValue = reviewCount > 0
+    ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviewCount
+    : 0;
   const workingDayLabels = (detailer.workingDays ?? [])
     .sort((a, b) => a - b)
     .map((d) => DAY_LABELS[d])
@@ -191,10 +196,10 @@ export default function DetailerPublicProfileScreen() {
               )}
             </View>
             <View style={styles.ratingRow}>
-              <StarRating rating={detailer.rating ?? 0} />
+              <StarRating rating={ratingValue} />
               <Text style={styles.ratingText}>
-                {detailer.rating > 0
-                  ? `${detailer.rating.toFixed(1)} · ${detailer.reviewCount ?? 0} reviews`
+                {reviewCount > 0
+                  ? `${ratingValue.toFixed(1)} · ${reviewCount} review${reviewCount !== 1 ? 's' : ''}`
                   : 'No reviews yet'}
               </Text>
             </View>
@@ -269,9 +274,9 @@ export default function DetailerPublicProfileScreen() {
 
         {reviews.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Reviews ({reviews.length})</Text>
+            <Text style={styles.sectionTitle}>Reviews ({reviewCount})</Text>
             <View style={styles.sectionCard}>
-              {reviews.map((r, i) => (
+              {reviews.slice(0, 10).map((r, i) => (
                 <View key={r.id}>
                   {i > 0 && <View style={styles.serviceRowBorder} />}
                   <ReviewCard review={r} />

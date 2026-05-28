@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { db } from '@/firebaseConfig';
 import { useAuth } from '@/hooks/useAuth';
+import { isConversationUnread } from '@/lib/conversations';
 
 const C = {
   bg:      '#0A1628',
@@ -39,6 +40,7 @@ type Conversation = {
   lastMessage: string;
   lastMessageAt: any;
   lastSenderId: string;
+  reads: Record<string, any>;
 };
 
 function timeAgo(ts: any): string {
@@ -57,7 +59,7 @@ function timeAgo(ts: any): string {
 function ConversationRow({ conv, uid }: { conv: Conversation; uid: string }) {
   const displayName = conv.businessName || conv.detailerName || 'Detailer';
   const initial = displayName[0]?.toUpperCase() ?? 'D';
-  const isUnread = conv.lastSenderId && conv.lastSenderId !== uid;
+  const isUnread = isConversationUnread(conv, uid);
 
   return (
     <Pressable
@@ -109,6 +111,7 @@ export default function ClientMessagesScreen() {
         lastMessage: String(d.data().lastMessage ?? ''),
         lastMessageAt: d.data().lastMessageAt ?? null,
         lastSenderId: String(d.data().lastSenderId ?? ''),
+        reads: d.data().reads ?? {},
       }));
       // Sort newest first client-side
       docs.sort((a, b) => {

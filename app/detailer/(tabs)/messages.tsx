@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { db } from '@/firebaseConfig';
 import { useAuth } from '@/hooks/useAuth';
+import { isConversationUnread } from '@/lib/conversations';
 
 const C = {
   bg:      '#0D1B2A',
@@ -42,6 +43,7 @@ type Conversation = {
   lastMessage: string;
   lastMessageAt: any;
   lastSenderId: string;
+  reads: Record<string, any>;
 };
 
 function timeAgo(ts: any): string {
@@ -60,7 +62,7 @@ function timeAgo(ts: any): string {
 function ConversationRow({ conv, uid }: { conv: Conversation; uid: string }) {
   const displayName = conv.clientName || 'Client';
   const initial = displayName[0]?.toUpperCase() ?? 'C';
-  const isUnread = conv.lastSenderId && conv.lastSenderId !== uid;
+  const isUnread = isConversationUnread(conv, uid);
   const preview = conv.lastSenderId === uid
     ? `You: ${conv.lastMessage}`
     : conv.lastMessage || 'Start a conversation…';
@@ -129,6 +131,7 @@ export default function DetailerMessagesScreen() {
         lastMessage: String(d.data().lastMessage ?? ''),
         lastMessageAt: d.data().lastMessageAt ?? null,
         lastSenderId: String(d.data().lastSenderId ?? ''),
+        reads: d.data().reads ?? {},
       }));
       docs.sort((a, b) => {
         const at = a.lastMessageAt?.toDate?.()?.getTime() ?? 0;
@@ -152,7 +155,7 @@ export default function DetailerMessagesScreen() {
     : conversations;
 
   const unreadCount = conversations.filter(
-    (c) => c.lastSenderId && c.lastSenderId !== user?.uid
+    (c) => isConversationUnread(c, user?.uid ?? '')
   ).length;
 
   return (
@@ -218,7 +221,7 @@ export default function DetailerMessagesScreen() {
             >
               {filtered.length === 0 ? (
                 <View style={styles.noResults}>
-                  <Text style={styles.noResultsText}>No results for "{search}"</Text>
+                  <Text style={styles.noResultsText}>No results for &quot;{search}&quot;</Text>
                 </View>
               ) : (
                 filtered.map((conv, index) => (

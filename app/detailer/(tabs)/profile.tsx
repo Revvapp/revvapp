@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { collection, doc, getDoc, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, orderBy, query, where } from 'firebase/firestore';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -92,7 +92,7 @@ export default function DetailerProfileScreen() {
       const snap = await getDoc(doc(db, 'detailers', user.uid));
       setProfile(snap.exists() ? (snap.data() as DetailerDocument) : null);
       const reviewsSnap = await getDocs(
-        query(collection(db, 'reviews'), where('detailerId', '==', user.uid), orderBy('createdAt', 'desc'), limit(20))
+        query(collection(db, 'reviews'), where('detailerId', '==', user.uid), orderBy('createdAt', 'desc'))
       );
       setReviews(reviewsSnap.docs.map((d) => ({
         id: d.id,
@@ -134,8 +134,11 @@ export default function DetailerProfileScreen() {
   const city = toTitleCase((profile?.city ?? '').trim());
   const stateCode = ((profile?.state ?? '').trim()).toUpperCase();
   const location = city && stateCode ? `${city}, ${stateCode}` : city || stateCode || '';
-  const rating = typeof profile?.rating === 'number' ? profile.rating : null;
-  const reviewCount = typeof profile?.reviewCount === 'number' ? profile.reviewCount : 0;
+  // Live rating computed from the reviews collection (single source of truth).
+  const reviewCount = reviews.length;
+  const rating = reviewCount > 0
+    ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviewCount
+    : null;
   const services = Array.isArray(profile?.services) ? (profile?.services as string[]) : [];
   const initials = initialsFrom(fullName, user?.email);
   const photoUrl = (profile?.profilePhotoUrl ?? '').trim();

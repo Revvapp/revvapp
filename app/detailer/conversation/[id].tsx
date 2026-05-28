@@ -27,6 +27,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { db } from '@/firebaseConfig';
 import { useAuth } from '@/hooks/useAuth';
+import { markConversationRead } from '@/lib/conversations';
+import { sendPushToUser } from '@/lib/pushNotifications';
 
 const C = {
   bg:      '#0D1B2A',
@@ -91,10 +93,12 @@ export default function DetailerConversationScreen() {
           createdAt: d.data().createdAt,
         }))
       );
+      // Opening (and staying in) the thread clears the unread badge.
+      if (user?.uid) markConversationRead(id, user.uid);
     });
 
     return () => unsub();
-  }, [id]);
+  }, [id, user?.uid]);
 
   async function send() {
     if (!text.trim() || !user?.uid || !id || !booking) return;
@@ -121,9 +125,27 @@ export default function DetailerConversationScreen() {
           lastMessage: msgText,
           lastMessageAt: serverTimestamp(),
           lastSenderId: user.uid,
+          reads: { [user.uid]: serverTimestamp() },
         },
         { merge: true }
       );
+
+      // Notify the client of the new message (best-effort — never break send).
+      try {
+        if (booking.clientId) {
+          const clientSnap = await getDoc(doc(db, 'clients', booking.clientId));
+          if (clientSnap.exists()) {
+            sendPushToUser(
+              clientSnap.data().expoPushToken,
+              booking.detailerName || 'New message',
+              msgText,
+              { type: 'message', conversationId: id }
+            );
+          }
+        }
+      } catch {
+        // ignore — messaging must succeed even if the push lookup fails
+      }
     } finally {
       setSending(false);
     }

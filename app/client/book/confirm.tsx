@@ -18,7 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { db } from '@/firebaseConfig';
 import { useAuth } from '@/hooks/useAuth';
 import { toTitleCase } from '@/lib/format';
-import { sendPushToUser } from '@/lib/pushNotification';
+import { sendPushToUser } from '@/lib/pushNotifications';
 
 const COLORS = {
   bg: '#0D1B2A',
