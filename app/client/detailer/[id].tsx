@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
-import { collection, doc, getDocs, onSnapshot, orderBy, query, where } from 'firebase/firestore';
+import { collection, doc, getDocs, onSnapshot, query, where } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -83,17 +83,20 @@ export default function DetailerPublicProfileScreen() {
 
   useEffect(() => {
     if (!id) return;
+    // No orderBy here so the query needs no composite index; sorted client-side.
     getDocs(
-      query(collection(db, 'reviews'), where('detailerId', '==', id), orderBy('createdAt', 'desc'))
+      query(collection(db, 'reviews'), where('detailerId', '==', id))
     ).then((snap) => {
-      setReviews(snap.docs.map((d) => ({
+      const docs = snap.docs.map((d) => ({
         id: d.id,
         clientName: String(d.data().clientName ?? ''),
         rating: Number(d.data().rating ?? 0),
         body: String(d.data().body ?? ''),
         service: String(d.data().service ?? ''),
         createdAt: d.data().createdAt,
-      })));
+      }));
+      docs.sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0));
+      setReviews(docs);
     }).catch(() => {});
   }, [id]);
 

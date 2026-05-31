@@ -82,6 +82,9 @@ export default function DetailerClientsScreen() {
       const sorted = Array.from(map.values()).sort((a, b) => b.lastDate.localeCompare(a.lastDate));
       setClients(sorted);
       setLoading(false);
+    }, (e) => {
+      if (__DEV__) console.warn('[clients listener]', e.message);
+      setLoading(false);
     });
     return () => unsub();
   }, [user?.uid]);

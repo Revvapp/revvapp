@@ -121,6 +121,9 @@ export default function ClientMessagesScreen() {
       });
       setConversations(docs);
       setLoading(false);
+    }, (e) => {
+      if (__DEV__) console.warn('[messages listener]', e.message);
+      setLoading(false);
     });
     return () => unsub();
   }, [user?.uid]);

@@ -159,6 +159,9 @@ export default function TimerScreen() {
       }
 
       setLoading(false);
+    }, (e) => {
+      if (__DEV__) console.warn('[timer listener]', e.message);
+      setLoading(false);
     });
     return () => unsub();
   }, [id]);

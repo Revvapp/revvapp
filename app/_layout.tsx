@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 
 import { BrandSplash } from '@/components/BrandSplash';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { AuthProvider } from '@/context/AuthContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/hooks/useAuth';
@@ -45,9 +46,11 @@ function RootNavigator() {
 
 function RootLayout() {
   return (
-    <AuthProvider>
-      <RootNavigator />
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <RootNavigator />
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
 

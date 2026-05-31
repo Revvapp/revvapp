@@ -107,6 +107,9 @@ export function useFindDetailers(): FindDetailersModel {
         next[id] = { rating: sum / count, reviewCount: count };
       });
       setRatings(next);
+    }, (e) => {
+      // Ratings are non-critical; leave detailers visible without them.
+      if (__DEV__) console.warn('[ratings listener]', e.message);
     });
     return () => unsub();
   }, []);

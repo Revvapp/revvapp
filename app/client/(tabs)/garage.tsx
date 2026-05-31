@@ -141,9 +141,14 @@ export default function ClientGarageScreen() {
         }))
       );
       setLoading(false);
+    }, (e) => {
+      if (__DEV__) console.warn('[garage listener]', e.message);
+      setLoading(false);
     });
     const unsubClient = onSnapshot(doc(db, 'clients', user.uid), (snap) => {
       if (snap.exists()) setActiveVehicleId(snap.data().activeVehicleId ?? null);
+    }, (e) => {
+      if (__DEV__) console.warn('[garage client listener]', e.message);
     });
     return () => { unsubVehicles(); unsubClient(); };
   }, [user?.uid]);

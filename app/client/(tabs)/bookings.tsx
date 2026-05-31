@@ -265,6 +265,9 @@ export default function ClientBookingsScreen() {
       docs.sort((a, b) => a.date.localeCompare(b.date));
       setBookings(docs);
       setLoading(false);
+    }, (e) => {
+      if (__DEV__) console.warn('[bookings listener]', e.message);
+      setLoading(false);
     });
     return () => unsub();
   }, [user?.uid]);

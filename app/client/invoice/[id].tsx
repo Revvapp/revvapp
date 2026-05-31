@@ -93,6 +93,9 @@ export default function ClientInvoiceScreen() {
         createdAt:    d.createdAt ?? null,
       });
       setLoading(false);
+    }, (e) => {
+      if (__DEV__) console.warn('[invoice listener]', e.message);
+      setLoading(false);
     });
     return () => unsub();
   }, [id]);

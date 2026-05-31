@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { addDoc, collection, doc, getDoc, getDocs, onSnapshot, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, onSnapshot, query, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -71,7 +71,9 @@ export default function ClientReviewScreen() {
       if (!bookingSnap.exists()) throw new Error('Booking not found');
       const b = bookingSnap.data();
 
-      await addDoc(collection(db, 'reviews'), {
+      // Keyed by bookingId so the database physically allows only one review
+      // per booking (rules forbid updates, so a duplicate write is rejected).
+      await setDoc(doc(db, 'reviews', id), {
         bookingId: id,
         clientId: user.uid,
         clientName: String(b.clientName ?? ''),

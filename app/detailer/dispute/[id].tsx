@@ -83,6 +83,9 @@ export default function DetailerDisputeScreen() {
         });
       }
       setLoading(false);
+    }, (e) => {
+      if (__DEV__) console.warn('[dispute listener]', e.message);
+      setLoading(false);
     });
     return () => unsub();
   }, [id]);

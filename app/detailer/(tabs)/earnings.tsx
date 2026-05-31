@@ -79,6 +79,9 @@ export default function DetailerEarningsScreen() {
       rows.sort((a, b) => b.date.localeCompare(a.date));
       setInvoices(rows);
       setLoading(false);
+    }, (e) => {
+      if (__DEV__) console.warn('[earnings listener]', e.message);
+      setLoading(false);
     });
     return () => unsub();
   }, [user?.uid]);

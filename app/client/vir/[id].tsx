@@ -57,6 +57,9 @@ export default function ClientVIRSignScreen() {
         setBooking({ id: snap.id, ...snap.data() } as BookingDocument);
       }
       setLoading(false);
+    }, (e) => {
+      if (__DEV__) console.warn('[vir listener]', e.message);
+      setLoading(false);
     });
     return () => unsub();
   }, [id]);
