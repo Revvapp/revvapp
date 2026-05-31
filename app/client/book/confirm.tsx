@@ -19,6 +19,7 @@ import { db } from '@/firebaseConfig';
 import { useAuth } from '@/hooks/useAuth';
 import { toTitleCase } from '@/lib/format';
 import { sendPushToUser } from '@/lib/pushNotifications';
+import { getRecipientPushToken } from '@/lib/pushTokens';
 
 const COLORS = {
   bg: '#0D1B2A',
@@ -117,14 +118,12 @@ export default function BookConfirmScreen() {
         createdAt: serverTimestamp(),
       });
 
-      const detailerSnap = await getDoc(doc(db, 'detailers', params.detailerId));
-      if (detailerSnap.exists()) {
-        sendPushToUser(
-          detailerSnap.data().expoPushToken,
-          'New Booking Request!',
-          `${clientName} wants to book ${toTitleCase(params.service ?? '')} on ${params.dateLabel ?? params.date}`
-        );
-      }
+      const detailerToken = await getRecipientPushToken(params.detailerId);
+      sendPushToUser(
+        detailerToken,
+        'New Booking Request!',
+        `${clientName} wants to book ${toTitleCase(params.service ?? '')} on ${params.dateLabel ?? params.date}`
+      );
 
       setSuccess(true);
     } catch (e) {

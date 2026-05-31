@@ -95,7 +95,7 @@ export default function ClientDashboardScreen() {
   const c        = useClientDashboard();
   const primary  = c.vehicles[0] ?? null;
   const insets   = useSafeAreaInsets();
-  useRegisterPushToken(user?.uid, 'clients');
+  useRegisterPushToken(user?.uid);
 
   useFocusEffect(useCallback(() => { c.refetch(); }, []));
 
@@ -156,7 +156,7 @@ export default function ClientDashboardScreen() {
                   <Ionicons name="car-sport-outline" size={40} color={C.gold} />
                 </View>
                 <Text style={s.noCarTitle}>Add your vehicle</Text>
-                <Text style={s.noCarSub}>It'll appear here</Text>
+                <Text style={s.noCarSub}>It&apos;ll appear here</Text>
               </Pressable>
             )}
           </View>

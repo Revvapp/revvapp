@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
-import { collection, doc, getDoc, onSnapshot, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
+import { collection, doc, onSnapshot, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -21,6 +21,7 @@ import { db } from '@/firebaseConfig';
 import { useAuth } from '@/hooks/useAuth';
 import { toTitleCase } from '@/lib/format';
 import { sendPushToUser } from '@/lib/pushNotifications';
+import { getRecipientPushToken } from '@/lib/pushTokens';
 
 const C = {
   bg:      '#0A1628',
@@ -95,10 +96,8 @@ export default function DetailerDisputeScreen() {
   async function notifyClient(title: string, body: string) {
     if (!dispute?.clientId) return;
     try {
-      const clientSnap = await getDoc(doc(db, 'clients', dispute.clientId));
-      if (clientSnap.exists()) {
-        sendPushToUser(clientSnap.data().expoPushToken, title, body, { type: 'dispute', invoiceId: id ?? '' });
-      }
+      const token = await getRecipientPushToken(dispute.clientId);
+      sendPushToUser(token, title, body, { type: 'dispute', invoiceId: id ?? '' });
     } catch {
       // best-effort
     }

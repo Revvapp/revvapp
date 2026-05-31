@@ -19,6 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { db } from '@/firebaseConfig';
 import { useAuth } from '@/hooks/useAuth';
 import { sendPushToUser } from '@/lib/pushNotifications';
+import { getRecipientPushToken } from '@/lib/pushTokens';
 
 const C = {
   bg:      '#0A1628',
@@ -92,14 +93,12 @@ export default function ClientReviewScreen() {
 
       const detailerId = String(b.detailerId ?? '');
       if (detailerId) {
-        const detailerSnap = await getDoc(doc(db, 'detailers', detailerId));
-        if (detailerSnap.exists()) {
-          sendPushToUser(
-            detailerSnap.data().expoPushToken,
-            'New Review!',
-            `You received a ${rating}-star review. Check your profile to see what they said.`
-          );
-        }
+        const token = await getRecipientPushToken(detailerId);
+        sendPushToUser(
+          token,
+          'New Review!',
+          `You received a ${rating}-star review. Check your profile to see what they said.`
+        );
       }
 
       Alert.alert(

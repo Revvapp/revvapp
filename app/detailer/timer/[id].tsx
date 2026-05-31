@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { doc, getDoc, onSnapshot, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { doc, onSnapshot, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { db } from '@/firebaseConfig';
 import { sendPushToUser } from '@/lib/pushNotifications';
+import { getRecipientPushToken } from '@/lib/pushTokens';
 import { toTitleCase } from '@/lib/format';
 
 const COLORS = {
@@ -248,8 +249,7 @@ export default function TimerScreen() {
                 timerAccumulatedSeconds: elapsed,
                 completedAt: serverTimestamp(),
               });
-              const clientSnap = await getDoc(doc(db, 'clients', booking.clientId));
-              const token = clientSnap.data()?.expoPushToken as string | undefined;
+              const token = await getRecipientPushToken(booking.clientId);
               await sendPushToUser(token, 'Your Detail is Complete!', 'Your detailer has finished. Check your invoice and leave a review.', { bookingId: id });
               router.replace({ pathname: '/detailer/before-after/[id]', params: { id: id! } });
             } catch {

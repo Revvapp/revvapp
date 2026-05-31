@@ -21,6 +21,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { db, storage } from '@/firebaseConfig';
 import { sendPushToUser } from '@/lib/pushNotifications';
+import { getRecipientPushToken } from '@/lib/pushTokens';
 
 const C = {
   bg:      '#0D1B2A',
@@ -213,8 +214,7 @@ export default function VIRCaptureScreen() {
       const bookingSnap = await getDoc(doc(db, 'bookings', id!));
       const clientId = bookingSnap.data()?.clientId as string | undefined;
       if (clientId) {
-        const clientSnap = await getDoc(doc(db, 'clients', clientId));
-        const token = clientSnap.data()?.expoPushToken as string | undefined;
+        const token = await getRecipientPushToken(clientId);
         await sendPushToUser(token, 'Inspection Ready to Sign', 'Your detailer has completed the pre-inspection. Please review and sign.', { bookingId: id! });
       }
       Alert.alert(

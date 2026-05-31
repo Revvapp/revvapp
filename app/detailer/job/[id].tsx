@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { doc, getDoc, onSnapshot, updateDoc } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { db } from '@/firebaseConfig';
 import { sendPushToUser } from '@/lib/pushNotifications';
+import { getRecipientPushToken } from '@/lib/pushTokens';
 import { formatJobDate } from '@/lib/dateKeys';
 import { toTitleCase } from '@/lib/format';
 import type { BookingDocument } from '@/types/firestore';
@@ -95,13 +96,11 @@ export default function JobDetailScreen() {
     try {
       await updateDoc(doc(db, 'bookings', id), { status });
       if (status === 'active') {
-        const clientSnap = await getDoc(doc(db, 'clients', booking.clientId));
-        const token = clientSnap.data()?.expoPushToken as string | undefined;
+        const token = await getRecipientPushToken(booking.clientId);
         await sendPushToUser(token, 'Booking Accepted!', 'Your detailer has accepted your booking.', { bookingId: id });
       }
       if (status === 'declined') {
-        const clientSnap = await getDoc(doc(db, 'clients', booking.clientId));
-        const token = clientSnap.data()?.expoPushToken as string | undefined;
+        const token = await getRecipientPushToken(booking.clientId);
         sendPushToUser(token, 'Booking Declined', 'Your detailer couldn\'t take this booking. Browse others nearby.');
         router.back();
       }

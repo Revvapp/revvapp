@@ -108,6 +108,13 @@ service cloud.firestore {
       allow write: if signedIn();
     }
 
+    match /pushTokens/{uid} {
+      // Tokens are not sensitive; any signed-in user may read one to send a
+      // notification, but only the owner may write their own.
+      allow read: if signedIn();
+      allow write: if isOwner(uid);
+    }
+
     match /conversations/{bookingId} {
       allow read, write: if request.auth != null;
 

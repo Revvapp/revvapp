@@ -45,7 +45,7 @@ function SkeletonBlock({ style }: { style?: object }) {
 export default function DetailerDashboardScreen() {
   const d = useDetailerDashboard();
   const { user } = useAuth();
-  useRegisterPushToken(user?.uid, 'detailers');
+  useRegisterPushToken(user?.uid);
   const progressAnim = useRef(new Animated.Value(0)).current;
   const [refreshing, setRefreshing] = useState(false);
   const [goalModalVisible, setGoalModalVisible] = useState(false);

@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
-import { doc, getDoc, onSnapshot, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { doc, onSnapshot, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { db } from '@/firebaseConfig';
 import { sendPushToUser } from '@/lib/pushNotifications';
+import { getRecipientPushToken } from '@/lib/pushTokens';
 import { toTitleCase } from '@/lib/format';
 import type { BookingDocument } from '@/types/firestore';
 
@@ -81,14 +82,12 @@ export default function ClientVIRSignScreen() {
               });
               const detailerId = String(booking?.detailerId ?? '');
               if (detailerId) {
-                const detailerSnap = await getDoc(doc(db, 'detailers', detailerId));
-                if (detailerSnap.exists()) {
-                  sendPushToUser(
-                    detailerSnap.data().expoPushToken,
-                    'Inspection Signed',
-                    'The client signed off — you can now start the job timer.'
-                  );
-                }
+                const token = await getRecipientPushToken(detailerId);
+                sendPushToUser(
+                  token,
+                  'Inspection Signed',
+                  'The client signed off — you can now start the job timer.'
+                );
               }
               Alert.alert(
                 'Inspection Signed!',

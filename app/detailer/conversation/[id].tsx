@@ -29,6 +29,7 @@ import { db } from '@/firebaseConfig';
 import { useAuth } from '@/hooks/useAuth';
 import { markConversationRead } from '@/lib/conversations';
 import { sendPushToUser } from '@/lib/pushNotifications';
+import { getRecipientPushToken } from '@/lib/pushTokens';
 
 const C = {
   bg:      '#0D1B2A',
@@ -132,17 +133,13 @@ export default function DetailerConversationScreen() {
 
       // Notify the client of the new message (best-effort — never break send).
       try {
-        if (booking.clientId) {
-          const clientSnap = await getDoc(doc(db, 'clients', booking.clientId));
-          if (clientSnap.exists()) {
-            sendPushToUser(
-              clientSnap.data().expoPushToken,
-              booking.detailerName || 'New message',
-              msgText,
-              { type: 'message', conversationId: id }
-            );
-          }
-        }
+        const token = await getRecipientPushToken(booking.clientId);
+        sendPushToUser(
+          token,
+          booking.detailerName || 'New message',
+          msgText,
+          { type: 'message', conversationId: id }
+        );
       } catch {
         // ignore — messaging must succeed even if the push lookup fails
       }

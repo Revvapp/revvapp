@@ -17,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { db } from '@/firebaseConfig';
 import { useAuth } from '@/hooks/useAuth';
 import { sendPushToUser } from '@/lib/pushNotifications';
+import { getRecipientPushToken } from '@/lib/pushTokens';
 import { toTitleCase } from '@/lib/format';
 import type { BookingDocument } from '@/types/firestore';
 
@@ -27,14 +28,12 @@ async function cancelBooking(id: string) {
     const detailerId = String(bookSnap.data().detailerId ?? '');
     const clientName = String(bookSnap.data().clientName ?? 'A client');
     if (detailerId) {
-      const detailerSnap = await getDoc(doc(db, 'detailers', detailerId));
-      if (detailerSnap.exists()) {
-        sendPushToUser(
-          detailerSnap.data().expoPushToken,
-          'Booking Cancelled',
-          `${clientName} has cancelled their booking.`
-        );
-      }
+      const token = await getRecipientPushToken(detailerId);
+      sendPushToUser(
+        token,
+        'Booking Cancelled',
+        `${clientName} has cancelled their booking.`
+      );
     }
   }
 }
