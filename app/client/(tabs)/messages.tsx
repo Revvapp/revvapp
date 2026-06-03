@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
-import { useEffect, useState } from 'react';
+import { memo, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -56,7 +56,7 @@ function timeAgo(ts: any): string {
   return `${days}d ago`;
 }
 
-function ConversationRow({ conv, uid }: { conv: Conversation; uid: string }) {
+function ConversationRowBase({ conv, uid }: { conv: Conversation; uid: string }) {
   const displayName = conv.businessName || conv.detailerName || 'Detailer';
   const initial = displayName[0]?.toUpperCase() ?? 'D';
   const isUnread = isConversationUnread(conv, uid);
@@ -87,6 +87,8 @@ function ConversationRow({ conv, uid }: { conv: Conversation; uid: string }) {
     </Pressable>
   );
 }
+
+const ConversationRow = memo(ConversationRowBase);
 
 export default function ClientMessagesScreen() {
   const { user } = useAuth();

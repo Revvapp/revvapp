@@ -1,6 +1,6 @@
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, getDocs, onSnapshot, query, where } from 'firebase/firestore';
 import * as Location from 'expo-location';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { db } from '@/firebaseConfig';
 import type { DetailerDocument } from '@/types/firestore';
@@ -89,54 +89,83 @@ export function useFindDetailers(): FindDetailersModel {
     return () => unsub();
   }, []);
 
-  // Live ratings aggregated from the reviews collection (single source of truth —
-  // the stored detailer.rating field is never written by clients).
+  // Stable key for the set of visible detailers, so ratings only refetch when
+  // the set actually changes — not on every minor detailer-doc update.
+  const detailerIdKey = useMemo(
+    () => rawDetailers.map((d) => d.uid).sort().join(','),
+    [rawDetailers]
+  );
+
+  // Ratings are aggregated from the reviews collection, but scoped to only the
+  // detailers currently shown (batched `in` queries) rather than subscribing to
+  // the entire global reviews collection — that keeps reads bounded as the app
+  // scales. Computed once per detailer set; Find doesn't need live rating updates.
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'reviews'), (snap) => {
-      const acc: Record<string, { sum: number; count: number }> = {};
-      snap.docs.forEach((d) => {
-        const detailerId = String(d.data().detailerId ?? '');
-        const r = Number(d.data().rating ?? 0);
-        if (!detailerId || !r) return;
-        acc[detailerId] = acc[detailerId]
-          ? { sum: acc[detailerId].sum + r, count: acc[detailerId].count + 1 }
-          : { sum: r, count: 1 };
-      });
-      const next: Record<string, { rating: number; reviewCount: number }> = {};
-      Object.entries(acc).forEach(([id, { sum, count }]) => {
-        next[id] = { rating: sum / count, reviewCount: count };
-      });
-      setRatings(next);
-    }, (e) => {
-      // Ratings are non-critical; leave detailers visible without them.
-      if (__DEV__) console.warn('[ratings listener]', e.message);
-    });
-    return () => unsub();
-  }, []);
+    const ids = detailerIdKey ? detailerIdKey.split(',') : [];
+    if (ids.length === 0) {
+      setRatings({});
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const acc: Record<string, { sum: number; count: number }> = {};
+        // Firestore `in` accepts up to 30 values per query.
+        for (let i = 0; i < ids.length; i += 30) {
+          const batch = ids.slice(i, i + 30);
+          const snap = await getDocs(
+            query(collection(db, 'reviews'), where('detailerId', 'in', batch))
+          );
+          snap.docs.forEach((d) => {
+            const detailerId = String(d.data().detailerId ?? '');
+            const r = Number(d.data().rating ?? 0);
+            if (!detailerId || !r) return;
+            acc[detailerId] = acc[detailerId]
+              ? { sum: acc[detailerId].sum + r, count: acc[detailerId].count + 1 }
+              : { sum: r, count: 1 };
+          });
+        }
+        if (cancelled) return;
+        const next: Record<string, { rating: number; reviewCount: number }> = {};
+        Object.entries(acc).forEach(([id, { sum, count }]) => {
+          next[id] = { rating: sum / count, reviewCount: count };
+        });
+        setRatings(next);
+      } catch (e) {
+        // Ratings are non-critical; leave detailers visible without them.
+        if (__DEV__) console.warn('[ratings query]', e instanceof Error ? e.message : e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [detailerIdKey]);
 
   const MAX_RADIUS_MI = 50;
 
-  const detailers: DetailerWithDistance[] = rawDetailers
-    .map((d) => {
-      const distanceMi =
-        clientLat != null && clientLng != null && d.lat != null && d.lng != null
-          ? haversineMi(clientLat, clientLng, d.lat, d.lng)
-          : null;
-      const agg = ratings[d.uid];
-      return {
-        ...d,
-        rating: agg ? agg.rating : 0,
-        reviewCount: agg ? agg.reviewCount : 0,
-        distanceMi,
-      };
-    })
-    .filter((d) => d.distanceMi == null || d.distanceMi <= MAX_RADIUS_MI)
-    .sort((a, b) => {
-      if (a.distanceMi == null && b.distanceMi == null) return 0;
-      if (a.distanceMi == null) return 1;
-      if (b.distanceMi == null) return -1;
-      return a.distanceMi - b.distanceMi;
-    });
+  const detailers: DetailerWithDistance[] = useMemo(
+    () =>
+      rawDetailers
+        .map((d) => {
+          const distanceMi =
+            clientLat != null && clientLng != null && d.lat != null && d.lng != null
+              ? haversineMi(clientLat, clientLng, d.lat, d.lng)
+              : null;
+          const agg = ratings[d.uid];
+          return {
+            ...d,
+            rating: agg ? agg.rating : 0,
+            reviewCount: agg ? agg.reviewCount : 0,
+            distanceMi,
+          };
+        })
+        .filter((d) => d.distanceMi == null || d.distanceMi <= MAX_RADIUS_MI)
+        .sort((a, b) => {
+          if (a.distanceMi == null && b.distanceMi == null) return 0;
+          if (a.distanceMi == null) return 1;
+          if (b.distanceMi == null) return -1;
+          return a.distanceMi - b.distanceMi;
+        }),
+    [rawDetailers, ratings, clientLat, clientLng]
+  );
 
   return { loading, locationDenied, error, detailers, clientLat, clientLng };
 }

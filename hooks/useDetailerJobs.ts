@@ -1,5 +1,5 @@
 import { collection, doc, onSnapshot, query, updateDoc, where } from 'firebase/firestore';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { db } from '@/firebaseConfig';
 import { useAuth } from '@/hooks/useAuth';
@@ -83,17 +83,23 @@ export function useDetailerJobs(): DetailerJobsModel {
     []
   );
 
-  const pending = bookings
-    .filter((b) => b.status === 'pending')
-    .sort((a, b) => a.date.localeCompare(b.date));
+  const pending = useMemo(
+    () => bookings.filter((b) => b.status === 'pending').sort((a, b) => a.date.localeCompare(b.date)),
+    [bookings]
+  );
 
-  const active = bookings
-    .filter((b) => ['active', 'vir_submitted', 'vir_signed', 'in_progress', 'paused'].includes(b.status))
-    .sort((a, b) => a.date.localeCompare(b.date));
+  const active = useMemo(
+    () =>
+      bookings
+        .filter((b) => ['active', 'vir_submitted', 'vir_signed', 'in_progress', 'paused'].includes(b.status))
+        .sort((a, b) => a.date.localeCompare(b.date)),
+    [bookings]
+  );
 
-  const completed = bookings
-    .filter((b) => b.status === 'completed')
-    .sort((a, b) => b.date.localeCompare(a.date));
+  const completed = useMemo(
+    () => bookings.filter((b) => b.status === 'completed').sort((a, b) => b.date.localeCompare(a.date)),
+    [bookings]
+  );
 
   return { loading, error, pending, active, completed, acceptJob, declineJob, completeJob };
 }
