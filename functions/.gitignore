@@ -1,0 +1,5 @@
+node_modules/
+lib/
+*.log
+# Never commit a service-account key
+service-account*.json
