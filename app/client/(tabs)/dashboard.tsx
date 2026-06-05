@@ -72,6 +72,7 @@ function FloatingCar({ bodyType }: { bodyType: BodyType }) {
         withTiming(1,   { duration: 2600, easing: Easing.inOut(Easing.sin) })
       ), -1, false
     );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const carStyle    = useAnimatedStyle(() => ({ transform: [{ translateY: float.value }] }));
@@ -97,6 +98,7 @@ export default function ClientDashboardScreen() {
   const insets   = useSafeAreaInsets();
   useRegisterPushToken(user?.uid);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useFocusEffect(useCallback(() => { c.refetch(); }, []));
 
   const scrollY = useSharedValue(0);

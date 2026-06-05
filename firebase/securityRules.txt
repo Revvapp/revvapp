@@ -49,10 +49,22 @@ service cloud.firestore {
       allow read: if signedIn()
         && (resource.data.clientId == request.auth.uid
             || resource.data.detailerId == request.auth.uid);
-      allow create: if signedIn();
+
+      // Create: caller must be the booking's client. Prevents spamming a
+      // detailer's calendar with bookings someone else didn't actually request.
+      allow create: if signedIn()
+        && request.resource.data.clientId == request.auth.uid;
+
+      // Update: either party on the booking, but they can't rewrite who's
+      // involved or the agreed price after the fact. (Further per-role status
+      // transition guards should be added once the dispute/payout flow ships.)
       allow update: if signedIn()
         && (resource.data.clientId == request.auth.uid
-            || resource.data.detailerId == request.auth.uid);
+            || resource.data.detailerId == request.auth.uid)
+        && request.resource.data.clientId == resource.data.clientId
+        && request.resource.data.detailerId == resource.data.detailerId
+        && request.resource.data.price == resource.data.price;
+
       allow delete: if false;
     }
 

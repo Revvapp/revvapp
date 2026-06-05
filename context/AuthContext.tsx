@@ -1,6 +1,6 @@
 import { router, usePathname } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { onAuthStateChanged, signOut as firebaseSignOut, type User } from 'firebase/auth';
 import {
   createContext,
@@ -14,7 +14,6 @@ import {
 } from 'react';
 
 import { auth, db } from '@/firebaseConfig';
-import { registerForPushNotificationsAsync } from '@/lib/pushNotifications';
 import { navigateAfterAuth } from '@/lib/routing';
 import type { UserDocument, UserType } from '@/types/firestore';
 
@@ -62,20 +61,6 @@ async function loadUserProfile(uid: string): Promise<UserDocument | null> {
   }
 }
 
-async function syncPushToken(uid: string): Promise<void> {
-  try {
-    const token = await registerForPushNotificationsAsync();
-    if (!token) return;
-    await setDoc(
-      doc(db, 'users', uid),
-      { pushToken: token, pushTokenUpdatedAt: new Date().toISOString() },
-      { merge: true }
-    );
-  } catch {
-    // Silent — push registration is best-effort and should not break login.
-  }
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserDocument | null>(null);
@@ -110,7 +95,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const p = await loadUserProfile(nextUser.uid);
         setUserProfile(p);
-        void syncPushToken(nextUser.uid);
       } finally {
         setLoading(false);
         if (!initializedRef.current) {

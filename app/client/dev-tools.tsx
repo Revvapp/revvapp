@@ -3,6 +3,19 @@ import * as Notifications from 'expo-notifications';
 import { Redirect, router } from 'expo-router';
 import { deleteDoc, doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { db } from '@/firebaseConfig';
+import { useAuth } from '@/hooks/useAuth';
 
 function makeTestDetailerDoc(uid: string) {
   return {
@@ -32,19 +45,6 @@ function makeTestDetailerDoc(uid: string) {
     profileComplete: true,
   };
 }
-import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-
-import { db } from '@/firebaseConfig';
-import { useAuth } from '@/hooks/useAuth';
 
 const COLORS = {
   bg: '#0D1B2A',

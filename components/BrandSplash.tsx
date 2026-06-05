@@ -22,6 +22,7 @@ export function BrandSplash() {
     brandOpacity.value = withDelay(220, withTiming(1, { duration: 400 }));
     brandY.value = withDelay(220, withSpring(0, { damping: 22, stiffness: 280 }));
     taglineOpacity.value = withDelay(620, withTiming(1, { duration: 500 }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const iconStyle = useAnimatedStyle(() => ({

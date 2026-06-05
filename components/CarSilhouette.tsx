@@ -190,6 +190,7 @@ export function CarSilhouette({ bodyType, animate = true }: Props) {
       -1,
       false
     );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [animate]);
 
   const carStyle = useAnimatedStyle(() => ({

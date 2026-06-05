@@ -23,7 +23,6 @@ import {
   type ReelMusic,
   type ReelTemplate,
 } from '@/lib/reachService';
-import { toTitleCase } from '@/lib/format';
 
 const C = {
   bg:     '#0D1B2A',
