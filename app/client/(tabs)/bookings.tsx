@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { collection, doc, getDoc, onSnapshot, query, updateDoc, where } from 'firebase/firestore';
+import { collection, doc, getDoc, limit, onSnapshot, orderBy, query, updateDoc, where } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -239,7 +239,12 @@ export default function ClientBookingsScreen() {
 
   useEffect(() => {
     if (!user?.uid) return;
-    const q = query(collection(db, 'bookings'), where('clientId', '==', user.uid));
+    const q = query(
+      collection(db, 'bookings'),
+      where('clientId', '==', user.uid),
+      orderBy('createdAt', 'desc'),
+      limit(200)
+    );
     const unsub = onSnapshot(q, (snap) => {
       const docs = snap.docs.map((d) => {
         const x = d.data();

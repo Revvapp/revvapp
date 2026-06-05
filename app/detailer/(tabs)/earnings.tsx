@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -63,7 +63,12 @@ export default function DetailerEarningsScreen() {
 
   useEffect(() => {
     if (!user?.uid) { setLoading(false); return; }
-    const q = query(collection(db, 'invoices'), where('detailerId', '==', user.uid));
+    const q = query(
+      collection(db, 'invoices'),
+      where('detailerId', '==', user.uid),
+      orderBy('createdAt', 'desc'),
+      limit(200)
+    );
     const unsub = onSnapshot(q, (snap) => {
       const rows: InvoiceRow[] = snap.docs.map((d) => {
         const x = d.data();

@@ -56,14 +56,31 @@ service cloud.firestore {
         && request.resource.data.clientId == request.auth.uid;
 
       // Update: either party on the booking, but they can't rewrite who's
-      // involved or the agreed price after the fact. (Further per-role status
-      // transition guards should be added once the dispute/payout flow ships.)
+      // involved or the agreed price. Status changes are role-gated: the
+      // client may only cancel or sign the VIR; the detailer drives every
+      // other lifecycle transition (accept/decline → VIR capture → timer
+      // → complete). Stops a client from self-marking 'completed' to skip
+      // the dispute window, or a detailer from rewriting 'cancelled'.
       allow update: if signedIn()
         && (resource.data.clientId == request.auth.uid
             || resource.data.detailerId == request.auth.uid)
         && request.resource.data.clientId == resource.data.clientId
         && request.resource.data.detailerId == resource.data.detailerId
-        && request.resource.data.price == resource.data.price;
+        && request.resource.data.price == resource.data.price
+        && (
+          request.resource.data.status == resource.data.status
+          || (
+            resource.data.clientId == request.auth.uid
+            && request.resource.data.status in ['cancelled', 'vir_signed']
+          )
+          || (
+            resource.data.detailerId == request.auth.uid
+            && request.resource.data.status in [
+              'accepted', 'declined', 'vir_pending', 'vir_submitted',
+              'in_progress', 'paused', 'completed'
+            ]
+          )
+        );
 
       allow delete: if false;
     }

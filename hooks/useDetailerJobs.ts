@@ -1,4 +1,4 @@
-import { collection, doc, onSnapshot, query, updateDoc, where } from 'firebase/firestore';
+import { collection, doc, limit, onSnapshot, orderBy, query, updateDoc, where } from 'firebase/firestore';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { db } from '@/firebaseConfig';
@@ -47,7 +47,14 @@ export function useDetailerJobs(): DetailerJobsModel {
       setLoading(false);
       return;
     }
-    const q = query(collection(db, 'bookings'), where('detailerId', '==', user.uid));
+    // Limit to most recent 200 — keeps unbounded read costs down for prolific
+    // detailers. Older history can be viewed via earnings/invoices archive.
+    const q = query(
+      collection(db, 'bookings'),
+      where('detailerId', '==', user.uid),
+      orderBy('createdAt', 'desc'),
+      limit(200)
+    );
     const unsub = onSnapshot(
       q,
       (snap) => {
