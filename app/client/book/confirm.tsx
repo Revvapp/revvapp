@@ -101,7 +101,7 @@ export default function BookConfirmScreen() {
         ? String(clientSnap.data().fullName ?? user.email ?? '')
         : (user.email ?? '');
 
-      await addDoc(collection(db, 'bookings'), {
+      const bookingRef = await addDoc(collection(db, 'bookings'), {
         clientId: user.uid,
         detailerId: params.detailerId,
         detailerName: params.detailerName ?? '',
@@ -122,7 +122,8 @@ export default function BookConfirmScreen() {
       sendPushToUser(
         detailerToken,
         'New Booking Request!',
-        `${clientName} wants to book ${toTitleCase(params.service ?? '')} on ${params.dateLabel ?? params.date}`
+        `${clientName} wants to book ${toTitleCase(params.service ?? '')} on ${params.dateLabel ?? params.date}`,
+        { type: 'booking_request', bookingId: bookingRef.id }
       );
 
       setSuccess(true);

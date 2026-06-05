@@ -9,6 +9,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { AuthProvider } from '@/context/AuthContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/hooks/useAuth';
+import { useNotificationRouting } from '@/hooks/useNotificationRouting';
 
 const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN;
 if (SENTRY_DSN) {
@@ -22,6 +23,8 @@ if (SENTRY_DSN) {
 function RootNavigator() {
   const colorScheme = useColorScheme();
   const { initialized } = useAuth();
+
+  useNotificationRouting();
 
   if (!initialized) {
     return <BrandSplash />;

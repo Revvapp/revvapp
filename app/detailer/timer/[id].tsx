@@ -250,7 +250,7 @@ export default function TimerScreen() {
                 completedAt: serverTimestamp(),
               });
               const token = await getRecipientPushToken(booking.clientId);
-              await sendPushToUser(token, 'Your Detail is Complete!', 'Your detailer has finished. Check your invoice and leave a review.', { bookingId: id });
+              await sendPushToUser(token, 'Your Detail is Complete!', 'Your detailer has finished. Check your invoice and leave a review.', { type: 'job_complete', bookingId: id });
               router.replace({ pathname: '/detailer/before-after/[id]', params: { id: id! } });
             } catch {
               Alert.alert('Error', 'Could not end job.');

@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
+import { collection, doc, getDocs, onSnapshot, query, updateDoc, where } from 'firebase/firestore';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
@@ -94,6 +94,31 @@ export default function JobDetailScreen() {
     if (!id || !booking) return;
     setActioning(true);
     try {
+      if (status === 'active') {
+        // Don't let a detailer accept two jobs in the same date + time slot.
+        const occupying = ['active', 'vir_submitted', 'vir_signed', 'in_progress', 'paused'];
+        const mine = await getDocs(
+          query(collection(db, 'bookings'), where('detailerId', '==', booking.detailerId))
+        );
+        const conflict = mine.docs.some((d) => {
+          if (d.id === id) return false;
+          const x = d.data();
+          return (
+            String(x.date ?? '') === booking.date &&
+            String(x.time ?? '') === booking.time &&
+            occupying.includes(String(x.status ?? '').toLowerCase())
+          );
+        });
+        if (conflict) {
+          setActioning(false);
+          Alert.alert(
+            'Time slot taken',
+            'You already have an accepted job at this date and time. Decline or finish the other booking first.'
+          );
+          return;
+        }
+      }
+
       await updateDoc(doc(db, 'bookings', id), { status });
       if (status === 'active') {
         const token = await getRecipientPushToken(booking.clientId);

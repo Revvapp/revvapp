@@ -215,7 +215,7 @@ export default function VIRCaptureScreen() {
       const clientId = bookingSnap.data()?.clientId as string | undefined;
       if (clientId) {
         const token = await getRecipientPushToken(clientId);
-        await sendPushToUser(token, 'Inspection Ready to Sign', 'Your detailer has completed the pre-inspection. Please review and sign.', { bookingId: id! });
+        await sendPushToUser(token, 'Inspection Ready to Sign', 'Your detailer has completed the pre-inspection. Please review and sign.', { type: 'vir', bookingId: id! });
       }
       Alert.alert(
         'Inspection Submitted',

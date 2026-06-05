@@ -20,21 +20,22 @@ service cloud.firestore {
         && request.resource.data.uid == uid
         && request.resource.data.email == request.auth.token.email;
       allow update: if isOwner(uid);
-      allow delete: if false;
+      // Owner may delete their own account (App Store account-deletion requirement).
+      allow delete: if isOwner(uid);
     }
 
     match /detailers/{uid} {
       allow read: if true;
       allow create, update: if isOwner(uid)
         && request.resource.data.uid == uid;
-      allow delete: if false;
+      allow delete: if isOwner(uid);
     }
 
     match /clients/{uid} {
       allow read: if isOwner(uid);
       allow create, update: if isOwner(uid)
         && request.resource.data.uid == uid;
-      allow delete: if false;
+      allow delete: if isOwner(uid);
 
       match /vehicles/{vehicleId} {
         allow read: if isOwner(uid);

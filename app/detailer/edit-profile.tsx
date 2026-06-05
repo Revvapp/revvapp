@@ -24,6 +24,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { DeleteAccountSection } from '@/components/DeleteAccountSection';
 import { auth, db, storage } from '@/firebaseConfig';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -591,6 +592,10 @@ export default function EditProfileScreen() {
                   ? <ActivityIndicator color={COLORS.darkText} />
                   : <Text style={styles.saveBtnText}>UPDATE PASSWORD</Text>}
               </Pressable>
+            </View>
+
+            <View style={styles.section}>
+              <DeleteAccountSection userType="detailer" />
             </View>
           </ScrollView>
         )}

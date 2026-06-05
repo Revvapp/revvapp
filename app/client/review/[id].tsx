@@ -97,7 +97,8 @@ export default function ClientReviewScreen() {
         sendPushToUser(
           token,
           'New Review!',
-          `You received a ${rating}-star review. Check your profile to see what they said.`
+          `You received a ${rating}-star review. Check your profile to see what they said.`,
+          { type: 'review' }
         );
       }
 
