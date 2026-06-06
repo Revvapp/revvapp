@@ -113,7 +113,8 @@ Revv Reach → AI-assisted social content creation
 | VIR sign screen — client signs off on the inspection | ✅ Done |
 | Client Invoice — luxury receipt layout with dispute window logic | ✅ Done |
 | Find Detailers — map + list (main entry point) | ✅ Done |
-| Garage tab | ❌ Not built |
+| Garage tab — add/edit vehicles, set dashboard vehicle | ✅ Done |
+| Vehicle service history — per-car detail timeline + re-book | ✅ Done |
 | Stripe card pre-auth on booking (money into escrow) | ❌ Not built |
 | 24hr Dispute — raise a dispute screen (`/dispute/[id]`) | ❌ Not built |
 | Verified Reviews — post-payment (requires real Stripe transaction) | ❌ Not built |

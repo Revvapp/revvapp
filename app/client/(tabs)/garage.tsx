@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import {
   addDoc,
   collection,
@@ -69,13 +70,14 @@ type Vehicle = {
 const BLANK = { year: '', make: '', model: '', color: '', licensePlate: '', bodyType: 'sedan' as BodyType };
 
 function VehicleCard({
-  vehicle, isActive, onSetActive, onDelete, onEdit,
+  vehicle, isActive, onSetActive, onDelete, onEdit, onOpen,
 }: {
   vehicle: Vehicle;
   isActive: boolean;
   onSetActive: () => void;
   onDelete: () => void;
   onEdit: () => void;
+  onOpen: () => void;
 }) {
   const label = `${vehicle.year} ${vehicle.make} ${vehicle.model}`.trim();
 
@@ -89,12 +91,15 @@ function VehicleCard({
       <View style={styles.cardSilhouette}>
         <CarSilhouette bodyType={vehicle.bodyType} animate={false} />
       </View>
-      <TouchableOpacity activeOpacity={0.7} style={styles.cardBody} onPress={onSetActive}>
+      <TouchableOpacity activeOpacity={0.7} style={styles.cardBody} onPress={onOpen}>
         <Text style={styles.cardLabel} numberOfLines={1}>{label || 'Vehicle'}</Text>
         <Text style={styles.cardSub} numberOfLines={1}>
           {[vehicle.color, vehicle.licensePlate].filter(Boolean).join(' · ')}
         </Text>
-        {isActive && <Text style={styles.activeTag}>On Dashboard</Text>}
+        <View style={styles.cardHintRow}>
+          {isActive && <Text style={styles.activeTag}>On Dashboard</Text>}
+          <Text style={styles.historyHint}>View history ›</Text>
+        </View>
       </TouchableOpacity>
       <TouchableOpacity activeOpacity={0.6} style={styles.editBtn} onPress={onEdit}>
         <Ionicons name="pencil-outline" size={17} color={C.muted} />
@@ -243,6 +248,7 @@ export default function ClientGarageScreen() {
                   onSetActive={() => setActiveVehicle(v.id)}
                   onDelete={() => deleteVehicle(v.id)}
                   onEdit={() => openEdit(v)}
+                  onOpen={() => router.push({ pathname: '/client/vehicle/[id]', params: { id: v.id } })}
                 />
               </Animated.View>
             ))}
@@ -455,7 +461,9 @@ const styles = StyleSheet.create({
   cardBody: { flex: 1 },
   cardLabel: { color: C.navy, fontSize: 15, fontWeight: '800', marginBottom: 3 },
   cardSub: { color: C.muted, fontSize: 13, fontWeight: '500' },
-  activeTag: { color: C.gold, fontSize: 11, fontWeight: '700', marginTop: 3 },
+  cardHintRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
+  activeTag: { color: C.gold, fontSize: 11, fontWeight: '700' },
+  historyHint: { color: C.gold, fontSize: 11, fontWeight: '700', opacity: 0.75 },
   editBtn:   { padding: 6 },
   deleteBtn: { padding: 6 },
 
