@@ -18,8 +18,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { db } from '@/firebaseConfig';
 import { useAuth } from '@/hooks/useAuth';
-import { sendPushToUser } from '@/lib/pushNotifications';
-import { getRecipientPushToken } from '@/lib/pushTokens';
 
 const C = {
   bg:      '#0A1628',
@@ -91,16 +89,7 @@ export default function ClientReviewScreen() {
 
       await updateDoc(doc(db, 'bookings', id), { hasReview: true });
 
-      const detailerId = String(b.detailerId ?? '');
-      if (detailerId) {
-        const token = await getRecipientPushToken(detailerId);
-        sendPushToUser(
-          token,
-          'New Review!',
-          `You received a ${rating}-star review. Check your profile to see what they said.`,
-          { type: 'review' }
-        );
-      }
+      // The detailer is notified server-side by the onReviewCreated Cloud Function.
 
       Alert.alert(
         'Review Submitted',

@@ -1,4 +1,4 @@
-import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
 
 import { db } from '@/firebaseConfig';
 
@@ -22,13 +22,6 @@ export async function savePushToken(uid: string, token: string): Promise<void> {
   }
 }
 
-/** Look up a recipient's Expo push token. Returns null if unknown. */
-export async function getRecipientPushToken(uid: string | null | undefined): Promise<string | null> {
-  if (!uid) return null;
-  try {
-    const snap = await getDoc(doc(db, 'pushTokens', uid));
-    return snap.exists() ? (snap.data().token ?? null) : null;
-  } catch {
-    return null;
-  }
-}
+// Recipient-token lookups now happen server-side (functions/src/notifications.ts),
+// where the Admin SDK reads pushTokens/{uid} to send the notification. The app
+// only writes its own token here; it never reads another user's.

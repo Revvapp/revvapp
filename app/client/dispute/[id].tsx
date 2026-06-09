@@ -21,8 +21,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { db, storage } from '@/firebaseConfig';
 import { useAuth } from '@/hooks/useAuth';
-import { sendPushToUser } from '@/lib/pushNotifications';
-import { getRecipientPushToken } from '@/lib/pushTokens';
 
 const C = {
   bg:      '#0A1628',
@@ -119,15 +117,7 @@ export default function ClientDisputeScreen() {
       });
       await updateDoc(doc(db, 'invoices', id), { status: 'disputed' });
 
-      if (detailerId) {
-        const token = await getRecipientPushToken(detailerId);
-        sendPushToUser(
-          token,
-          'Dispute Raised',
-          'A client has raised a dispute on a recent job. Payment is paused pending review.',
-          { type: 'dispute', invoiceId: id }
-        );
-      }
+      // The detailer is notified server-side by the onDisputeCreated Cloud Function.
 
       Alert.alert(
         'Dispute Submitted',

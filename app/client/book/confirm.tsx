@@ -18,8 +18,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { db } from '@/firebaseConfig';
 import { useAuth } from '@/hooks/useAuth';
 import { toTitleCase } from '@/lib/format';
-import { sendPushToUser } from '@/lib/pushNotifications';
-import { getRecipientPushToken } from '@/lib/pushTokens';
 
 const COLORS = {
   bg: '#0D1B2A',
@@ -101,7 +99,7 @@ export default function BookConfirmScreen() {
         ? String(clientSnap.data().fullName ?? user.email ?? '')
         : (user.email ?? '');
 
-      const bookingRef = await addDoc(collection(db, 'bookings'), {
+      await addDoc(collection(db, 'bookings'), {
         clientId: user.uid,
         detailerId: params.detailerId,
         detailerName: params.detailerName ?? '',
@@ -118,14 +116,7 @@ export default function BookConfirmScreen() {
         createdAt: serverTimestamp(),
       });
 
-      const detailerToken = await getRecipientPushToken(params.detailerId);
-      sendPushToUser(
-        detailerToken,
-        'New Booking Request!',
-        `${clientName} wants to book ${toTitleCase(params.service ?? '')} on ${params.dateLabel ?? params.date}`,
-        { type: 'booking_request', bookingId: bookingRef.id }
-      );
-
+      // The detailer is notified server-side by the onBookingCreated Cloud Function.
       setSuccess(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to create booking.');

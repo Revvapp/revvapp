@@ -20,8 +20,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { db } from '@/firebaseConfig';
 import { useAuth } from '@/hooks/useAuth';
 import { toTitleCase } from '@/lib/format';
-import { sendPushToUser } from '@/lib/pushNotifications';
-import { getRecipientPushToken } from '@/lib/pushTokens';
 
 const C = {
   bg:      '#0A1628',
@@ -93,16 +91,6 @@ export default function DetailerDisputeScreen() {
 
   const isResolved = dispute?.status === 'resolved';
 
-  async function notifyClient(title: string, body: string) {
-    if (!dispute?.clientId) return;
-    try {
-      const token = await getRecipientPushToken(dispute.clientId);
-      sendPushToUser(token, title, body, { type: 'dispute', invoiceId: id ?? '' });
-    } catch {
-      // best-effort
-    }
-  }
-
   async function submitResponse() {
     if (!dispute || !response.trim() || submitting) return;
     setSubmitting(true);
@@ -111,7 +99,7 @@ export default function DetailerDisputeScreen() {
         detailerResponse: response.trim(),
         respondedAt: serverTimestamp(),
       });
-      await notifyClient('Detailer Responded', 'The detailer has responded to your dispute.');
+      // The client is notified of the response server-side (onDisputeUpdated).
       setResponse('');
       Alert.alert('Response Sent', 'Your response has been added to the dispute.');
     } catch {
@@ -142,7 +130,7 @@ export default function DetailerDisputeScreen() {
         resolvedBy: user?.uid ?? '',
       });
       if (id) await updateDoc(doc(db, 'invoices', id), { status: 'released' });
-      await notifyClient('Dispute Resolved', 'Your dispute has been marked resolved and the payment released.');
+      // The client is notified of the resolution server-side (onDisputeUpdated).
       Alert.alert('Dispute Resolved', 'The dispute is closed and the payment has been released.');
     } catch {
       Alert.alert('Error', 'Could not resolve the dispute. Please try again.');
