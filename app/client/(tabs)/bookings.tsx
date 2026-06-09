@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { collection, doc, getDoc, limit, onSnapshot, orderBy, query, updateDoc, where } from 'firebase/firestore';
+import { collection, doc, limit, onSnapshot, orderBy, query, updateDoc, where } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -16,26 +16,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { db } from '@/firebaseConfig';
 import { useAuth } from '@/hooks/useAuth';
-import { sendPushToUser } from '@/lib/pushNotifications';
-import { getRecipientPushToken } from '@/lib/pushTokens';
 import { toTitleCase } from '@/lib/format';
 import type { BookingDocument } from '@/types/firestore';
 
 async function cancelBooking(id: string) {
   await updateDoc(doc(db, 'bookings', id), { status: 'cancelled' });
-  const bookSnap = await getDoc(doc(db, 'bookings', id));
-  if (bookSnap.exists()) {
-    const detailerId = String(bookSnap.data().detailerId ?? '');
-    const clientName = String(bookSnap.data().clientName ?? 'A client');
-    if (detailerId) {
-      const token = await getRecipientPushToken(detailerId);
-      sendPushToUser(
-        token,
-        'Booking Cancelled',
-        `${clientName} has cancelled their booking.`
-      );
-    }
-  }
+  // The detailer is notified server-side (onBookingStatusChanged → cancelled).
 }
 
 const C = {

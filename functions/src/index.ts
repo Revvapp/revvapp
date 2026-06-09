@@ -1,10 +1,11 @@
-import { initializeApp } from 'firebase-admin/app';
-import { FieldValue, getFirestore } from 'firebase-admin/firestore';
+import { FieldValue } from 'firebase-admin/firestore';
 import { onDocumentWritten } from 'firebase-functions/v2/firestore';
 import { logger } from 'firebase-functions/v2';
 
-initializeApp();
-const db = getFirestore();
+import { db } from './admin';
+
+// Server-side push notifications (booking, message, dispute and review events).
+export * from './notifications';
 
 /**
  * Keeps each detailer's aggregate rating in sync with the reviews collection.

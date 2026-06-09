@@ -28,8 +28,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { db } from '@/firebaseConfig';
 import { useAuth } from '@/hooks/useAuth';
 import { markConversationRead } from '@/lib/conversations';
-import { sendPushToUser } from '@/lib/pushNotifications';
-import { getRecipientPushToken } from '@/lib/pushTokens';
 
 const C = {
   bg:      '#0A1628',
@@ -134,18 +132,7 @@ export default function ClientConversationScreen() {
         { merge: true }
       );
 
-      // Notify the detailer of the new message (best-effort — never break send).
-      try {
-        const token = await getRecipientPushToken(booking.detailerId);
-        sendPushToUser(
-          token,
-          booking.clientName || 'New message',
-          msgText,
-          { type: 'message', conversationId: id }
-        );
-      } catch {
-        // ignore — messaging must succeed even if the push lookup fails
-      }
+      // The detailer is notified of the new message server-side (onMessageCreated).
     } finally {
       setSending(false);
     }

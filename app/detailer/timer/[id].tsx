@@ -14,8 +14,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { db } from '@/firebaseConfig';
-import { sendPushToUser } from '@/lib/pushNotifications';
-import { getRecipientPushToken } from '@/lib/pushTokens';
 import { toTitleCase } from '@/lib/format';
 
 const COLORS = {
@@ -249,8 +247,7 @@ export default function TimerScreen() {
                 timerAccumulatedSeconds: elapsed,
                 completedAt: serverTimestamp(),
               });
-              const token = await getRecipientPushToken(booking.clientId);
-              await sendPushToUser(token, 'Your Detail is Complete!', 'Your detailer has finished. Check your invoice and leave a review.', { type: 'job_complete', bookingId: id });
+              // The client is notified server-side (onBookingStatusChanged → completed).
               router.replace({ pathname: '/detailer/before-after/[id]', params: { id: id! } });
             } catch {
               Alert.alert('Error', 'Could not end job.');

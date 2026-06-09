@@ -135,7 +135,7 @@ Revv Reach → AI-assisted social content creation
 | Payment auto-release + 10% take rate logic | ❌ Not built |
 | Revv Care fund — 1% set-aside per booking | ❌ Not built |
 | Email / SMS delivery (Twilio) — invoice + notifications | ❌ Not built |
-| Push notifications — server-side triggers on booking events | ❌ Not built |
+| Push notifications — server-side triggers on booking/message/dispute/review events | ✅ Done |
 | Per-booking chat / messaging | ❌ Not built |
 | Firebase Cloud Functions (Blaze plan) | ❌ Not set up |
 

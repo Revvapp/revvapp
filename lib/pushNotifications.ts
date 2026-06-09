@@ -46,36 +46,7 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
   }
 }
 
-export type PushMessage = {
-  to: string;
-  title: string;
-  body: string;
-  data?: Record<string, string>;
-};
-
-/** Fire-and-forget send via Expo's push service. Never throws. */
-export async function sendPushNotification(msg: PushMessage): Promise<void> {
-  try {
-    await fetch('https://exp.host/--/api/v2/push/send', {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Accept-Encoding': 'gzip, deflate',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(msg),
-    });
-  } catch {
-    // Best-effort — never throw
-  }
-}
-
-export async function sendPushToUser(
-  token: string | null | undefined,
-  title: string,
-  body: string,
-  data?: Record<string, string>
-): Promise<void> {
-  if (!token) return;
-  await sendPushNotification({ to: token, title, body, data });
-}
+// Outbound push sends live server-side in functions/src/notifications.ts, where
+// they fire authoritatively off Firestore writes. The app only registers a
+// token (above) and routes taps (hooks/useNotificationRouting.ts); it never
+// sends pushes itself, so a backgrounded sender can't drop a notification.

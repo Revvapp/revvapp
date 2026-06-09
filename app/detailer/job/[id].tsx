@@ -14,8 +14,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { db } from '@/firebaseConfig';
-import { sendPushToUser } from '@/lib/pushNotifications';
-import { getRecipientPushToken } from '@/lib/pushTokens';
 import { formatJobDate } from '@/lib/dateKeys';
 import { toTitleCase } from '@/lib/format';
 import type { BookingDocument } from '@/types/firestore';
@@ -120,13 +118,8 @@ export default function JobDetailScreen() {
       }
 
       await updateDoc(doc(db, 'bookings', id), { status });
-      if (status === 'active') {
-        const token = await getRecipientPushToken(booking.clientId);
-        await sendPushToUser(token, 'Booking Accepted!', 'Your detailer has accepted your booking.', { bookingId: id });
-      }
+      // The client is notified of accept/decline server-side (onBookingStatusChanged).
       if (status === 'declined') {
-        const token = await getRecipientPushToken(booking.clientId);
-        sendPushToUser(token, 'Booking Declined', 'Your detailer couldn\'t take this booking. Browse others nearby.');
         router.back();
       }
     } catch (e) {

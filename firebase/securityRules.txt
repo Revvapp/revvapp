@@ -110,7 +110,12 @@ service cloud.firestore {
       // Reviews are public so detailer profiles can display them.
       allow read: if signedIn();
       // Only the booking's own client may post, and only for a completed booking.
+      // The review's doc id MUST equal its bookingId — combined with the
+      // update/delete denial below, that caps it at exactly one review per
+      // booking. Without this, a client could addDoc() many random-id reviews
+      // for the same booking and inflate or tank a detailer's aggregate rating.
       allow create: if signedIn()
+        && reviewId == request.resource.data.bookingId
         && request.resource.data.clientId == request.auth.uid
         && request.resource.data.bookingId is string
         && get(/databases/$(database)/documents/bookings/$(request.resource.data.bookingId)).data.clientId == request.auth.uid
@@ -135,21 +140,65 @@ service cloud.firestore {
     match /emailLookup/{emailId} {
       // Readable pre-auth so signup can resolve an existing account's type.
       allow read: if true;
-      allow write: if signedIn();
+      // A user may only write the lookup for their OWN email (the doc id is the
+      // lowercased email), and only point it at their own uid. Stops a signed-in
+      // user from overwriting someone else's email→userType/uid mapping and
+      // hijacking how that account is resolved at sign-in.
+      allow write: if signedIn()
+        && request.auth.token.email != null
+        && emailId == request.auth.token.email.lower()
+        && request.resource.data.uid == request.auth.uid;
     }
 
     match /pushTokens/{uid} {
-      // Tokens are not sensitive; any signed-in user may read one to send a
-      // notification, but only the owner may write their own.
-      allow read: if signedIn();
-      allow write: if isOwner(uid);
+      // Notifications are sent server-side (Cloud Functions, Admin SDK), so the
+      // client never needs to read another user's token. Lock read+write to the
+      // owner — a client can manage its own token and nothing more. The Admin
+      // SDK bypasses these rules, so the notification functions still read freely.
+      allow read, write: if isOwner(uid);
     }
 
+    // A conversation lives at conversations/{bookingId} — its doc id is the
+    // booking id, so the booking is the source of truth for who may take part.
     match /conversations/{bookingId} {
-      allow read, write: if request.auth != null;
+      function booking() {
+        return get(/databases/$(database)/documents/bookings/$(bookingId)).data;
+      }
+      // True only for the actual client/detailer on the underlying booking.
+      // Reads the booking (not the conversation's own fields) so participation
+      // can't be forged by writing the conversation doc.
+      function isBookingParty() {
+        return signedIn()
+          && exists(/databases/$(database)/documents/bookings/$(bookingId))
+          && (booking().clientId == request.auth.uid
+              || booking().detailerId == request.auth.uid);
+      }
+
+      // Read/list off the conversation's own participant fields — no cross-doc
+      // get(), so listing a user's threads (where clientId/detailerId == uid)
+      // stays a single cheap query. Those fields are trustworthy because the
+      // write rule below forces them to match the booking.
+      allow read: if signedIn()
+        && (resource.data.clientId == request.auth.uid
+            || resource.data.detailerId == request.auth.uid);
+
+      // Only a real booking party may write the thread doc, and they can only
+      // stamp the true participant ids from the booking. Stops a stranger who
+      // knows a booking id from hijacking the thread or reading its messages.
+      allow create, update: if isBookingParty()
+        && request.resource.data.clientId == booking().clientId
+        && request.resource.data.detailerId == booking().detailerId;
+
+      allow delete: if false;
 
       match /messages/{messageId} {
-        allow read, write: if request.auth != null;
+        // Only the two booking parties can read the thread's messages.
+        allow read: if isBookingParty();
+        // A party may post, but only as themselves — no spoofing senderId.
+        allow create: if isBookingParty()
+          && request.resource.data.senderId == request.auth.uid;
+        // Messages are an immutable record.
+        allow update, delete: if false;
       }
     }
 

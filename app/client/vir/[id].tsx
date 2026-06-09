@@ -15,8 +15,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { db } from '@/firebaseConfig';
-import { sendPushToUser } from '@/lib/pushNotifications';
-import { getRecipientPushToken } from '@/lib/pushTokens';
 import { toTitleCase } from '@/lib/format';
 import type { BookingDocument } from '@/types/firestore';
 
@@ -80,15 +78,7 @@ export default function ClientVIRSignScreen() {
                 status: 'vir_signed',
                 virSignedAt: serverTimestamp(),
               });
-              const detailerId = String(booking?.detailerId ?? '');
-              if (detailerId) {
-                const token = await getRecipientPushToken(detailerId);
-                sendPushToUser(
-                  token,
-                  'Inspection Signed',
-                  'The client signed off — you can now start the job timer.'
-                );
-              }
+              // The detailer is notified server-side (onBookingStatusChanged → vir_signed).
               Alert.alert(
                 'Inspection Signed!',
                 'Your detailer has been notified and can now start the job timer.',
