@@ -300,24 +300,10 @@ export default function JobDetailScreen() {
         {!isCompleted && (
           <Pressable
             style={styles.reportBtn}
-            onPress={() =>
-              Alert.alert(
-                'Report Off-Platform Request',
-                'Did your client ask to pay outside of REVV? This protects your Revv Care coverage and keeps your account in good standing.',
-                [
-                  { text: 'Cancel', style: 'cancel' },
-                  {
-                    text: 'Submit Report',
-                    style: 'destructive',
-                    onPress: () =>
-                      Alert.alert('Report Submitted', 'Thank you. Our team will review this booking.'),
-                  },
-                ]
-              )
-            }
+            onPress={() => router.push({ pathname: '/detailer/report/[id]', params: { id: id! } })}
           >
             <Ionicons name="flag-outline" size={13} color={COLORS.red} />
-            <Text style={styles.reportBtnText}>Report Off-Platform Request</Text>
+            <Text style={styles.reportBtnText}>Report a Problem</Text>
           </Pressable>
         )}
       </ScrollView>

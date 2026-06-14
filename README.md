@@ -83,7 +83,7 @@ Revv Reach → AI-assisted social content creation
 | Dev-tools screen (DEV only, gated in production) | ✅ Done |
 | Stripe Connect Express — KYC onboarding for payouts | ❌ Not built |
 | Payment auto-release to detailer after 24hr window | ❌ Not built |
-| Off-platform report button (on every active booking) | ❌ Not built |
+| Off-platform / safety report button (job + chat) → `reports` collection | ✅ Done |
 
 ---
 
@@ -118,7 +118,7 @@ Revv Reach → AI-assisted social content creation
 | Stripe card pre-auth on booking (money into escrow) | ❌ Not built |
 | 24hr Dispute — raise a dispute screen (`/dispute/[id]`) | ❌ Not built |
 | Verified Reviews — post-payment (requires real Stripe transaction) | ❌ Not built |
-| Off-platform report button | ❌ Not built |
+| Off-platform / safety report button (in-chat) → `reports` collection | ✅ Done |
 
 ---
 

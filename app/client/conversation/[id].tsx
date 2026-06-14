@@ -172,7 +172,13 @@ export default function ClientConversationScreen() {
             <Text style={styles.headerSub}>{booking.vehicleLabel}</Text>
           )}
         </View>
-        <View style={{ width: 30 }} />
+        <Pressable
+          onPress={() => router.push({ pathname: '/client/report/[id]', params: { id: id! } })}
+          hitSlop={10}
+          style={{ width: 30, alignItems: 'flex-end' }}
+        >
+          <Ionicons name="flag-outline" size={19} color={C.gray} />
+        </Pressable>
       </View>
 
       <KeyboardAvoidingView
