@@ -137,6 +137,25 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    match /reports/{reportId} {
+      // A report is a confidential flag to the REVV trust & safety team, NOT a
+      // message to the other party — so the reported user must never be able to
+      // read it. Only the author can read their own reports; the team uses the
+      // Admin SDK (which bypasses these rules).
+      allow read: if signedIn() && resource.data.reporterId == request.auth.uid;
+      // Only a party on the underlying booking may file one, stamped as
+      // themselves. clientId/detailerId carry the booking parties so the team
+      // knows who was reported; one of them must be the reporter.
+      allow create: if signedIn()
+        && request.resource.data.reporterId == request.auth.uid
+        && (request.resource.data.reporterRole == 'client'
+            || request.resource.data.reporterRole == 'detailer')
+        && (request.resource.data.clientId == request.auth.uid
+            || request.resource.data.detailerId == request.auth.uid);
+      // Immutable — reports are handled by the team off-platform.
+      allow update, delete: if false;
+    }
+
     match /emailLookup/{emailId} {
       // Readable pre-auth so signup can resolve an existing account's type.
       allow read: if true;

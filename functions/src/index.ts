@@ -7,6 +7,9 @@ import { db } from './admin';
 // Server-side push notifications (booking, message, dispute and review events).
 export * from './notifications';
 
+// Trust & safety report logging (off-platform / safety reports).
+export * from './reports';
+
 /**
  * Keeps each detailer's aggregate rating in sync with the reviews collection.
  *
