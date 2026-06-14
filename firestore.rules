@@ -1,5 +1,6 @@
-// Revv — Firestore + Storage security rules (paste into Firebase Console).
-// Deploy: firebase deploy --only firestore:rules,storage
+// Revv — Firestore security rules.
+// Deployed via the CLI: firebase deploy --only firestore:rules
+// (wired through firebase.json). Storage rules live in ../storage.rules.
 
 rules_version = '2';
 
@@ -58,9 +59,9 @@ service cloud.firestore {
       // Update: either party on the booking, but they can't rewrite who's
       // involved or the agreed price. Status changes are role-gated: the
       // client may only cancel or sign the VIR; the detailer drives every
-      // other lifecycle transition (accept/decline → VIR capture → timer
-      // → complete). Stops a client from self-marking 'completed' to skip
-      // the dispute window, or a detailer from rewriting 'cancelled'.
+      // other lifecycle transition (accept → VIR capture → timer → complete
+      // → pending_release). The status lists below mirror exactly the values
+      // the app writes — keep them in sync with the app or legit writes break.
       allow update: if signedIn()
         && (resource.data.clientId == request.auth.uid
             || resource.data.detailerId == request.auth.uid)
@@ -76,8 +77,8 @@ service cloud.firestore {
           || (
             resource.data.detailerId == request.auth.uid
             && request.resource.data.status in [
-              'accepted', 'declined', 'vir_pending', 'vir_submitted',
-              'in_progress', 'paused', 'completed'
+              'active', 'declined', 'vir_submitted', 'in_progress',
+              'paused', 'completed', 'pending_release'
             ]
           )
         );
@@ -219,32 +220,6 @@ service cloud.firestore {
         // Messages are an immutable record.
         allow update, delete: if false;
       }
-    }
-
-  }
-}
-
-service firebase.storage {
-  match /b/{bucket}/o {
-
-    match /detailers/{uid}/{allPaths=**} {
-      allow read: if true;
-      allow write: if request.auth != null && request.auth.uid == uid;
-    }
-
-    match /vir-photos/{bookingId}/{allPaths=**} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
-    }
-
-    match /after-photos/{bookingId}/{allPaths=**} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
-    }
-
-    match /disputes/{uid}/{allPaths=**} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == uid;
     }
 
   }
