@@ -3,6 +3,7 @@ import * as Location from 'expo-location';
 import { useEffect, useMemo, useState } from 'react';
 
 import { db } from '@/firebaseConfig';
+import { mapFirestoreError } from '@/lib/firestoreErrors';
 import type { DetailerDocument } from '@/types/firestore';
 
 export type DetailerWithDistance = DetailerDocument & {
@@ -82,7 +83,7 @@ export function useFindDetailers(): FindDetailersModel {
         setLoading(false);
       },
       (e) => {
-        setError(e.message);
+        setError(mapFirestoreError(e));
         setLoading(false);
       }
     );

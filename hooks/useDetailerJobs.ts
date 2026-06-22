@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { db } from '@/firebaseConfig';
 import { useAuth } from '@/hooks/useAuth';
+import { mapFirestoreError } from '@/lib/firestoreErrors';
 import type { BookingDocument } from '@/types/firestore';
 
 export type DetailerJobsModel = {
@@ -62,7 +63,7 @@ export function useDetailerJobs(): DetailerJobsModel {
         setLoading(false);
       },
       (e) => {
-        setError(e.message);
+        setError(mapFirestoreError(e));
         setLoading(false);
       }
     );

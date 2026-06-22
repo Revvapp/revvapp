@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { db } from '@/firebaseConfig';
 import { formatJobDate } from '@/lib/dateKeys';
+import { mapFirestoreError } from '@/lib/firestoreErrors';
 import { toTitleCase } from '@/lib/format';
 import type { BookingDocument } from '@/types/firestore';
 
@@ -81,7 +82,7 @@ export default function JobDetailScreen() {
         setLoading(false);
       },
       (e) => {
-        setError(e.message);
+        setError(mapFirestoreError(e));
         setLoading(false);
       }
     );

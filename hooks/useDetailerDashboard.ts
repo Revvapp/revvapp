@@ -12,6 +12,7 @@ import {
   startOfMonth,
   startOfWeekSunday,
 } from '@/lib/dateKeys';
+import { mapFirestoreError } from '@/lib/firestoreErrors';
 import { toTitleCase } from '@/lib/format';
 import type { BookingDocument } from '@/types/firestore';
 
@@ -140,7 +141,7 @@ export function useDetailerDashboard(): DetailerDashboardModel {
         setBookingsLoaded(true);
       },
       (e) => {
-        setError(e.message);
+        setError(mapFirestoreError(e));
         setBookingsLoaded(true);
       }
     );

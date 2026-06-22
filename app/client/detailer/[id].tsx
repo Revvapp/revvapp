@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { db } from '@/firebaseConfig';
 import { lowestRate } from '@/hooks/useFindDetailers';
+import { mapFirestoreError } from '@/lib/firestoreErrors';
 import { toTitleCase } from '@/lib/format';
 import type { DetailerDocument } from '@/types/firestore';
 
@@ -113,7 +114,7 @@ export default function DetailerPublicProfileScreen() {
         setLoading(false);
       },
       (e) => {
-        setError(e.message);
+        setError(mapFirestoreError(e));
         setLoading(false);
       }
     );

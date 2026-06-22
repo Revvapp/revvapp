@@ -17,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { db } from '@/firebaseConfig';
 import { useAuth } from '@/hooks/useAuth';
 import { isConversationUnread } from '@/lib/conversations';
+import { mapFirestoreError } from '@/lib/firestoreErrors';
 
 const C = {
   bg:      '#0D1B2A',
@@ -143,7 +144,7 @@ export default function DetailerMessagesScreen() {
       setConversations(docs);
       setLoading(false);
     }, (err) => {
-      setError(err.message);
+      setError(mapFirestoreError(err));
       setLoading(false);
     });
     return () => unsub();
