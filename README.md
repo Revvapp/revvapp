@@ -78,8 +78,8 @@ Revv Reach → AI-assisted social content creation
 | Before/After photo upload | ✅ Done |
 | Detailer Invoice — formal receipt layout | ✅ Done |
 | Edit Profile | ✅ Done |
-| Clients tab | ✅ Done (mock data) |
-| Earnings tab | ✅ Done (mock data) |
+| Clients tab — live Firestore query over the detailer's bookings | ✅ Done |
+| Earnings tab — live invoice data (`invoices` query, weekly/monthly rollups) | ✅ Done |
 | Dev-tools screen (DEV only, gated in production) | ✅ Done |
 | Stripe Connect Express — KYC onboarding for payouts | ❌ Not built |
 | Payment auto-release to detailer after 24hr window | ❌ Not built |
@@ -116,8 +116,8 @@ Revv Reach → AI-assisted social content creation
 | Garage tab — add/edit vehicles, set dashboard vehicle | ✅ Done |
 | Vehicle service history — per-car detail timeline + re-book | ✅ Done |
 | Stripe card pre-auth on booking (money into escrow) | ❌ Not built |
-| 24hr Dispute — raise a dispute screen (`/dispute/[id]`) | ❌ Not built |
-| Verified Reviews — post-payment (requires real Stripe transaction) | ❌ Not built |
+| 24hr Dispute — raise a dispute screen (`/dispute/[id]`) → writes `disputes`, flips invoice to `disputed` | ✅ Done |
+| Verified Reviews — gated on a completed booking, one per booking, written to `reviews` | ✅ Done (payment-gating lands with Stripe) |
 | Off-platform / safety report button (in-chat) → `reports` collection | ✅ Done |
 
 ---
@@ -135,9 +135,10 @@ Revv Reach → AI-assisted social content creation
 | Payment auto-release + 10% take rate logic | ❌ Not built |
 | Revv Care fund — 1% set-aside per booking | ❌ Not built |
 | Email / SMS delivery (Twilio) — invoice + notifications | ❌ Not built |
-| Push notifications — server-side triggers on booking/message/dispute/review events | ✅ Done |
-| Per-booking chat / messaging | ❌ Not built |
-| Firebase Cloud Functions (Blaze plan) | ❌ Not set up |
+| Push notifications — server-side trigger code written (`functions/src/notifications.ts`) | ✅ Code done |
+| Per-booking chat / messaging — conversation threads, message send, unread badges | ✅ Done |
+| Firestore composite indexes — defined and deployed to `revv-app2026` | ✅ Done |
+| Firebase Cloud Functions — code written (notifications, reports, admin); **deployment unverified** (CLI needs `firebase login --reauth`; requires Blaze plan) | ⚠️ Verify |
 
 ---
 
