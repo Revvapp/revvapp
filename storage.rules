@@ -7,19 +7,30 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
 
+    // True only for the client or detailer on the underlying booking. Reads the
+    // booking doc from Firestore so a stranger who happens to know a bookingId
+    // can neither view nor tamper with that job's photos. The VIR is the
+    // damage-liability record, so write access in particular must be locked to
+    // the two parties.
+    function isBookingParty(bookingId) {
+      return request.auth != null
+        && (
+          firestore.get(/databases/(default)/documents/bookings/$(bookingId)).data.clientId == request.auth.uid
+          || firestore.get(/databases/(default)/documents/bookings/$(bookingId)).data.detailerId == request.auth.uid
+        );
+    }
+
     match /detailers/{uid}/{allPaths=**} {
       allow read: if true;
       allow write: if request.auth != null && request.auth.uid == uid;
     }
 
     match /vir-photos/{bookingId}/{allPaths=**} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow read, write: if isBookingParty(bookingId);
     }
 
     match /after-photos/{bookingId}/{allPaths=**} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow read, write: if isBookingParty(bookingId);
     }
 
     match /disputes/{uid}/{allPaths=**} {

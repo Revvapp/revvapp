@@ -27,8 +27,31 @@ service cloud.firestore {
 
     match /detailers/{uid} {
       allow read: if true;
-      allow create, update: if isOwner(uid)
-        && request.resource.data.uid == uid;
+
+      // A detailer manages their own public profile, but must never forge trust
+      // signals. rating/reviewCount/ratingSum are owned by the
+      // aggregateDetailerRating Cloud Function (Admin SDK — bypasses these
+      // rules); idVerified is earned via background check, never self-granted.
+      // So a freshly created profile starts unverified with a zeroed rating.
+      allow create: if isOwner(uid)
+        && request.resource.data.uid == uid
+        && request.resource.data.get('idVerified', false) == false
+        && request.resource.data.get('rating', 0) == 0
+        && request.resource.data.get('reviewCount', 0) == 0
+        && request.resource.data.get('ratingSum', 0) == 0;
+
+      // Updates may not change any protected trust field — each must carry
+      // through unchanged from the stored doc (which only the Admin SDK sets).
+      // Profile edits (name, bio, rates, availability) leave these untouched, so
+      // this is transparent to every legitimate write.
+      allow update: if isOwner(uid)
+        && request.resource.data.uid == uid
+        && request.resource.data.get('idVerified', false) == resource.data.get('idVerified', false)
+        && request.resource.data.get('isFoundingPro', false) == resource.data.get('isFoundingPro', false)
+        && request.resource.data.get('rating', 0) == resource.data.get('rating', 0)
+        && request.resource.data.get('reviewCount', 0) == resource.data.get('reviewCount', 0)
+        && request.resource.data.get('ratingSum', 0) == resource.data.get('ratingSum', 0);
+
       allow delete: if isOwner(uid);
     }
 
@@ -98,7 +121,16 @@ service cloud.firestore {
       // status (and nothing else) to 'disputed' (raising a dispute) or 'released'
       // (auto-release after the dispute window closes).
       allow update: if signedIn() && (
-        resource.data.detailerId == request.auth.uid
+        // Detailer may update their own invoice (share flags, reel URL, status),
+        // but NOT the money: price, platform fee and payout are immutable once
+        // the invoice is written. When real payouts land these become
+        // Admin-SDK-only; this closes the gap in the meantime.
+        (
+          resource.data.detailerId == request.auth.uid
+          && request.resource.data.get('price', 0) == resource.data.get('price', 0)
+          && request.resource.data.get('platformFee', 0) == resource.data.get('platformFee', 0)
+          && request.resource.data.get('detailerPayout', 0) == resource.data.get('detailerPayout', 0)
+        )
         || (
           resource.data.clientId == request.auth.uid
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
@@ -120,7 +152,15 @@ service cloud.firestore {
         && request.resource.data.clientId == request.auth.uid
         && request.resource.data.bookingId is string
         && get(/databases/$(database)/documents/bookings/$(request.resource.data.bookingId)).data.clientId == request.auth.uid
-        && get(/databases/$(database)/documents/bookings/$(request.resource.data.bookingId)).data.status == 'completed';
+        && get(/databases/$(database)/documents/bookings/$(request.resource.data.bookingId)).data.status == 'completed'
+        // The review must target the SAME detailer as the booking, and the score
+        // must be a real 1–5. Without this a client could set detailerId to any
+        // (publicly listed) detailer and rating to any magnitude, poisoning that
+        // victim's aggregate via the aggregateDetailerRating function.
+        && request.resource.data.detailerId == get(/databases/$(database)/documents/bookings/$(request.resource.data.bookingId)).data.detailerId
+        && request.resource.data.rating is number
+        && request.resource.data.rating >= 1
+        && request.resource.data.rating <= 5;
       // Reviews are permanent.
       allow update, delete: if false;
     }

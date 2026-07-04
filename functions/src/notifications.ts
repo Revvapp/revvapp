@@ -161,8 +161,14 @@ export const onMessageCreated = onDocumentCreated(
     const recipientId = senderId === clientId ? detailerId : clientId;
     if (!recipientId) return;
 
-    const title = String(m.senderName ?? '') || 'New message';
-    const body = String(m.text ?? '').slice(0, 160) || 'Sent you a message.';
+    // Derive the display name from the conversation's participant fields (which
+    // security rules bind to the booking) rather than trusting a per-message
+    // `senderName` a sender could set to anything — that value drives the push
+    // title and is a phishing surface.
+    const senderName =
+      senderId === clientId ? String(convo.clientName ?? '') : String(convo.detailerName ?? '');
+    const title = senderName || 'New message';
+    const body = String(m.text ?? '').replace(/\s+/g, ' ').trim().slice(0, 160) || 'Sent you a message.';
     await notifyUser(recipientId, title, body, { type: 'message', conversationId });
   }
 );
