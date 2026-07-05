@@ -240,7 +240,12 @@ export default function TimerScreen() {
           onPress: async () => {
             setSaving(true);
             try {
-              const elapsed = booking.timerAccumulatedSeconds ?? displaySeconds;
+              // Accumulated time plus any still-running segment, so the recorded
+              // total is correct regardless of which state we end from.
+              const runningSegment = booking.timerStartMs
+                ? Math.floor((Date.now() - booking.timerStartMs) / 1000)
+                : 0;
+              const elapsed = (booking.timerAccumulatedSeconds ?? 0) + runningSegment;
               await updateDoc(doc(db, 'bookings', id), {
                 status: 'completed',
                 timerStartMs: null,
@@ -373,28 +378,18 @@ export default function TimerScreen() {
           {/* Action Buttons */}
           <View style={styles.actionRow}>
             {isNotStarted && (
-              <>
-                <Pressable
-                  style={[styles.btnStart, styles.btnDisabledStyle]}
-                  onPress={handleStart}
-                  disabled={saving}
-                >
-                  {saving ? <ActivityIndicator color={COLORS.white} size="small" /> : <Text style={styles.btnStartText}>START TIMER</Text>}
-                </Pressable>
-                <Pressable style={styles.btnNotes}>
-                  <Text style={styles.btnNotesText}>Notes</Text>
-                </Pressable>
-              </>
+              <Pressable
+                style={[styles.btnStart, saving && styles.btnDisabledStyle]}
+                onPress={handleStart}
+                disabled={saving}
+              >
+                {saving ? <ActivityIndicator color={COLORS.white} size="small" /> : <Text style={styles.btnStartText}>START TIMER</Text>}
+              </Pressable>
             )}
             {isRunning && (
-              <>
-                <Pressable style={styles.btnPause} onPress={handlePause} disabled={saving}>
-                  {saving ? <ActivityIndicator color={COLORS.white} size="small" /> : <Text style={styles.btnPauseText}>PAUSE</Text>}
-                </Pressable>
-                <Pressable style={styles.btnNotes}>
-                  <Text style={styles.btnNotesText}>Notes</Text>
-                </Pressable>
-              </>
+              <Pressable style={styles.btnPause} onPress={handlePause} disabled={saving}>
+                {saving ? <ActivityIndicator color={COLORS.white} size="small" /> : <Text style={styles.btnPauseText}>PAUSE</Text>}
+              </Pressable>
             )}
             {isPaused && (
               <>

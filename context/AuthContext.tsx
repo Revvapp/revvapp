@@ -48,16 +48,23 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-async function loadUserProfile(uid: string): Promise<UserDocument | null> {
+// Discriminates a genuine "no profile doc" (ok: true, profile: null) from a
+// transient load failure (ok: false). The caller keeps the last-known profile on
+// failure instead of nulling it — otherwise a flaky network turns a signed-in
+// user into "no account" and the routing effect bounces them to the landing.
+type ProfileLoad =
+  | { ok: true; profile: UserDocument | null }
+  | { ok: false };
+
+async function loadUserProfile(uid: string): Promise<ProfileLoad> {
   try {
-    if (auth.currentUser) {
-      await auth.currentUser.getIdToken(true);
-    }
+    // No forced getIdToken(true) here: the Firestore SDK attaches a valid token
+    // on its own, and a forced network refresh was a needless failure point that
+    // ran on every auth change.
     const snap = await getDoc(doc(db, 'users', uid));
-    if (!snap.exists()) return null;
-    return snap.data() as UserDocument;
+    return { ok: true, profile: snap.exists() ? (snap.data() as UserDocument) : null };
   } catch {
-    return null;
+    return { ok: false };
   }
 }
 
@@ -75,8 +82,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUserProfile(null);
       return;
     }
-    const p = await loadUserProfile(auth.currentUser.uid);
-    setUserProfile(p);
+    const res = await loadUserProfile(auth.currentUser.uid);
+    if (res.ok) setUserProfile(res.profile);
+    // On failure keep the current profile rather than wiping it.
   }, []);
 
   useEffect(() => {
@@ -93,8 +101,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
       try {
-        const p = await loadUserProfile(nextUser.uid);
-        setUserProfile(p);
+        const res = await loadUserProfile(nextUser.uid);
+        // Only overwrite on a definitive result; a transient failure leaves any
+        // previously loaded profile intact instead of forcing a redirect to '/'.
+        if (res.ok) setUserProfile(res.profile);
       } finally {
         setLoading(false);
         if (!initializedRef.current) {

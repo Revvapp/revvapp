@@ -36,12 +36,21 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
   const projectId =
     Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
 
+  if (!projectId && __DEV__) {
+    console.warn(
+      '[push] No EAS projectId found (app.json → extra.eas.projectId). ' +
+        'getExpoPushTokenAsync will fail, so no push token is saved and ' +
+        'server-side notifications have nothing to deliver to. Run `eas init`.'
+    );
+  }
+
   try {
     const token = await Notifications.getExpoPushTokenAsync(
       projectId ? { projectId } : undefined
     );
     return token.data;
-  } catch {
+  } catch (err) {
+    if (__DEV__) console.warn('[push] Could not get Expo push token:', err);
     return null;
   }
 }
