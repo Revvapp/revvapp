@@ -1,5 +1,5 @@
 import { FieldValue } from 'firebase-admin/firestore';
-import { onDocumentWritten } from 'firebase-functions/v2/firestore';
+import { onDocumentUpdated, onDocumentWritten } from 'firebase-functions/v2/firestore';
 import { logger } from 'firebase-functions/v2';
 
 import { db } from './admin';
@@ -56,4 +56,39 @@ export const aggregateDetailerRating = onDocumentWritten('reviews/{reviewId}', a
     );
 
   logger.info(`Updated rating for detailer ${detailerId}: ${rating} (${count} reviews)`);
+});
+
+/**
+ * Stamps lastDetailedDate on the client's vehicle when a booking completes.
+ *
+ * The app used to write this from the detailer's device, but Firestore rules
+ * (correctly) restrict `clients/{uid}/vehicles/*` to the owning client, so the
+ * write was always denied. The Admin SDK bypasses rules, making this the one
+ * legitimate writer. The garage/history screens also fall back to the most
+ * recent completed booking, so a missed stamp degrades gracefully.
+ */
+export const syncVehicleLastDetailed = onDocumentUpdated('bookings/{bookingId}', async (event) => {
+  const before = event.data?.before.data();
+  const after = event.data?.after.data();
+  if (!before || !after) return;
+  if (before.status === after.status || String(after.status) !== 'completed') return;
+
+  const clientId = String(after.clientId ?? '');
+  const vehicleId = String(after.vehicleId ?? '');
+  const jobDate = String(after.date ?? '');
+  if (!clientId || !vehicleId || !jobDate) return;
+
+  try {
+    // update() (not set+merge) so a vehicle deleted from the garage isn't
+    // resurrected as a stub doc with only a lastDetailedDate.
+    await db
+      .collection('clients')
+      .doc(clientId)
+      .collection('vehicles')
+      .doc(vehicleId)
+      .update({ lastDetailedDate: jobDate });
+  } catch (err) {
+    // The vehicle may have been deleted from the garage — nothing to stamp.
+    logger.warn(`Could not stamp lastDetailedDate for vehicle ${vehicleId}`, err as Error);
+  }
 });

@@ -94,7 +94,18 @@ export function useClientDashboard(): ClientDashboardModel {
         } satisfies BookingDocument;
       });
 
-      const activeStatuses = new Set(['pending', 'confirmed', 'in_progress', 'paused']);
+      // Every status a live job passes through before completion. Acceptance
+      // writes 'active' (there is no 'confirmed' status), and the VIR states
+      // must stay visible too, or a booking vanishes from the dashboard
+      // between acceptance and timer start.
+      const activeStatuses = new Set([
+        'pending',
+        'active',
+        'vir_submitted',
+        'vir_signed',
+        'in_progress',
+        'paused',
+      ]);
       const activeBookings = bookingsRaw.filter((b) => activeStatuses.has(b.status));
 
       const displayName = fullName.trim()

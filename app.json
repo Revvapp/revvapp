@@ -11,7 +11,13 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.anonymous.revv-app",
-      "buildNumber": "1"
+      "buildNumber": "1",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "entitlements": {
+        "aps-environment": "development"
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -40,7 +46,8 @@
         "expo-image-picker",
         {
           "photosPermission": "Allow Revv to access your photos to upload your profile and portfolio.",
-          "cameraPermission": "Allow Revv to access your camera to capture vehicle inspection and before/after photos."
+          "cameraPermission": "Revv uses the camera to photograph your vehicle's condition for pre-job inspection reports and before/after photos.",
+          "microphonePermission": "Revv may capture audio when you record video of your detailing work."
         }
       ],
       [
@@ -58,7 +65,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/images/icon.png",
+          "icon": "./assets/images/android-icon-monochrome.png",
           "color": "#C9A227"
         }
       ],

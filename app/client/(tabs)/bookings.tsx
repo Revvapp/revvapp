@@ -43,7 +43,6 @@ type TabType = 'upcoming' | 'history';
 const STATUS_CONFIG: Record<string, { label: string; dot: string }> = {
   pending:       { label: 'Awaiting Acceptance', dot: C.gold },
   active:        { label: 'Confirmed',           dot: C.navy },
-  confirmed:     { label: 'Confirmed',           dot: C.navy },
   vir_submitted: { label: 'Sign Inspection',     dot: '#E67E22' },
   vir_signed:    { label: 'Starting Soon',       dot: C.green },
   in_progress:   { label: 'In Progress',         dot: C.green },
@@ -110,7 +109,7 @@ function BookingCard({ booking }: { booking: BookingDocument }) {
 
       {booking.status === 'completed' && (
         <>
-          {!(booking as any).hasReview ? (
+          {!booking.hasReview ? (
             <Pressable
               style={styles.ctaPrimary}
               onPress={() => router.push({ pathname: '/client/review/[id]', params: { id: booking.id } })}
@@ -134,7 +133,7 @@ function BookingCard({ booking }: { booking: BookingDocument }) {
         </>
       )}
 
-      {['active', 'confirmed', 'vir_submitted', 'vir_signed', 'in_progress', 'paused'].includes(booking.status) && (
+      {['active', 'vir_submitted', 'vir_signed', 'in_progress', 'paused'].includes(booking.status) && (
         <Pressable
           style={styles.ctaMessage}
           onPress={() => router.push({ pathname: '/client/conversation/[id]', params: { id: booking.id } })}
@@ -144,7 +143,8 @@ function BookingCard({ booking }: { booking: BookingDocument }) {
         </Pressable>
       )}
 
-      {['pending', 'confirmed'].includes(booking.status) && (
+      {/* Cancellable until the inspection begins — 'active' is the accepted state. */}
+      {['pending', 'active'].includes(booking.status) && (
         <Pressable
           style={styles.cancelBtn}
           onPress={() =>
@@ -167,27 +167,13 @@ function BookingCard({ booking }: { booking: BookingDocument }) {
         </Pressable>
       )}
 
-      {['pending', 'active', 'confirmed', 'vir_submitted', 'vir_signed', 'in_progress', 'paused'].includes(booking.status) && (
+      {['pending', 'active', 'vir_submitted', 'vir_signed', 'in_progress', 'paused'].includes(booking.status) && (
         <Pressable
           style={styles.reportBtn}
-          onPress={() =>
-            Alert.alert(
-              'Report Off-Platform Request',
-              'Did your detailer ask you to pay outside of REVV (cash, Venmo, Zelle, etc.)?\n\nThis violates our terms and removes your payment protection.',
-              [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                  text: 'Submit Report',
-                  style: 'destructive',
-                  onPress: () =>
-                    Alert.alert('Report Submitted', 'Thank you. Our team will review this booking.'),
-                },
-              ]
-            )
-          }
+          onPress={() => router.push({ pathname: '/client/report/[id]', params: { id: booking.id } })}
         >
           <Ionicons name="flag-outline" size={12} color={C.red} />
-          <Text style={styles.reportBtnText}>Report Off-Platform Request</Text>
+          <Text style={styles.reportBtnText}>Report a Problem</Text>
         </Pressable>
       )}
     </Animated.View>
@@ -249,6 +235,7 @@ export default function ClientBookingsScreen() {
           address: x.address ? String(x.address) : undefined,
           notes: x.notes ? String(x.notes) : undefined,
           clientName: x.clientName ? String(x.clientName) : undefined,
+          hasReview: x.hasReview === true,
           createdAt: x.createdAt ?? null,
         } satisfies BookingDocument;
       });
@@ -263,7 +250,7 @@ export default function ClientBookingsScreen() {
   }, [user?.uid]);
 
   const upcoming = bookings.filter((b) =>
-    ['pending', 'active', 'confirmed', 'vir_submitted', 'vir_signed', 'in_progress', 'paused'].includes(b.status)
+    ['pending', 'active', 'vir_submitted', 'vir_signed', 'in_progress', 'paused'].includes(b.status)
   );
   const history = bookings.filter((b) =>
     ['completed', 'declined', 'cancelled'].includes(b.status)

@@ -74,6 +74,15 @@ export default function ClientInvoiceScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [invoice, setInvoice] = useState<InvoiceData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [now, setNow] = useState(() => Date.now());
+
+  // Re-render each minute while the dispute window is open so the countdown
+  // ticks down and the auto-release below actually fires when time runs out.
+  useEffect(() => {
+    if (invoice?.status !== 'pending_release') return;
+    const t = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(t);
+  }, [invoice?.status]);
 
   useEffect(() => {
     if (!id) return;
@@ -105,7 +114,7 @@ export default function ClientInvoiceScreen() {
     if (invoice.status === 'pending_release' && !disputeWindowOpen(invoice.createdAt?.seconds ?? null)) {
       updateDoc(doc(db, 'invoices', id), { status: 'released' });
     }
-  }, [invoice, id]);
+  }, [invoice, id, now]);
 
   if (loading) {
     return (
@@ -129,9 +138,21 @@ export default function ClientInvoiceScreen() {
 
   const invoiceNum = `REV-${invoice.date.replace(/-/g, '')}-${(id ?? '').slice(-4).toUpperCase()}`;
   const createdSeconds = invoice.createdAt?.seconds ?? null;
-  const disputeOpen = disputeWindowOpen(createdSeconds);
-  const window = windowLabel(createdSeconds);
+  const disputeOpen = invoice.status === 'pending_release' && disputeWindowOpen(createdSeconds);
+  const window =
+    invoice.status === 'disputed'
+      ? {
+          line1: 'Dispute in review',
+          line2: 'Payment is paused while our team reviews your dispute.',
+        }
+      : windowLabel(createdSeconds);
   const detailerDisplay = invoice.businessName ? toTitleCase(invoice.businessName) : toTitleCase(invoice.detailerName);
+  const statusPill =
+    invoice.status === 'disputed'
+      ? { label: 'Disputed', bg: '#FDECEA', fg: '#C0392B' }
+      : invoice.status === 'released'
+      ? { label: 'Paid', bg: '#D4EDDA', fg: '#155724' }
+      : { label: 'Completed', bg: '#D4EDDA', fg: '#155724' };
 
   return (
     <SafeAreaView edges={['top']} style={styles.safe}>
@@ -141,8 +162,8 @@ export default function ClientInvoiceScreen() {
           <Ionicons name="arrow-back" size={22} color={C.white} />
         </Pressable>
         <Text style={styles.navTitle}>Receipt</Text>
-        <View style={styles.statusPill}>
-          <Text style={styles.statusPillText}>Completed</Text>
+        <View style={[styles.statusPill, { backgroundColor: statusPill.bg }]}>
+          <Text style={[styles.statusPillText, { color: statusPill.fg }]}>{statusPill.label}</Text>
         </View>
       </View>
 

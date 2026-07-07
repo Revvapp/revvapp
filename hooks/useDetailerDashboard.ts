@@ -1,4 +1,4 @@
-import { collection, doc, getDoc, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, doc, getDoc, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import { useCallback, useEffect, useState } from 'react';
 
 import { db } from '@/firebaseConfig';
@@ -116,7 +116,15 @@ export function useDetailerDashboard(): DetailerDashboardModel {
       setBookingsLoaded(true);
       return;
     }
-    const q = query(collection(db, 'bookings'), where('detailerId', '==', user.uid));
+    // Most recent 200, matching useDetailerJobs — the dashboard only surfaces
+    // today/this-week/this-month rollups, so old history is dead weight here.
+    // Uses the existing detailerId+createdAt composite index.
+    const q = query(
+      collection(db, 'bookings'),
+      where('detailerId', '==', user.uid),
+      orderBy('createdAt', 'desc'),
+      limit(200)
+    );
     const unsub = onSnapshot(
       q,
       (snap) => {

@@ -1,5 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
-import { collection, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore';
+import {
+  collection,
+  getAggregateFromServer,
+  getCountFromServer,
+  limit,
+  onSnapshot,
+  orderBy,
+  query,
+  sum,
+  where,
+} from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -60,6 +70,10 @@ export default function DetailerEarningsScreen() {
   const { user } = useAuth();
   const [invoices, setInvoices] = useState<InvoiceRow[]>([]);
   const [loading, setLoading] = useState(true);
+  // Server-side aggregate so "All Time" stays truthful past the 200-invoice
+  // listener cap. Null until (or unless) the aggregate resolves; the local sum
+  // is the fallback.
+  const [allTime, setAllTime] = useState<{ total: number; count: number } | null>(null);
 
   useEffect(() => {
     if (!user?.uid) { setLoading(false); return; }
@@ -84,6 +98,22 @@ export default function DetailerEarningsScreen() {
       rows.sort((a, b) => b.date.localeCompare(a.date));
       setInvoices(rows);
       setLoading(false);
+
+      // Refresh the true all-time totals whenever the invoice set changes.
+      const allQ = query(collection(db, 'invoices'), where('detailerId', '==', user.uid!));
+      Promise.all([
+        getAggregateFromServer(allQ, { total: sum('detailerPayout') }),
+        getCountFromServer(allQ),
+      ])
+        .then(([agg, cnt]) => {
+          setAllTime({
+            total: Number(agg.data().total ?? 0),
+            count: cnt.data().count,
+          });
+        })
+        .catch(() => {
+          // Fall back to the local (capped) sum.
+        });
     }, (e) => {
       if (__DEV__) console.warn('[earnings listener]', e.message);
       setLoading(false);
@@ -106,7 +136,8 @@ export default function DetailerEarningsScreen() {
   const monthTotal = thisMonth.reduce((s, i) => s + i.detailerPayout, 0);
   const lastMonthTotal = lastMonth.reduce((s, i) => s + i.detailerPayout, 0);
   const weekTotal = thisWeek.reduce((s, i) => s + i.detailerPayout, 0);
-  const allTimeTotal = invoices.reduce((s, i) => s + i.detailerPayout, 0);
+  const allTimeTotal = allTime?.total ?? invoices.reduce((s, i) => s + i.detailerPayout, 0);
+  const allTimeCount = allTime?.count ?? invoices.length;
 
   const monthChange = lastMonthTotal > 0
     ? Math.round(((monthTotal - lastMonthTotal) / lastMonthTotal) * 100)
@@ -161,7 +192,7 @@ export default function DetailerEarningsScreen() {
                 <View style={styles.statCard}>
                   <Text style={styles.statLabel}>ALL TIME</Text>
                   <Text style={styles.statValue}>{fmt(allTimeTotal)}</Text>
-                  <Text style={styles.statSub}>{invoices.length} invoice{invoices.length !== 1 ? 's' : ''}</Text>
+                  <Text style={styles.statSub}>{allTimeCount} invoice{allTimeCount !== 1 ? 's' : ''}</Text>
                 </View>
               </View>
 

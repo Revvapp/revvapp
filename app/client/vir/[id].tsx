@@ -107,7 +107,13 @@ export default function ClientVIRSignScreen() {
 
   const panels = booking?.virPanels ?? {};
   const orderedPanels = PANEL_ORDER.filter((k) => panels[k]);
-  const alreadySigned = booking?.status === 'in_progress' || booking?.status === 'completed';
+  // Every post-signature status must show the signed banner — re-signing a
+  // paused job would knock the booking back to 'vir_signed' and let the timer
+  // be restarted from zero. Pre-inspection statuses fall through to the sign
+  // button, which stays disabled until panels exist.
+  const alreadySigned = ['vir_signed', 'in_progress', 'paused', 'completed'].includes(
+    booking?.status ?? ''
+  );
 
   return (
     <SafeAreaView edges={['top']} style={styles.safe}>

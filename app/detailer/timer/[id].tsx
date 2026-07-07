@@ -387,9 +387,14 @@ export default function TimerScreen() {
               </Pressable>
             )}
             {isRunning && (
-              <Pressable style={styles.btnPause} onPress={handlePause} disabled={saving}>
-                {saving ? <ActivityIndicator color={COLORS.white} size="small" /> : <Text style={styles.btnPauseText}>PAUSE</Text>}
-              </Pressable>
+              <>
+                <Pressable style={styles.btnPause} onPress={handlePause} disabled={saving}>
+                  {saving ? <ActivityIndicator color={COLORS.white} size="small" /> : <Text style={styles.btnPauseText}>PAUSE</Text>}
+                </Pressable>
+                <Pressable style={styles.btnEndJob} onPress={handleEndJob} disabled={saving}>
+                  <Text style={styles.btnEndJobText}>End job</Text>
+                </Pressable>
+              </>
             )}
             {isPaused && (
               <>

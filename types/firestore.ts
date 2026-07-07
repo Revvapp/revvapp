@@ -86,6 +86,7 @@ export type BookingDocument = {
   virPanels?: Record<string, { photoUrl: string; notes: string }>;
   timerAccumulatedSeconds?: number;
   afterPhotos?: string[];
+  hasReview?: boolean;
   serviceChecklist?: Array<{ name: string; estimatedMinutes: number; completed: boolean; completedMinutes?: number }>;
   createdAt: Timestamp | null;
 };

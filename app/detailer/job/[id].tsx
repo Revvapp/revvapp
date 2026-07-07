@@ -96,8 +96,14 @@ export default function JobDetailScreen() {
       if (status === 'active') {
         // Don't let a detailer accept two jobs in the same date + time slot.
         const occupying = ['active', 'vir_submitted', 'vir_signed', 'in_progress', 'paused'];
+        // Equality-only filters (no composite index needed) — only this date's
+        // bookings matter for a slot conflict, not the whole history.
         const mine = await getDocs(
-          query(collection(db, 'bookings'), where('detailerId', '==', booking.detailerId))
+          query(
+            collection(db, 'bookings'),
+            where('detailerId', '==', booking.detailerId),
+            where('date', '==', booking.date)
+          )
         );
         const conflict = mine.docs.some((d) => {
           if (d.id === id) return false;

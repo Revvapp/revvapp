@@ -110,14 +110,10 @@ export default function BeforeAfterScreen() {
         createdAt: serverTimestamp(),
       });
 
-      const clientId = String(b.clientId ?? '');
-      const vehicleId = String(b.vehicleId ?? '');
-      const jobDate = String(b.date ?? '');
-      if (clientId && vehicleId && jobDate) {
-        await updateDoc(doc(db, 'clients', clientId, 'vehicles', vehicleId), {
-          lastDetailedDate: jobDate,
-        });
-      }
+      // The vehicle's lastDetailedDate is stamped server-side (syncVehicleLastDetailed
+      // in functions/src/index.ts) — Firestore rules block a detailer from writing
+      // to a client's vehicle doc directly, and the history screen falls back to
+      // the latest completed booking anyway.
 
       router.replace({ pathname: '/detailer/invoice/[id]', params: { id } });
     } catch (err) {

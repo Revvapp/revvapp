@@ -95,7 +95,21 @@ service cloud.firestore {
           request.resource.data.status == resource.data.status
           || (
             resource.data.clientId == request.auth.uid
-            && request.resource.data.status in ['cancelled', 'vir_signed']
+            && (
+              // Cancel only before the inspection starts — once a VIR exists the
+              // job is a liability record and must run its course or be disputed.
+              (
+                request.resource.data.status == 'cancelled'
+                && resource.data.status in ['pending', 'active']
+              )
+              // Sign only a report that is actually awaiting signature. Without
+              // this, a client could re-sign a paused job, knocking it back to
+              // 'vir_signed' and letting the timer restart from zero.
+              || (
+                request.resource.data.status == 'vir_signed'
+                && resource.data.status == 'vir_submitted'
+              )
+            )
           )
           || (
             resource.data.detailerId == request.auth.uid
