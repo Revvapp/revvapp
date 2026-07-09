@@ -19,7 +19,6 @@ export default function DetailerLayout() {
         <Stack.Screen name="invoice/[id]" />
         <Stack.Screen name="conversation/[id]" />
         <Stack.Screen name="report/[id]" />
-        <Stack.Screen name="dev-tools" />
       </Stack>
     </ProtectedRoute>
   );

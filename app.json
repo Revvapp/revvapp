@@ -10,18 +10,18 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.revv-app",
+      "bundleIdentifier": "com.revvapp.app",
       "buildNumber": "1",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       },
       "entitlements": {
-        "aps-environment": "development"
+        "aps-environment": "production"
       }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#0A1628",
+        "backgroundColor": "#060F1E",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -56,9 +56,9 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#0A1628",
+          "backgroundColor": "#060F1E",
           "dark": {
-            "backgroundColor": "#0A1628"
+            "backgroundColor": "#060F1E"
           }
         }
       ],

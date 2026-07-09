@@ -264,11 +264,6 @@ export default function ClientDashboardScreen() {
             <Text style={s.headerTitle}>Home</Text>
           </View>
           <View style={s.headerRight} pointerEvents="box-none">
-            {__DEV__ && (
-              <Pressable style={s.devBtn} onPress={() => router.push('/client/dev-tools')}>
-                <Ionicons name="construct-outline" size={18} color={C.gold} />
-              </Pressable>
-            )}
             <Pressable style={s.avatar} onPress={() => router.push('/client/profile')}>
               <Text style={s.avatarText}>{c.initials}</Text>
             </Pressable>
@@ -354,10 +349,6 @@ const s = StyleSheet.create({
   wordmark:    { color: C.gold, fontSize: 10, fontWeight: '900', letterSpacing: 3, marginBottom: 2 },
   headerTitle: { color: C.white, fontSize: 26, fontWeight: '900', letterSpacing: -0.5 },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  devBtn: {
-    width: 34, height: 34, borderRadius: 17,
-    backgroundColor: C.navy, alignItems: 'center', justifyContent: 'center',
-  },
   avatar: {
     width: 34, height: 34, borderRadius: 17,
     backgroundColor: C.navy, borderWidth: 1.5, borderColor: C.goldRim,

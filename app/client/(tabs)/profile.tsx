@@ -175,13 +175,6 @@ export default function ClientProfileScreen() {
           <Text style={styles.editBtnText}>Edit Profile</Text>
         </Pressable>
 
-        {__DEV__ && (
-          <Pressable style={styles.devBtn} onPress={() => router.push('/client/dev-tools')}>
-            <Ionicons name="construct-outline" size={14} color={C.gold} />
-            <Text style={styles.devBtnText}>Dev Tools</Text>
-          </Pressable>
-        )}
-
         <Pressable style={styles.signOutBtn} onPress={onSignOut}>
           <Text style={styles.signOutText}>Sign Out</Text>
         </Pressable>
@@ -341,23 +334,6 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   editBtnText: { color: C.navy, fontSize: 14, fontWeight: '900', letterSpacing: 0.5 },
-
-  devBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(201,162,39,0.35)',
-    borderRadius: 12,
-    paddingVertical: 11,
-    marginBottom: 14,
-  },
-  devBtnText: {
-    color: C.gold,
-    fontSize: 13,
-    fontWeight: '700',
-  },
 
   signOutBtn: {
     alignItems: 'center',
