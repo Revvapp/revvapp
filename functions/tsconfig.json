@@ -4,13 +4,13 @@
     "target": "es2020",
     "moduleResolution": "node",
     "outDir": "lib",
-    "rootDir": ".",
+    "rootDir": "src",
     "sourceMap": true,
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "noUnusedLocals": true
   },
-  "include": ["src", "scripts"],
+  "include": ["src"],
   "exclude": ["node_modules", "lib"]
 }
