@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useStripe } from '@stripe/stripe-react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { addDoc, collection, doc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { useState } from 'react';
@@ -18,6 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { db } from '@/firebaseConfig';
 import { useAuth } from '@/hooks/useAuth';
 import { toTitleCase } from '@/lib/format';
+import { createBookingPaymentIntent } from '@/lib/payments';
 
 const COLORS = {
   bg: '#0D1B2A',
@@ -78,6 +80,7 @@ type ConfirmParams = {
 export default function BookConfirmScreen() {
   const params = useLocalSearchParams<ConfirmParams>();
   const { user } = useAuth();
+  const { initPaymentSheet, presentPaymentSheet } = useStripe();
 
   const [address, setAddress] = useState('');
   const [notes, setNotes] = useState('');
@@ -94,6 +97,28 @@ export default function BookConfirmScreen() {
     setSubmitting(true);
 
     try {
+      // The card hold comes first: the server prices the service from the
+      // detailer's rate card and returns a manual-capture PaymentIntent. The
+      // booking is only written after the sheet confirms, so an abandoned
+      // payment leaves nothing behind.
+      const sheet = await createBookingPaymentIntent(params.detailerId, params.service);
+
+      const init = await initPaymentSheet({
+        merchantDisplayName: 'Revv',
+        customerId: sheet.customerId,
+        customerEphemeralKeySecret: sheet.ephemeralKeySecret,
+        paymentIntentClientSecret: sheet.paymentIntentClientSecret,
+        returnURL: 'revvapp://stripe-redirect',
+      });
+      if (init.error) throw new Error(init.error.message);
+
+      const result = await presentPaymentSheet();
+      if (result.error) {
+        // 'Canceled' is the user closing the sheet, not a failure.
+        if (result.error.code !== 'Canceled') setError(result.error.message);
+        return;
+      }
+
       const clientSnap = await getDoc(doc(db, 'clients', user.uid));
       const clientName = clientSnap.exists()
         ? String(clientSnap.data().fullName ?? user.email ?? '')
@@ -104,7 +129,9 @@ export default function BookConfirmScreen() {
         detailerId: params.detailerId,
         detailerName: params.detailerName ?? '',
         service: params.service,
-        price: priceNum,
+        // The authorized amount is authoritative — a stale rate passed through
+        // navigation params must not disagree with what the card holds.
+        price: sheet.amountCents / 100,
         status: 'pending',
         date: params.date,
         time: params.time,
@@ -113,6 +140,8 @@ export default function BookConfirmScreen() {
         address: address.trim(),
         notes: notes.trim() || null,
         clientName,
+        paymentIntentId: sheet.paymentIntentId,
+        paymentStatus: 'requires_capture',
         createdAt: serverTimestamp(),
       });
 
@@ -192,7 +221,7 @@ export default function BookConfirmScreen() {
           <View style={styles.priceCard}>
             <Text style={styles.priceLabel}>Total Due</Text>
             <Text style={styles.priceValue}>${priceNum % 1 === 0 ? priceNum.toFixed(0) : priceNum.toFixed(2)}</Text>
-            <Text style={styles.priceNote}>Charged only after your detailer accepts</Text>
+            <Text style={styles.priceNote}>Held on your card now — charged only when the job is completed</Text>
           </View>
 
           <Text style={[styles.sectionLabel, { marginTop: 16 }]}>Service Location</Text>
@@ -242,7 +271,7 @@ export default function BookConfirmScreen() {
             }
           </Pressable>
           <Text style={styles.disclaimer}>
-            Your detailer will receive this request and must accept before payment is collected.
+            Your card is authorized when you book. You&apos;re only charged after the job is completed — cancel before the inspection and the hold is released.
           </Text>
         </View>
       </KeyboardAvoidingView>

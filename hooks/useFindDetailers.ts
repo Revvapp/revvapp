@@ -70,10 +70,14 @@ export function useFindDetailers(): FindDetailersModel {
   }, []);
 
   useEffect(() => {
+    // payoutsEnabled gates marketplace visibility: a detailer who can't
+    // receive money can't be booked, so they don't appear in search until
+    // Stripe Connect onboarding is finished.
     const q = query(
       collection(db, 'detailers'),
       where('isActive', '==', true),
-      where('profileComplete', '==', true)
+      where('profileComplete', '==', true),
+      where('payoutsEnabled', '==', true)
     );
     const unsub = onSnapshot(
       q,

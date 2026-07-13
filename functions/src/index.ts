@@ -10,6 +10,9 @@ export * from './notifications';
 // Trust & safety report logging (off-platform / safety reports).
 export * from './reports';
 
+// Stripe payment layer: Connect onboarding, booking card holds, webhook.
+export * from './stripe';
+
 /**
  * Keeps each detailer's aggregate rating in sync with the reviews collection.
  *

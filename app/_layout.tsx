@@ -1,5 +1,6 @@
 import * as Sentry from '@sentry/react-native';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { StripeProvider } from '@stripe/stripe-react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
@@ -47,11 +48,15 @@ function RootNavigator() {
   );
 }
 
+const STRIPE_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '';
+
 function RootLayout() {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <RootNavigator />
+        <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY} urlScheme="revvapp">
+          <RootNavigator />
+        </StripeProvider>
       </AuthProvider>
     </ErrorBoundary>
   );

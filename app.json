@@ -69,7 +69,14 @@
           "color": "#C9A227"
         }
       ],
-      "@sentry/react-native"
+      "@sentry/react-native",
+      [
+        "@stripe/stripe-react-native",
+        {
+          "merchantIdentifier": "merchant.com.revvapp.app",
+          "enableGooglePay": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
 import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
 import { useCallback, useEffect, useState } from 'react';
 import {
@@ -17,6 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { db } from '@/firebaseConfig';
 import { useAuth } from '@/hooks/useAuth';
 import { toTitleCase } from '@/lib/format';
+import { createConnectAccount, getConnectStatus } from '@/lib/payments';
 import type { DetailerDocument } from '@/types/firestore';
 
 const C = {
@@ -83,6 +85,7 @@ export default function DetailerProfileScreen() {
   const [profile, setProfile] = useState<Partial<DetailerDocument> | null>(null);
   const [error, setError] = useState('');
   const [reviews, setReviews] = useState<Review[]>([]);
+  const [payoutBusy, setPayoutBusy] = useState(false);
 
   const load = useCallback(async () => {
     if (!user?.uid) { setLoading(false); return; }
@@ -120,6 +123,22 @@ export default function DetailerProfileScreen() {
       { text: 'Sign out', style: 'destructive', onPress: () => void signOut() },
     ]);
   };
+
+  async function onSetUpPayouts() {
+    setPayoutBusy(true);
+    try {
+      const { url } = await createConnectAccount();
+      await WebBrowser.openBrowserAsync(url);
+      // The browser has no way to hand control back (Stripe requires https
+      // return URLs, not app schemes), so re-check status once it closes.
+      await getConnectStatus();
+      await load();
+    } catch (e) {
+      Alert.alert('Payout setup failed', e instanceof Error ? e.message : 'Please try again.');
+    } finally {
+      setPayoutBusy(false);
+    }
+  }
 
   if (loading) {
     return (
@@ -194,6 +213,44 @@ export default function DetailerProfileScreen() {
             label="Status"
           />
         </View>
+
+        <Text style={styles.sectionLabel}>PAYOUTS</Text>
+        {profile?.payoutsEnabled ? (
+          <View style={[styles.card, styles.payoutCard]}>
+            <View style={styles.payoutRow}>
+              <View style={[styles.infoIconWrap, { backgroundColor: 'rgba(39,174,96,0.12)' }]}>
+                <Ionicons name="checkmark-circle" size={16} color={C.green} />
+              </View>
+              <View style={styles.infoContent}>
+                <Text style={styles.infoValue}>Payouts active</Text>
+                <Text style={styles.payoutHint}>You receive your earnings through Stripe.</Text>
+              </View>
+            </View>
+          </View>
+        ) : (
+          <View style={[styles.card, styles.payoutCard]}>
+            <View style={styles.payoutRow}>
+              <View style={styles.infoIconWrap}>
+                <Ionicons name="card-outline" size={15} color={C.gold} />
+              </View>
+              <View style={styles.infoContent}>
+                <Text style={styles.infoValue}>Set up payouts</Text>
+                <Text style={styles.payoutHint}>
+                  Connect your bank to appear in search and get paid for jobs.
+                </Text>
+              </View>
+            </View>
+            <Pressable
+              style={[styles.payoutBtn, payoutBusy && { opacity: 0.6 }]}
+              onPress={onSetUpPayouts}
+              disabled={payoutBusy}
+            >
+              {payoutBusy
+                ? <ActivityIndicator size="small" color={C.navy} />
+                : <Text style={styles.payoutBtnText}>Connect with Stripe</Text>}
+            </Pressable>
+          </View>
+        )}
 
         <Text style={styles.sectionLabel}>ACCOUNT DETAILS</Text>
         <View style={styles.card}>
@@ -466,6 +523,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
   },
+
+  payoutCard: { paddingVertical: 4, paddingBottom: 14 },
+  payoutRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    gap: 12,
+  },
+  payoutHint: { color: C.muted, fontSize: 12, fontWeight: '600', marginTop: 2, lineHeight: 16 },
+  payoutBtn: {
+    backgroundColor: C.gold,
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  payoutBtnText: { color: C.navy, fontSize: 13, fontWeight: '900', letterSpacing: 0.3 },
 
   reviewRow:     { padding: 14, gap: 4 },
   reviewStars:   { flexDirection: 'row', gap: 2, marginBottom: 2 },

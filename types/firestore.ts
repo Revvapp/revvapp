@@ -39,6 +39,8 @@ export type DetailerDocument = {
   isFoundingPro?: boolean;
   isActive: boolean;
   profileComplete: boolean;
+  stripeAccountId?: string;
+  payoutsEnabled?: boolean;
 };
 
 export type ClientDocument = {
@@ -48,6 +50,7 @@ export type ClientDocument = {
   phone?: string;
   city?: string;
   state?: string;
+  stripeCustomerId?: string;
   createdAt?: Timestamp | null;
 };
 
@@ -87,6 +90,8 @@ export type BookingDocument = {
   timerAccumulatedSeconds?: number;
   afterPhotos?: string[];
   hasReview?: boolean;
+  paymentIntentId?: string;
+  paymentStatus?: 'requires_capture' | 'captured' | 'canceled';
   serviceChecklist?: Array<{ name: string; estimatedMinutes: number; completed: boolean; completedMinutes?: number }>;
   createdAt: Timestamp | null;
 };
