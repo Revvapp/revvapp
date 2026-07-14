@@ -2,6 +2,7 @@
   "expo": {
     "name": "Revv",
     "slug": "revv-app",
+    "owner": "revvapp",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -28,7 +29,12 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "versionCode": 1
+      "versionCode": 1,
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "output": "static",
@@ -82,8 +88,9 @@
       "reactCompiler": true
     },
     "extra": {
+      "router": {},
       "eas": {
-        "projectId": "daf66a54-3b73-4b8b-9553-de5f20675f6d"
+        "projectId": "3cd91004-8474-4d7a-b3cf-6dc33f24e8c1"
       }
     }
   }
