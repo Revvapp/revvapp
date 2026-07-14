@@ -1,8 +1,9 @@
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { logger } from 'firebase-functions/v2';
 import { defineSecret } from 'firebase-functions/params';
 import { onDocumentUpdated } from 'firebase-functions/v2/firestore';
 import { HttpsError, onCall, onRequest } from 'firebase-functions/v2/https';
+import { onSchedule } from 'firebase-functions/v2/scheduler';
 import Stripe from 'stripe';
 
 import { db } from './admin';
@@ -278,5 +279,72 @@ export const stripeWebhook = onRequest(
     }
 
     res.json({ received: true });
+  }
+);
+
+/**
+ * ⚠️ DRAFT — NOT YET DEPLOYED. Verify end-to-end in Stripe TEST mode before
+ * enabling in production; this moves real money.
+ *
+ * Phase 3/4 of docs/STRIPE_PLAN.md — auto-release after the 24h dispute window.
+ * The booking hold is a manual-capture *destination charge*, so capturing it
+ * both charges the client and settles the payout to the detailer (minus the 10%
+ * application fee) in one step. That is exactly the "auto-release" the business
+ * rules describe, so we capture at window-close — not at job completion.
+ *
+ * Eligible booking: status `completed`, hold still `requires_capture`, completed
+ * more than 24h ago, and its invoice (same id as the booking) is not `disputed`.
+ * Capture → paymentStatus `captured` and invoice `released`. Stripe auth holds
+ * last ~7 days, so a 30-minute cadence has ample margin.
+ *
+ * Follow-up (intentionally NOT here): Revv Care 1% accrual, partial capture for
+ * partial-refund dispute outcomes, and removing the legacy client-side
+ * `released` flip in app/client/invoice/[id].tsx once this is live.
+ */
+const DISPUTE_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+export const releaseHoldsAfterDisputeWindow = onSchedule(
+  { schedule: 'every 30 minutes', region: REGION, secrets: [STRIPE_SECRET_KEY] },
+  async () => {
+    const cutoffMs = Date.now() - DISPUTE_WINDOW_MS;
+    const snap = await db
+      .collection('bookings')
+      .where('status', '==', 'completed')
+      .where('paymentStatus', '==', 'requires_capture')
+      .limit(100)
+      .get();
+    if (snap.empty) return;
+
+    const stripe = stripeClient();
+    for (const bookingDoc of snap.docs) {
+      const b = bookingDoc.data();
+      const completedAt = b.completedAt as Timestamp | undefined;
+      if (!completedAt || completedAt.toMillis() > cutoffMs) continue; // window still open
+      const paymentIntentId = b.paymentIntentId as string | undefined;
+      if (!paymentIntentId) continue;
+
+      // The invoice shares the booking id; never release one under dispute.
+      const invoiceRef = db.collection('invoices').doc(bookingDoc.id);
+      const invoiceSnap = await invoiceRef.get();
+      if (invoiceSnap.data()?.status === 'disputed') continue;
+
+      try {
+        await stripe.paymentIntents.capture(paymentIntentId);
+        await bookingDoc.ref.update({ paymentStatus: 'captured' });
+        if (invoiceSnap.exists) {
+          await invoiceRef.update({
+            status: 'released',
+            releasedAt: FieldValue.serverTimestamp(),
+          });
+        }
+        logger.info(`Released hold ${paymentIntentId} for booking ${bookingDoc.id}`);
+      } catch (err) {
+        // Leave paymentStatus untouched so a transient failure retries next run.
+        logger.error(
+          `Capture failed for ${paymentIntentId} (booking ${bookingDoc.id})`,
+          err as Error
+        );
+      }
+    }
   }
 );

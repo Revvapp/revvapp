@@ -16,16 +16,12 @@ webhook all exist in `functions/src/stripe.ts` + `lib/payments.ts`.
 - ✅ Card hold at booking (`createBookingPaymentIntent`, manual capture, server-derived amount)
 - ✅ Cancel hold on booking end (`cancelHoldOnBookingEnd`)
 - ✅ Webhook w/ signature verification + `stripeEvents` idempotency ledger
-- 🔴 **Capture on job completion is NOT implemented.** Nothing calls
-  `paymentIntents.capture()` when a booking → `completed`. Holds are placed but the
-  card is never charged and the Detailer is never paid — the authorization simply
-  expires (~7 days). **This is the single most important gap.**
-  - Design decision required: the PaymentIntent uses `transfer_data.destination`,
-    so capture transfers to the Detailer immediately. To honor the 24-hour dispute
-    window you likely need **separate charges & transfers** (capture on completion,
-    hold the transfer, release after the window) rather than capture-on-completion.
-  - Build + test in **Stripe test mode** end-to-end before enabling live keys.
-- ⬜ Auto-release / transfer after the 24h dispute window (server-side, scheduled)
+- 🟠 **Capture / auto-release — DRAFT written, not deployed.**
+  `releaseHoldsAfterDisputeWindow` (scheduled, `functions/src/stripe.ts`) captures
+  the manual-capture destination charge once the 24h window closes with no dispute
+  — which both charges the client and settles the payout in one step. **Must be
+  verified end-to-end in Stripe TEST mode before deploying** (it moves real money).
+  Until deployed, holds are placed but never captured, so no one is charged/paid.
 - ⬜ Dispute → refund / partial-refund path
 - ⬜ Detailer subscription billing ($34.99/mo) + trial/Founding Pro
 - ⬜ Revv Care fund accrual + claims
