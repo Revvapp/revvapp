@@ -38,7 +38,12 @@ service cloud.firestore {
         && request.resource.data.get('idVerified', false) == false
         && request.resource.data.get('rating', 0) == 0
         && request.resource.data.get('reviewCount', 0) == 0
-        && request.resource.data.get('ratingSum', 0) == 0;
+        && request.resource.data.get('ratingSum', 0) == 0
+        // Payout eligibility and the Stripe account are set only by the Connect
+        // Cloud Functions (Admin SDK). A detailer must not self-grant either —
+        // payoutsEnabled gates marketplace visibility and booking eligibility.
+        && request.resource.data.get('payoutsEnabled', false) == false
+        && request.resource.data.get('stripeAccountId', '') == '';
 
       // Updates may not change any protected trust field — each must carry
       // through unchanged from the stored doc (which only the Admin SDK sets).
@@ -50,15 +55,24 @@ service cloud.firestore {
         && request.resource.data.get('isFoundingPro', false) == resource.data.get('isFoundingPro', false)
         && request.resource.data.get('rating', 0) == resource.data.get('rating', 0)
         && request.resource.data.get('reviewCount', 0) == resource.data.get('reviewCount', 0)
-        && request.resource.data.get('ratingSum', 0) == resource.data.get('ratingSum', 0);
+        && request.resource.data.get('ratingSum', 0) == resource.data.get('ratingSum', 0)
+        && request.resource.data.get('stripeAccountId', '') == resource.data.get('stripeAccountId', '')
+        && request.resource.data.get('payoutsEnabled', false) == resource.data.get('payoutsEnabled', false);
 
       allow delete: if isOwner(uid);
     }
 
     match /clients/{uid} {
       allow read: if isOwner(uid);
-      allow create, update: if isOwner(uid)
-        && request.resource.data.uid == uid;
+      // stripeCustomerId is server-owned (set by the Stripe Cloud Functions via
+      // the Admin SDK). A client must never write it: a forged customer id would
+      // make the server mint a Stripe ephemeral key for someone else's customer.
+      allow create: if isOwner(uid)
+        && request.resource.data.uid == uid
+        && request.resource.data.get('stripeCustomerId', '') == '';
+      allow update: if isOwner(uid)
+        && request.resource.data.uid == uid
+        && request.resource.data.get('stripeCustomerId', '') == resource.data.get('stripeCustomerId', '');
       allow delete: if isOwner(uid);
 
       match /vehicles/{vehicleId} {
@@ -91,6 +105,11 @@ service cloud.firestore {
         && request.resource.data.clientId == resource.data.clientId
         && request.resource.data.detailerId == resource.data.detailerId
         && request.resource.data.price == resource.data.price
+        // Payment fields are owned by the Stripe functions (Admin SDK). Neither
+        // party may alter the hold from the client — e.g. flipping paymentStatus
+        // to 'captured' to dodge the capture, or swapping the PaymentIntent.
+        && request.resource.data.get('paymentStatus', '') == resource.data.get('paymentStatus', '')
+        && request.resource.data.get('paymentIntentId', '') == resource.data.get('paymentIntentId', '')
         && (
           request.resource.data.status == resource.data.status
           || (
@@ -230,6 +249,12 @@ service cloud.firestore {
       // owner — a client can manage its own token and nothing more. The Admin
       // SDK bypasses these rules, so the notification functions still read freely.
       allow read, write: if isOwner(uid);
+    }
+
+    match /stripeEvents/{eventId} {
+      // Written only by the Stripe webhook (Admin SDK) as an idempotency ledger.
+      // Never client-accessible.
+      allow read, write: if false;
     }
 
     // A conversation lives at conversations/{bookingId} — its doc id is the
