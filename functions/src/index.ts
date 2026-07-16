@@ -95,3 +95,47 @@ export const syncVehicleLastDetailed = onDocumentUpdated('bookings/{bookingId}',
     logger.warn(`Could not stamp lastDetailedDate for vehicle ${vehicleId}`, err as Error);
   }
 });
+
+/**
+ * Creates the Revv invoice the instant a booking completes, server-side.
+ *
+ * Invoices used to be written only by the detailer's before/after screen, so a
+ * detailer who finished a job but never opened that screen left the client with
+ * no invoice to view or dispute — while the hold could still auto-release. This
+ * guarantees the invoice exists the moment the job is marked complete. Idempotent
+ * (skips if the before/after screen already created it); the detailer's screen
+ * now attaches after-photos to whichever doc exists.
+ */
+export const createInvoiceOnCompletion = onDocumentUpdated('bookings/{bookingId}', async (event) => {
+  const before = event.data?.before.data();
+  const after = event.data?.after.data();
+  if (!before || !after) return;
+  if (before.status === after.status || String(after.status) !== 'completed') return;
+
+  const bookingId = event.params.bookingId;
+  const invoiceRef = db.collection('invoices').doc(bookingId);
+  if ((await invoiceRef.get()).exists) return; // already created client-side
+
+  const price = Number(after.price ?? 0);
+  const platformFee = Math.round(price * 0.1 * 100) / 100;
+  const detailerPayout = Math.round((price - platformFee) * 100) / 100;
+
+  await invoiceRef.set({
+    bookingId,
+    clientId: String(after.clientId ?? ''),
+    detailerId: String(after.detailerId ?? ''),
+    clientName: String(after.clientName ?? ''),
+    detailerName: String(after.detailerName ?? ''),
+    businessName: after.businessName ?? null,
+    vehicleLabel: String(after.vehicleLabel ?? ''),
+    service: String(after.service ?? ''),
+    date: String(after.date ?? ''),
+    price,
+    platformFee,
+    detailerPayout,
+    status: 'pending_release',
+    afterPhotos: Array.isArray(after.afterPhotos) ? after.afterPhotos : [],
+    createdAt: FieldValue.serverTimestamp(),
+  });
+  logger.info(`Created invoice for completed booking ${bookingId}`);
+});

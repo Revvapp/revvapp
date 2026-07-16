@@ -1,7 +1,7 @@
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { logger } from 'firebase-functions/v2';
 import { defineSecret } from 'firebase-functions/params';
-import { onDocumentUpdated } from 'firebase-functions/v2/firestore';
+import { onDocumentCreated, onDocumentUpdated } from 'firebase-functions/v2/firestore';
 import { HttpsError, onCall, onRequest } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import Stripe from 'stripe';
@@ -345,6 +345,59 @@ export const releaseHoldsAfterDisputeWindow = onSchedule(
           err as Error
         );
       }
+    }
+  }
+);
+
+/**
+ * ⚠️ DRAFT — verify in Stripe TEST mode before deploying (watch for false
+ * positives around hold-authorization timing).
+ *
+ * Bookings are written client-side after the PaymentSheet confirms a card hold.
+ * Firestore rules can't call Stripe, so nothing stops a client from writing a
+ * booking with a fake or missing paymentIntentId and getting free work from a
+ * detailer. This trigger closes that hole: it retrieves the PaymentIntent and
+ * voids the booking unless it is a real, uncaptured hold whose amount and parties
+ * match the booking. Legit app bookings pass untouched (the hold is created by
+ * createBookingPaymentIntent with matching metadata and a server-priced amount).
+ */
+export const validateBookingHold = onDocumentCreated(
+  { document: 'bookings/{bookingId}', region: REGION, secrets: [STRIPE_SECRET_KEY] },
+  async (event) => {
+    const snap = event.data;
+    const b = snap?.data();
+    if (!b || String(b.status) !== 'pending') return;
+
+    const bookingId = event.params.bookingId;
+    const paymentIntentId = b.paymentIntentId as string | undefined;
+
+    async function voidBooking(reason: string): Promise<void> {
+      logger.warn(`Voiding booking ${bookingId}: ${reason}`);
+      // Do NOT cancel the PaymentIntent here — on a parties mismatch it belongs
+      // to someone else. Declining the booking removes the free-work incentive;
+      // a genuinely orphaned hold expires on its own (~7 days).
+      await snap!.ref.update({ status: 'declined', paymentStatus: 'invalid', voidReason: reason });
+    }
+
+    if (!paymentIntentId) return voidBooking('missing paymentIntentId');
+
+    try {
+      const pi = await stripeClient().paymentIntents.retrieve(paymentIntentId);
+      if (pi.status !== 'requires_capture') return voidBooking(`hold not authorized (${pi.status})`);
+      if (
+        pi.metadata?.clientId !== String(b.clientId ?? '') ||
+        pi.metadata?.detailerId !== String(b.detailerId ?? '')
+      ) {
+        return voidBooking('hold parties do not match booking');
+      }
+      const expectedCents = Math.round(Number(b.price ?? 0) * 100);
+      if (pi.amount !== expectedCents) {
+        return voidBooking(`amount mismatch (${pi.amount} vs ${expectedCents})`);
+      }
+      // Real, matching hold — nothing to change (paymentStatus is already
+      // 'requires_capture' from the client write / webhook).
+    } catch (err) {
+      return voidBooking(`could not retrieve hold: ${(err as Error).message}`);
     }
   }
 );

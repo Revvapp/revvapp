@@ -69,16 +69,8 @@ export default function BeforeAfterScreen() {
     setUploading(true);
     try {
       const invoiceRef = doc(db, 'invoices', id);
-      const existing = await getDoc(invoiceRef);
-      if (existing.exists()) {
-        router.replace({ pathname: '/detailer/invoice/[id]', params: { id } });
-        return;
-      }
 
-      const bookingSnap = await getDoc(doc(db, 'bookings', id));
-      if (!bookingSnap.exists()) throw new Error('Booking not found');
-      const b = bookingSnap.data();
-
+      // Upload after-photos first (if the detailer added any).
       let afterPhotos: string[] = [];
       if (!skipPhotos) {
         const filled = photos
@@ -87,6 +79,23 @@ export default function BeforeAfterScreen() {
         afterPhotos = await Promise.all(filled.map(({ uri, i }) => uploadAfterPhoto(id, i, uri)));
         await updateDoc(doc(db, 'bookings', id), { afterPhotos });
       }
+
+      const existing = await getDoc(invoiceRef);
+      if (existing.exists()) {
+        // The invoice was already created server-side on completion
+        // (createInvoiceOnCompletion). Just attach the after-photos.
+        if (afterPhotos.length > 0) {
+          await updateDoc(invoiceRef, { afterPhotos });
+        }
+        router.replace({ pathname: '/detailer/invoice/[id]', params: { id } });
+        return;
+      }
+
+      // Fallback (server trigger not deployed): create the invoice here. The
+      // vehicle's lastDetailedDate is stamped server-side (syncVehicleLastDetailed).
+      const bookingSnap = await getDoc(doc(db, 'bookings', id));
+      if (!bookingSnap.exists()) throw new Error('Booking not found');
+      const b = bookingSnap.data();
 
       const price = Number(b.price ?? 0);
       const platformFee = Math.round(price * 0.1 * 100) / 100;
@@ -109,11 +118,6 @@ export default function BeforeAfterScreen() {
         afterPhotos,
         createdAt: serverTimestamp(),
       });
-
-      // The vehicle's lastDetailedDate is stamped server-side (syncVehicleLastDetailed
-      // in functions/src/index.ts) — Firestore rules block a detailer from writing
-      // to a client's vehicle doc directly, and the history screen falls back to
-      // the latest completed booking anyway.
 
       router.replace({ pathname: '/detailer/invoice/[id]', params: { id } });
     } catch (err) {
