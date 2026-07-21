@@ -13,6 +13,9 @@ export * from './reports';
 // Stripe payment layer: Connect onboarding, booking card holds, webhook.
 export * from './stripe';
 
+// Server-owned booking, dispute, invoice-evidence, and account workflows.
+export * from './workflows';
+
 /**
  * Keeps each detailer's aggregate rating in sync with the reviews collection.
  *

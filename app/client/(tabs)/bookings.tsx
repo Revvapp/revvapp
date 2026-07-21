@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { collection, doc, limit, onSnapshot, orderBy, query, updateDoc, where } from 'firebase/firestore';
+import { collection, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -17,10 +17,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { db } from '@/firebaseConfig';
 import { useAuth } from '@/hooks/useAuth';
 import { toTitleCase } from '@/lib/format';
+import { transitionBooking } from '@/lib/payments';
 import type { BookingDocument } from '@/types/firestore';
 
 async function cancelBooking(id: string) {
-  await updateDoc(doc(db, 'bookings', id), { status: 'cancelled' });
+  await transitionBooking(id, 'cancel');
   // The detailer is notified server-side (onBookingStatusChanged → cancelled).
 }
 

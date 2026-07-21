@@ -1,11 +1,11 @@
 import * as Sentry from '@sentry/react-native';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { StripeProvider } from '@stripe/stripe-react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 
 import { BrandSplash } from '@/components/BrandSplash';
+import { AppStripeProvider } from '@/components/AppStripeProvider';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { AuthProvider } from '@/context/AuthContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -48,15 +48,13 @@ function RootNavigator() {
   );
 }
 
-const STRIPE_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '';
-
 function RootLayout() {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY} urlScheme="revvapp">
+        <AppStripeProvider>
           <RootNavigator />
-        </StripeProvider>
+        </AppStripeProvider>
       </AuthProvider>
     </ErrorBoundary>
   );

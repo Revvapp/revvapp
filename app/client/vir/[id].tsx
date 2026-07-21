@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
-import { doc, onSnapshot, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { db } from '@/firebaseConfig';
 import { toTitleCase } from '@/lib/format';
+import { transitionBooking } from '@/lib/payments';
 import type { BookingDocument } from '@/types/firestore';
 
 const COLORS = {
@@ -74,10 +75,7 @@ export default function ClientVIRSignScreen() {
           onPress: async () => {
             setSigning(true);
             try {
-              await updateDoc(doc(db, 'bookings', id!), {
-                status: 'vir_signed',
-                virSignedAt: serverTimestamp(),
-              });
+              await transitionBooking(id!, 'sign_vir');
               // The detailer is notified server-side (onBookingStatusChanged → vir_signed).
               Alert.alert(
                 'Inspection Signed!',

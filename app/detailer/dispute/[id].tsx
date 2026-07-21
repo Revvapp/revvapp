@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
-import { collection, doc, onSnapshot, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -18,8 +18,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { db } from '@/firebaseConfig';
-import { useAuth } from '@/hooks/useAuth';
 import { toTitleCase } from '@/lib/format';
+import { respondToDispute } from '@/lib/payments';
 
 const C = {
   bg:      '#0A1628',
@@ -58,7 +58,6 @@ type DisputeData = {
 
 export default function DetailerDisputeScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { user } = useAuth();
   const [dispute, setDispute] = useState<DisputeData | null>(null);
   const [loading, setLoading] = useState(true);
   const [response, setResponse] = useState('');
@@ -95,45 +94,12 @@ export default function DetailerDisputeScreen() {
     if (!dispute || !response.trim() || submitting) return;
     setSubmitting(true);
     try {
-      await updateDoc(doc(db, 'disputes', dispute.id), {
-        detailerResponse: response.trim(),
-        respondedAt: serverTimestamp(),
-      });
+      await respondToDispute(dispute.id, response.trim());
       // The client is notified of the response server-side (onDisputeUpdated).
       setResponse('');
       Alert.alert('Response Sent', 'Your response has been added to the dispute.');
     } catch {
       Alert.alert('Error', 'Could not send your response. Please try again.');
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  function confirmResolve() {
-    Alert.alert(
-      'Mark as Resolved?',
-      'Confirm you have settled this issue with the client. This releases the held payment and closes the dispute.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Resolve', style: 'default', onPress: () => void resolveDispute() },
-      ]
-    );
-  }
-
-  async function resolveDispute() {
-    if (!dispute || submitting) return;
-    setSubmitting(true);
-    try {
-      await updateDoc(doc(db, 'disputes', dispute.id), {
-        status: 'resolved',
-        resolvedAt: serverTimestamp(),
-        resolvedBy: user?.uid ?? '',
-      });
-      if (id) await updateDoc(doc(db, 'invoices', id), { status: 'released' });
-      // The client is notified of the resolution server-side (onDisputeUpdated).
-      Alert.alert('Dispute Resolved', 'The dispute is closed and the payment has been released.');
-    } catch {
-      Alert.alert('Error', 'Could not resolve the dispute. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -250,17 +216,8 @@ export default function DetailerDisputeScreen() {
                   )}
               </Pressable>
 
-              <Pressable
-                style={[styles.resolveBtn, submitting && styles.btnDisabled]}
-                onPress={confirmResolve}
-                disabled={submitting}
-              >
-                <Ionicons name="checkmark-circle" size={17} color={C.white} />
-                <Text style={styles.resolveBtnText}>Mark as Resolved & Release Payment</Text>
-              </Pressable>
-
               <Text style={styles.noteText}>
-                Resolving confirms you have settled the issue with the client. This releases the held payment and closes the dispute.
+                REVV support must review and resolve payment disputes. Neither party can release disputed funds.
               </Text>
             </>
           ) : (

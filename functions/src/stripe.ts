@@ -4,6 +4,7 @@ import { defineSecret } from 'firebase-functions/params';
 import { onDocumentCreated, onDocumentUpdated } from 'firebase-functions/v2/firestore';
 import { HttpsError, onCall, onRequest } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
+import { randomUUID } from 'node:crypto';
 import Stripe from 'stripe';
 
 import { db } from './admin';
@@ -38,12 +39,46 @@ const CONNECT_REFRESH_URL = 'https://revvapp.github.io/revvapp/?stripe=refresh';
 
 const PLATFORM_FEE_RATE = 0.10;
 
+async function enforceRateLimit(uid: string, action: string, max: number, windowMs: number): Promise<void> {
+  const ref = db.collection('rateLimits').doc(`${action}_${uid}`);
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const data = snap.data();
+    const startedAt = data?.startedAt as Timestamp | undefined;
+    const withinWindow = startedAt && Date.now() - startedAt.toMillis() < windowMs;
+    const count = withinWindow ? Number(data?.count ?? 0) : 0;
+    if (count >= max) throw new HttpsError('resource-exhausted', 'Too many requests. Try again later.');
+    tx.set(ref, {
+      uid,
+      action,
+      count: count + 1,
+      startedAt: withinWindow ? startedAt : FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+  });
+}
+
 function stripeClient(): Stripe {
   return new Stripe(STRIPE_SECRET_KEY.value());
 }
 
+async function recipientTransfersActive(stripe: Stripe, accountId: string): Promise<boolean> {
+  try {
+    const account = await stripe.v2.core.accounts.retrieve(accountId, {
+      include: ['configuration.recipient'],
+    });
+    return account.configuration?.recipient?.capabilities?.stripe_balance
+      ?.stripe_transfers?.status === 'active';
+  } catch {
+    // Accounts created before the v2 migration remain usable during test-mode
+    // transition. New accounts never enter this legacy path.
+    const legacy = await stripe.accounts.retrieve(accountId);
+    return !legacy.deleted && legacy.capabilities?.transfers === 'active';
+  }
+}
+
 /**
- * Creates (or reuses) the detailer's Express account and returns a fresh
+ * Creates (or reuses) the detailer's connected account and returns a fresh
  * onboarding link. Links are single-use and expire, so one is minted per call.
  */
 export const createConnectAccount = onCall(
@@ -51,6 +86,10 @@ export const createConnectAccount = onCall(
   async (request) => {
     const uid = request.auth?.uid;
     if (!uid) throw new HttpsError('unauthenticated', 'Sign in required.');
+
+    const userRole = (await db.collection('users').doc(uid).get()).data()?.userType;
+    if (userRole !== 'detailer') throw new HttpsError('permission-denied', 'Detailer access required.');
+    await enforceRateLimit(uid, 'connect', 5, 60 * 60 * 1_000);
 
     const ref = db.collection('detailers').doc(uid);
     const snap = await ref.get();
@@ -60,37 +99,61 @@ export const createConnectAccount = onCall(
 
     const stripe = stripeClient();
     let accountId = snap.data()?.stripeAccountId as string | undefined;
+    let accountVersion = snap.data()?.stripeAccountVersion as string | undefined;
 
     if (!accountId) {
-      const account = await stripe.accounts.create({
-        type: 'express',
-        email: (request.auth?.token.email as string | undefined) ?? undefined,
-        business_type: 'individual',
-        capabilities: {
-          card_payments: { requested: true },
-          transfers: { requested: true },
+      const account = await stripe.v2.core.accounts.create({
+        contact_email: (request.auth?.token.email as string | undefined) ?? undefined,
+        dashboard: 'express',
+        configuration: {
+          recipient: {
+            capabilities: {
+              stripe_balance: { stripe_transfers: { requested: true } },
+            },
+          },
+        },
+        defaults: {
+          responsibilities: {
+            fees_collector: 'application',
+            losses_collector: 'application',
+          },
         },
         metadata: { uid },
       });
       accountId = account.id;
-      await ref.update({ stripeAccountId: accountId, payoutsEnabled: false });
+      accountVersion = 'v2';
+      await ref.update({ stripeAccountId: accountId, stripeAccountVersion: 'v2', payoutsEnabled: false });
     }
 
-    const link = await stripe.accountLinks.create({
-      account: accountId,
-      type: 'account_onboarding',
-      return_url: CONNECT_RETURN_URL,
-      refresh_url: CONNECT_REFRESH_URL,
-    });
+    const link = accountVersion === 'v2'
+      ? await stripe.v2.core.accountLinks.create({
+        account: accountId,
+        use_case: {
+          type: 'account_onboarding',
+          account_onboarding: {
+            configurations: ['recipient'],
+            collection_options: { fields: 'eventually_due', future_requirements: 'include' },
+            return_url: CONNECT_RETURN_URL,
+            refresh_url: CONNECT_REFRESH_URL,
+          },
+        },
+      })
+      : await stripe.accountLinks.create({
+        account: accountId,
+        type: 'account_onboarding',
+        return_url: CONNECT_RETURN_URL,
+        refresh_url: CONNECT_REFRESH_URL,
+      });
 
     return { url: link.url };
   }
 );
 
 /**
- * Re-reads the Express account and syncs `payoutsEnabled` onto the detailer
+ * Re-reads the connected account and syncs `payoutsEnabled` onto the detailer
  * doc. Called by the app when it returns from the onboarding browser; the
- * `account.updated` webhook keeps the flag honest afterwards.
+ * legacy `account.updated` webhook keeps v1 accounts in sync; every payment
+ * also rechecks the capability directly with Stripe.
  */
 export const getConnectStatus = onCall(
   { region: REGION, secrets: [STRIPE_SECRET_KEY] },
@@ -98,15 +161,17 @@ export const getConnectStatus = onCall(
     const uid = request.auth?.uid;
     if (!uid) throw new HttpsError('unauthenticated', 'Sign in required.');
 
+    const userRole = (await db.collection('users').doc(uid).get()).data()?.userType;
+    if (userRole !== 'detailer') throw new HttpsError('permission-denied', 'Detailer access required.');
+
     const ref = db.collection('detailers').doc(uid);
     const accountId = (await ref.get()).data()?.stripeAccountId as string | undefined;
     if (!accountId) return { payoutsEnabled: false, detailsSubmitted: false };
 
-    const account = await stripeClient().accounts.retrieve(accountId);
-    const payoutsEnabled = account.payouts_enabled === true;
+    const payoutsEnabled = await recipientTransfersActive(stripeClient(), accountId);
     await ref.update({ payoutsEnabled });
 
-    return { payoutsEnabled, detailsSubmitted: account.details_submitted === true };
+    return { payoutsEnabled, detailsSubmitted: payoutsEnabled };
   }
 );
 
@@ -125,6 +190,10 @@ export const createBookingPaymentIntent = onCall(
   async (request) => {
     const uid = request.auth?.uid;
     if (!uid) throw new HttpsError('unauthenticated', 'Sign in required.');
+
+    const userRole = (await db.collection('users').doc(uid).get()).data()?.userType;
+    if (userRole !== 'client') throw new HttpsError('permission-denied', 'Client access required.');
+    await enforceRateLimit(uid, 'payment_intent', 10, 60 * 60 * 1_000);
 
     const detailerId = String(request.data?.detailerId ?? '');
     const service = String(request.data?.service ?? '');
@@ -148,6 +217,10 @@ export const createBookingPaymentIntent = onCall(
     }
 
     const stripe = stripeClient();
+    if (!(await recipientTransfersActive(stripe, accountId))) {
+      await db.collection('detailers').doc(detailerId).update({ payoutsEnabled: false });
+      throw new HttpsError('failed-precondition', 'This detailer must finish Stripe onboarding.');
+    }
 
     const clientRef = db.collection('clients').doc(uid);
     const clientDoc = (await clientRef.get()).data() ?? {};
@@ -167,16 +240,14 @@ export const createBookingPaymentIntent = onCall(
       { apiVersion: EPHEMERAL_KEY_API_VERSION }
     );
 
-    const platformFeeCents = Math.round(amountCents * PLATFORM_FEE_RATE);
+    const transferGroup = `booking_${randomUUID()}`;
     const paymentIntent = await stripe.paymentIntents.create({
       amount: amountCents,
       currency: 'usd',
       customer: customerId,
       capture_method: 'manual',
-      automatic_payment_methods: { enabled: true },
-      application_fee_amount: platformFeeCents,
-      transfer_data: { destination: accountId },
-      metadata: { clientId: uid, detailerId, service },
+      transfer_group: transferGroup,
+      metadata: { clientId: uid, detailerId, service, fundsFlow: 'separate', transferGroup },
     });
 
     return {
@@ -186,6 +257,97 @@ export const createBookingPaymentIntent = onCall(
       customerId,
       amountCents,
     };
+  }
+);
+
+/**
+ * Creates the booking only after PaymentSheet has confirmed the server-priced
+ * hold. The PaymentIntent id is also the booking id, making replay impossible:
+ * Firestore create() succeeds exactly once for a given hold.
+ */
+export const finalizeBooking = onCall(
+  { region: REGION, secrets: [STRIPE_SECRET_KEY] },
+  async (request) => {
+    const uid = request.auth?.uid;
+    if (!uid) throw new HttpsError('unauthenticated', 'Sign in required.');
+
+    const userRole = (await db.collection('users').doc(uid).get()).data()?.userType;
+    if (userRole !== 'client') throw new HttpsError('permission-denied', 'Client access required.');
+
+    const paymentIntentId = String(request.data?.paymentIntentId ?? '');
+    const date = String(request.data?.date ?? '').trim();
+    const time = String(request.data?.time ?? '').trim();
+    const vehicleId = String(request.data?.vehicleId ?? '').trim();
+    const vehicleLabel = String(request.data?.vehicleLabel ?? '').trim();
+    const address = String(request.data?.address ?? '').trim();
+    const notes = String(request.data?.notes ?? '').trim();
+    if (!paymentIntentId || !date || !time || !vehicleId || !address) {
+      throw new HttpsError('invalid-argument', 'Required booking details are missing.');
+    }
+    if (date.length > 20 || time.length > 20 || vehicleLabel.length > 200 || address.length > 500 || notes.length > 1_000) {
+      throw new HttpsError('invalid-argument', 'A booking field is too long.');
+    }
+    const dateMatch = date.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!dateMatch) throw new HttpsError('invalid-argument', 'Booking date is invalid.');
+    const bookingDay = Date.UTC(Number(dateMatch[1]), Number(dateMatch[2]) - 1, Number(dateMatch[3]));
+    const normalizedDate = new Date(bookingDay).toISOString().slice(0, 10);
+    if (normalizedDate !== date) throw new HttpsError('invalid-argument', 'Booking date is invalid.');
+    const now = new Date();
+    const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+    const daysAhead = Math.round((bookingDay - today) / (24 * 60 * 60 * 1_000));
+    if (daysAhead < 1 || daysAhead > 4) {
+      throw new HttpsError('failed-precondition', 'Bookings must be scheduled 1–4 days ahead.');
+    }
+
+    const pi = await stripeClient().paymentIntents.retrieve(paymentIntentId);
+    if (pi.status !== 'requires_capture' || pi.metadata?.clientId !== uid) {
+      throw new HttpsError('failed-precondition', 'A valid card hold is required.');
+    }
+    const detailerId = String(pi.metadata.detailerId ?? '');
+    const service = String(pi.metadata.service ?? '');
+    if (!detailerId || !service) throw new HttpsError('failed-precondition', 'Hold metadata is invalid.');
+
+    const [detailerSnap, clientSnap, vehicleSnap] = await Promise.all([
+      db.collection('detailers').doc(detailerId).get(),
+      db.collection('clients').doc(uid).get(),
+      db.collection('clients').doc(uid).collection('vehicles').doc(vehicleId).get(),
+    ]);
+    if (!detailerSnap.exists || detailerSnap.data()?.payoutsEnabled !== true) {
+      throw new HttpsError('failed-precondition', 'Detailer is not eligible for bookings.');
+    }
+    if (!vehicleSnap.exists || vehicleSnap.data()?.ownerId !== uid) {
+      throw new HttpsError('permission-denied', 'Vehicle does not belong to this client.');
+    }
+    const detailer = detailerSnap.data()!;
+    const client = clientSnap.data() ?? {};
+    const ref = db.collection('bookings').doc(paymentIntentId);
+    try {
+      await ref.create({
+        clientId: uid,
+        detailerId,
+        detailerName: String(detailer.businessName ?? detailer.fullName ?? ''),
+        businessName: detailer.businessName ?? null,
+        service,
+        price: pi.amount / 100,
+        status: 'pending',
+        date,
+        time,
+        vehicleId,
+        vehicleLabel,
+        address,
+        notes: notes || null,
+        clientName: String(client.fullName ?? request.auth?.token.email ?? ''),
+        paymentIntentId,
+        paymentStatus: 'requires_capture',
+        createdAt: FieldValue.serverTimestamp(),
+      });
+    } catch (err) {
+      if ((err as { code?: number | string }).code === 6 || (err as { code?: string }).code === 'already-exists') {
+        throw new HttpsError('already-exists', 'This payment hold already has a booking.');
+      }
+      throw err;
+    }
+    return { bookingId: ref.id };
   }
 );
 
@@ -256,7 +418,8 @@ export const stripeWebhook = onRequest(
           .limit(1)
           .get();
         if (!match.empty) {
-          await match.docs[0].ref.update({ payoutsEnabled: account.payouts_enabled === true });
+          const ready = await recipientTransfersActive(stripeClient(), account.id).catch(() => false);
+          await match.docs[0].ref.update({ payoutsEnabled: ready });
         }
         break;
       }
@@ -283,19 +446,15 @@ export const stripeWebhook = onRequest(
 );
 
 /**
- * ⚠️ DRAFT — NOT YET DEPLOYED. Verify end-to-end in Stripe TEST mode before
- * enabling in production; this moves real money.
- *
  * Phase 3/4 of docs/STRIPE_PLAN.md — auto-release after the 24h dispute window.
- * The booking hold is a manual-capture *destination charge*, so capturing it
- * both charges the client and settles the payout to the detailer (minus the 10%
- * application fee) in one step. That is exactly the "auto-release" the business
- * rules describe, so we capture at window-close — not at job completion.
+ * The booking hold is a platform charge. At window-close we capture it and then
+ * create an idempotent separate Transfer for 90% to the connected recipient.
  *
  * Eligible booking: status `completed`, hold still `requires_capture`, completed
  * more than 24h ago, and its invoice (same id as the booking) is not `disputed`.
- * Capture → paymentStatus `captured` and invoice `released`. Stripe auth holds
- * last ~7 days, so a 30-minute cadence has ample margin.
+ * Capture + Transfer → paymentStatus `captured` and invoice `released`. Booking
+ * dates are limited to four days ahead to stay inside the card authorization
+ * window with margin for the 24-hour dispute period.
  *
  * Follow-up (intentionally NOT here): Revv Care 1% accrual, partial capture for
  * partial-refund dispute outcomes, and removing the legacy client-side
@@ -306,7 +465,6 @@ const DISPUTE_WINDOW_MS = 24 * 60 * 60 * 1000;
 export const releaseHoldsAfterDisputeWindow = onSchedule(
   { schedule: 'every 30 minutes', region: REGION, secrets: [STRIPE_SECRET_KEY] },
   async () => {
-    const cutoffMs = Date.now() - DISPUTE_WINDOW_MS;
     const snap = await db
       .collection('bookings')
       .where('status', '==', 'completed')
@@ -318,20 +476,67 @@ export const releaseHoldsAfterDisputeWindow = onSchedule(
     const stripe = stripeClient();
     for (const bookingDoc of snap.docs) {
       const b = bookingDoc.data();
+      const releaseEligibleAt = b.releaseEligibleAt as Timestamp | undefined;
+      // Legacy documents may use completedAt, but all new writes use the
+      // server-owned releaseEligibleAt timestamp.
       const completedAt = b.completedAt as Timestamp | undefined;
-      if (!completedAt || completedAt.toMillis() > cutoffMs) continue; // window still open
+      const eligibleMs = releaseEligibleAt?.toMillis()
+        ?? (completedAt ? completedAt.toMillis() + DISPUTE_WINDOW_MS : Number.POSITIVE_INFINITY);
+      if (eligibleMs > Date.now()) continue;
       const paymentIntentId = b.paymentIntentId as string | undefined;
       if (!paymentIntentId) continue;
 
       // The invoice shares the booking id; never release one under dispute.
       const invoiceRef = db.collection('invoices').doc(bookingDoc.id);
-      const invoiceSnap = await invoiceRef.get();
-      if (invoiceSnap.data()?.status === 'disputed') continue;
+      const disputeRef = db.collection('disputes').doc(bookingDoc.id);
+
+      // Atomically claim the capture. createDispute reads the same booking doc,
+      // so a dispute and capture cannot cross in flight unnoticed.
+      const claimed = await db.runTransaction(async (tx) => {
+        const [freshBooking, invoiceSnap, disputeSnap] = await Promise.all([
+          tx.get(bookingDoc.ref), tx.get(invoiceRef), tx.get(disputeRef),
+        ]);
+        const fresh = freshBooking.data();
+        if (!fresh || fresh.paymentStatus !== 'requires_capture' || fresh.captureState === 'processing') return false;
+        if (invoiceSnap.data()?.status === 'disputed' || disputeSnap.data()?.status === 'open') return false;
+        const eligible = fresh.releaseEligibleAt as Timestamp | undefined;
+        if (!eligible || eligible.toMillis() > Date.now()) return false;
+        tx.update(bookingDoc.ref, { captureState: 'processing', captureStartedAt: FieldValue.serverTimestamp() });
+        return true;
+      });
+      if (!claimed) continue;
 
       try {
-        await stripe.paymentIntents.capture(paymentIntentId);
-        await bookingDoc.ref.update({ paymentStatus: 'captured' });
-        if (invoiceSnap.exists) {
+        let intent = await stripe.paymentIntents.retrieve(paymentIntentId, { expand: ['latest_charge'] });
+        if (intent.status === 'requires_capture') {
+          intent = await stripe.paymentIntents.capture(paymentIntentId, { expand: ['latest_charge'] });
+        }
+        if (intent.status !== 'succeeded') throw new Error(`Unexpected PaymentIntent status: ${intent.status}`);
+
+        let transferId: string | null = null;
+        if (intent.metadata?.fundsFlow === 'separate') {
+          const charge = intent.latest_charge;
+          const chargeId = typeof charge === 'string' ? charge : charge?.id;
+          const detailerAccountId = String(
+            (await db.collection('detailers').doc(String(intent.metadata.detailerId)).get()).data()?.stripeAccountId ?? ''
+          );
+          if (!chargeId || !detailerAccountId) throw new Error('Captured payment is missing transfer details.');
+          const transferAmount = intent.amount - Math.round(intent.amount * PLATFORM_FEE_RATE);
+          const transfer = await stripe.transfers.create({
+            amount: transferAmount,
+            currency: intent.currency,
+            destination: detailerAccountId,
+            source_transaction: chargeId,
+            transfer_group: intent.transfer_group ?? undefined,
+            metadata: { bookingId: bookingDoc.id, paymentIntentId },
+          }, { idempotencyKey: `release_${bookingDoc.id}` });
+          transferId = transfer.id;
+        }
+        await bookingDoc.ref.update({
+          paymentStatus: 'captured', captureState: 'complete', capturedAt: FieldValue.serverTimestamp(),
+          ...(transferId ? { transferId } : {}),
+        });
+        if ((await invoiceRef.get()).exists) {
           await invoiceRef.update({
             status: 'released',
             releasedAt: FieldValue.serverTimestamp(),
@@ -340,6 +545,7 @@ export const releaseHoldsAfterDisputeWindow = onSchedule(
         logger.info(`Released hold ${paymentIntentId} for booking ${bookingDoc.id}`);
       } catch (err) {
         // Leave paymentStatus untouched so a transient failure retries next run.
+        await bookingDoc.ref.update({ captureState: 'failed', captureErrorAt: FieldValue.serverTimestamp() });
         logger.error(
           `Capture failed for ${paymentIntentId} (booking ${bookingDoc.id})`,
           err as Error

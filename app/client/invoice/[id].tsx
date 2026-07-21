@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
-import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -74,7 +74,7 @@ export default function ClientInvoiceScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [invoice, setInvoice] = useState<InvoiceData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [now, setNow] = useState(() => Date.now());
+  const [, setNow] = useState(() => Date.now());
 
   // Re-render each minute while the dispute window is open so the countdown
   // ticks down and the auto-release below actually fires when time runs out.
@@ -108,13 +108,6 @@ export default function ClientInvoiceScreen() {
     });
     return () => unsub();
   }, [id]);
-
-  useEffect(() => {
-    if (!invoice || !id) return;
-    if (invoice.status === 'pending_release' && !disputeWindowOpen(invoice.createdAt?.seconds ?? null)) {
-      updateDoc(doc(db, 'invoices', id), { status: 'released' });
-    }
-  }, [invoice, id, now]);
 
   if (loading) {
     return (

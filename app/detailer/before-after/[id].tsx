@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
-import { doc, getDoc, setDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { getDownloadURL, ref as storageRef, uploadBytes } from 'firebase/storage';
 import { useState } from 'react';
 import {
@@ -16,7 +15,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { db, storage } from '@/firebaseConfig';
+import { storage } from '@/firebaseConfig';
+import { attachAfterPhotos } from '@/lib/payments';
 
 const C = {
   bg:     '#0D1B2A',
@@ -68,8 +68,6 @@ export default function BeforeAfterScreen() {
     if (!id) return;
     setUploading(true);
     try {
-      const invoiceRef = doc(db, 'invoices', id);
-
       // Upload after-photos first (if the detailer added any).
       let afterPhotos: string[] = [];
       if (!skipPhotos) {
@@ -77,47 +75,8 @@ export default function BeforeAfterScreen() {
           .map((uri, i) => ({ uri, i }))
           .filter((x) => x.uri !== null) as { uri: string; i: number }[];
         afterPhotos = await Promise.all(filled.map(({ uri, i }) => uploadAfterPhoto(id, i, uri)));
-        await updateDoc(doc(db, 'bookings', id), { afterPhotos });
       }
-
-      const existing = await getDoc(invoiceRef);
-      if (existing.exists()) {
-        // The invoice was already created server-side on completion
-        // (createInvoiceOnCompletion). Just attach the after-photos.
-        if (afterPhotos.length > 0) {
-          await updateDoc(invoiceRef, { afterPhotos });
-        }
-        router.replace({ pathname: '/detailer/invoice/[id]', params: { id } });
-        return;
-      }
-
-      // Fallback (server trigger not deployed): create the invoice here. The
-      // vehicle's lastDetailedDate is stamped server-side (syncVehicleLastDetailed).
-      const bookingSnap = await getDoc(doc(db, 'bookings', id));
-      if (!bookingSnap.exists()) throw new Error('Booking not found');
-      const b = bookingSnap.data();
-
-      const price = Number(b.price ?? 0);
-      const platformFee = Math.round(price * 0.1 * 100) / 100;
-      const detailerPayout = Math.round((price - platformFee) * 100) / 100;
-
-      await setDoc(invoiceRef, {
-        bookingId: id,
-        clientId: String(b.clientId ?? ''),
-        detailerId: String(b.detailerId ?? ''),
-        clientName: String(b.clientName ?? ''),
-        detailerName: String(b.detailerName ?? ''),
-        businessName: b.businessName ?? null,
-        vehicleLabel: String(b.vehicleLabel ?? ''),
-        service: String(b.service ?? ''),
-        date: String(b.date ?? ''),
-        price,
-        platformFee,
-        detailerPayout,
-        status: 'pending_release',
-        afterPhotos,
-        createdAt: serverTimestamp(),
-      });
+      await attachAfterPhotos(id, afterPhotos);
 
       router.replace({ pathname: '/detailer/invoice/[id]', params: { id } });
     } catch (err) {

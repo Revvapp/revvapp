@@ -1,7 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
-import { addDoc, collection, doc, getDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { getDownloadURL, ref as storageRef, uploadBytes } from 'firebase/storage';
 import { useState } from 'react';
 import {
@@ -19,8 +18,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { db, storage } from '@/firebaseConfig';
+import { storage } from '@/firebaseConfig';
 import { useAuth } from '@/hooks/useAuth';
+import { createDispute } from '@/lib/payments';
 
 const C = {
   bg:      '#0A1628',
@@ -48,7 +48,7 @@ const CATEGORIES = [
   { key: 'other',           label: 'Other',                icon: 'ellipsis-horizontal-outline' as const },
 ];
 
-async function uploadDisputePhoto(userId: string, localUri: string, index: number): Promise<string> {
+async function uploadDisputePhoto(bookingId: string, userId: string, localUri: string, index: number): Promise<string> {
   const blob = await new Promise<Blob>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.onload = () => resolve(xhr.response as Blob);
@@ -57,7 +57,7 @@ async function uploadDisputePhoto(userId: string, localUri: string, index: numbe
     xhr.open('GET', localUri, true);
     xhr.send(null);
   });
-  const ref = storageRef(storage, `disputes/${userId}/${Date.now()}_${index}.jpg`);
+  const ref = storageRef(storage, `disputes/${bookingId}/${userId}/${Date.now()}_${index}.jpg`);
   await uploadBytes(ref, blob);
   return getDownloadURL(ref);
 }
@@ -95,27 +95,16 @@ export default function ClientDisputeScreen() {
     setUploading(photos.length > 0);
     try {
       const photoUrls = await Promise.all(
-        photos.map((uri, i) => uploadDisputePhoto(user.uid!, uri, i))
+        photos.map((uri, i) => uploadDisputePhoto(id, user.uid!, uri, i))
       );
       setUploading(false);
 
-      // Resolve the detailer up front so it can be stored on the dispute
-      // (the detailer needs it to read the dispute under security rules).
-      const invoiceSnap = await getDoc(doc(db, 'invoices', id));
-      const detailerId = invoiceSnap.exists() ? String(invoiceSnap.data().detailerId ?? '') : '';
-
-      await addDoc(collection(db, 'disputes'), {
-        invoiceId: id,
+      await createDispute({
         bookingId: id,
-        clientId: user.uid,
-        detailerId,
         category,
         description: description.trim(),
         photoUrls,
-        status: 'open',
-        createdAt: serverTimestamp(),
       });
-      await updateDoc(doc(db, 'invoices', id), { status: 'disputed' });
 
       // The detailer is notified server-side by the onDisputeCreated Cloud Function.
 

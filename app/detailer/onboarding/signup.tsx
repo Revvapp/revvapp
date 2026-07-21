@@ -103,10 +103,10 @@ export default function DetailerOnboardingSignupScreen() {
         userType: 'detailer',
         createdAt: serverTimestamp(),
         onboardingComplete: false,
-        isFoundingPro: true,
-        subscriptionStatus: 'trial',
-        trialDays: 60,
-        trialStartDate: serverTimestamp(),
+        isFoundingPro: false,
+        subscriptionStatus: 'pending',
+        trialDays: 0,
+        trialStartDate: null,
       });
       if (cred.user.email) {
         await setEmailLookup(cred.user.email, uid, 'detailer');

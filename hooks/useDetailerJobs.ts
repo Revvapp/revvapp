@@ -1,9 +1,10 @@
-import { collection, doc, limit, onSnapshot, orderBy, query, updateDoc, where } from 'firebase/firestore';
+import { collection, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { db } from '@/firebaseConfig';
 import { useAuth } from '@/hooks/useAuth';
 import { mapFirestoreError } from '@/lib/firestoreErrors';
+import { transitionBooking } from '@/lib/payments';
 import type { BookingDocument } from '@/types/firestore';
 
 export type DetailerJobsModel = {
@@ -72,21 +73,21 @@ export function useDetailerJobs(): DetailerJobsModel {
 
   const acceptJob = useCallback(
     async (id: string) => {
-      await updateDoc(doc(db, 'bookings', id), { status: 'active' });
+      await transitionBooking(id, 'accept');
     },
     []
   );
 
   const declineJob = useCallback(
     async (id: string) => {
-      await updateDoc(doc(db, 'bookings', id), { status: 'declined' });
+      await transitionBooking(id, 'decline');
     },
     []
   );
 
   const completeJob = useCallback(
     async (id: string) => {
-      await updateDoc(doc(db, 'bookings', id), { status: 'completed' });
+      await transitionBooking(id, 'complete');
     },
     []
   );

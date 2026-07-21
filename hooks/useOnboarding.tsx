@@ -106,7 +106,9 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
           incomeGoal: state.incomeGoal,
           rating: 0,
           reviewCount: 0,
-          isActive: true,
+          // Marketplace eligibility is granted server-side after subscription,
+          // identity, and payout checks complete.
+          isActive: false,
           profileComplete: true,
           updatedAt: serverTimestamp(),
         },

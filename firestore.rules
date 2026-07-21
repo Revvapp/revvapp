@@ -19,10 +19,23 @@ service cloud.firestore {
       allow read: if isOwner(uid);
       allow create: if isOwner(uid)
         && request.resource.data.uid == uid
-        && request.resource.data.email == request.auth.token.email;
-      allow update: if isOwner(uid);
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.get('isFoundingPro', false) == false
+        && request.resource.data.get('subscriptionStatus', 'pending') == 'pending'
+        && request.resource.data.get('trialDays', 0) == 0
+        && request.resource.data.get('trialStartDate', null) == null;
+      allow update: if isOwner(uid)
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.email == resource.data.email
+        && request.resource.data.userType == resource.data.userType
+        && request.resource.data.get('isFoundingPro', false) == resource.data.get('isFoundingPro', false)
+        && request.resource.data.get('subscriptionStatus', '') == resource.data.get('subscriptionStatus', '')
+        && request.resource.data.get('trialDays', 0) == resource.data.get('trialDays', 0)
+        && request.resource.data.get('trialStartDate', null) == resource.data.get('trialStartDate', null);
       // Owner may delete their own account (App Store account-deletion requirement).
-      allow delete: if isOwner(uid);
+      // Account deletion is an Admin SDK workflow so related data can be
+      // cleaned/anonymized consistently before the Auth identity disappears.
+      allow delete: if false;
     }
 
     match /detailers/{uid} {
@@ -34,6 +47,7 @@ service cloud.firestore {
       // rules); idVerified is earned via background check, never self-granted.
       // So a freshly created profile starts unverified with a zeroed rating.
       allow create: if isOwner(uid)
+        && get(/databases/$(database)/documents/users/$(uid)).data.userType == 'detailer'
         && request.resource.data.uid == uid
         && request.resource.data.get('idVerified', false) == false
         && request.resource.data.get('rating', 0) == 0
@@ -43,7 +57,9 @@ service cloud.firestore {
         // Cloud Functions (Admin SDK). A detailer must not self-grant either —
         // payoutsEnabled gates marketplace visibility and booking eligibility.
         && request.resource.data.get('payoutsEnabled', false) == false
-        && request.resource.data.get('stripeAccountId', '') == '';
+        && request.resource.data.get('stripeAccountId', '') == ''
+        && request.resource.data.get('stripeAccountVersion', '') == ''
+        && request.resource.data.get('isActive', false) == false;
 
       // Updates may not change any protected trust field — each must carry
       // through unchanged from the stored doc (which only the Admin SDK sets).
@@ -57,9 +73,11 @@ service cloud.firestore {
         && request.resource.data.get('reviewCount', 0) == resource.data.get('reviewCount', 0)
         && request.resource.data.get('ratingSum', 0) == resource.data.get('ratingSum', 0)
         && request.resource.data.get('stripeAccountId', '') == resource.data.get('stripeAccountId', '')
-        && request.resource.data.get('payoutsEnabled', false) == resource.data.get('payoutsEnabled', false);
+        && request.resource.data.get('stripeAccountVersion', '') == resource.data.get('stripeAccountVersion', '')
+        && request.resource.data.get('payoutsEnabled', false) == resource.data.get('payoutsEnabled', false)
+        && request.resource.data.get('isActive', false) == resource.data.get('isActive', false);
 
-      allow delete: if isOwner(uid);
+      allow delete: if false;
     }
 
     match /clients/{uid} {
@@ -68,12 +86,13 @@ service cloud.firestore {
       // the Admin SDK). A client must never write it: a forged customer id would
       // make the server mint a Stripe ephemeral key for someone else's customer.
       allow create: if isOwner(uid)
+        && get(/databases/$(database)/documents/users/$(uid)).data.userType == 'client'
         && request.resource.data.uid == uid
         && request.resource.data.get('stripeCustomerId', '') == '';
       allow update: if isOwner(uid)
         && request.resource.data.uid == uid
         && request.resource.data.get('stripeCustomerId', '') == resource.data.get('stripeCustomerId', '');
-      allow delete: if isOwner(uid);
+      allow delete: if false;
 
       match /vehicles/{vehicleId} {
         allow read: if isOwner(uid);
@@ -88,58 +107,9 @@ service cloud.firestore {
         && (resource.data.clientId == request.auth.uid
             || resource.data.detailerId == request.auth.uid);
 
-      // Create: caller must be the booking's client. Prevents spamming a
-      // detailer's calendar with bookings someone else didn't actually request.
-      allow create: if signedIn()
-        && request.resource.data.clientId == request.auth.uid;
-
-      // Update: either party on the booking, but they can't rewrite who's
-      // involved or the agreed price. Status changes are role-gated: the
-      // client may only cancel or sign the VIR; the detailer drives every
-      // other lifecycle transition (accept → VIR capture → timer → complete
-      // → pending_release). The status lists below mirror exactly the values
-      // the app writes — keep them in sync with the app or legit writes break.
-      allow update: if signedIn()
-        && (resource.data.clientId == request.auth.uid
-            || resource.data.detailerId == request.auth.uid)
-        && request.resource.data.clientId == resource.data.clientId
-        && request.resource.data.detailerId == resource.data.detailerId
-        && request.resource.data.price == resource.data.price
-        // Payment fields are owned by the Stripe functions (Admin SDK). Neither
-        // party may alter the hold from the client — e.g. flipping paymentStatus
-        // to 'captured' to dodge the capture, or swapping the PaymentIntent.
-        && request.resource.data.get('paymentStatus', '') == resource.data.get('paymentStatus', '')
-        && request.resource.data.get('paymentIntentId', '') == resource.data.get('paymentIntentId', '')
-        && (
-          request.resource.data.status == resource.data.status
-          || (
-            resource.data.clientId == request.auth.uid
-            && (
-              // Cancel only before the inspection starts — once a VIR exists the
-              // job is a liability record and must run its course or be disputed.
-              (
-                request.resource.data.status == 'cancelled'
-                && resource.data.status in ['pending', 'active']
-              )
-              // Sign only a report that is actually awaiting signature. Without
-              // this, a client could re-sign a paused job, knocking it back to
-              // 'vir_signed' and letting the timer restart from zero.
-              || (
-                request.resource.data.status == 'vir_signed'
-                && resource.data.status == 'vir_submitted'
-              )
-            )
-          )
-          || (
-            resource.data.detailerId == request.auth.uid
-            && request.resource.data.status in [
-              'active', 'declined', 'vir_submitted', 'in_progress',
-              'paused', 'completed', 'pending_release'
-            ]
-          )
-        );
-
-      allow delete: if false;
+      // All writes go through server workflows. This makes prices, parties,
+      // liability evidence, lifecycle timestamps and Stripe state authoritative.
+      allow create, update, delete: if false;
     }
 
     match /invoices/{invoiceId} {
@@ -148,28 +118,7 @@ service cloud.firestore {
         resource.data.detailerId == request.auth.uid ||
         resource.data.clientId == request.auth.uid
       );
-      allow create: if signedIn()
-        && request.resource.data.detailerId == request.auth.uid;
-      // Detailer may freely update their own invoices. Client may only flip the
-      // status (and nothing else) to 'disputed' (raising a dispute) or 'released'
-      // (auto-release after the dispute window closes).
-      allow update: if signedIn() && (
-        // Detailer may update their own invoice (share flags, reel URL, status),
-        // but NOT the money: price, platform fee and payout are immutable once
-        // the invoice is written. When real payouts land these become
-        // Admin-SDK-only; this closes the gap in the meantime.
-        (
-          resource.data.detailerId == request.auth.uid
-          && request.resource.data.get('price', 0) == resource.data.get('price', 0)
-          && request.resource.data.get('platformFee', 0) == resource.data.get('platformFee', 0)
-          && request.resource.data.get('detailerPayout', 0) == resource.data.get('detailerPayout', 0)
-        )
-        || (
-          resource.data.clientId == request.auth.uid
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
-          && request.resource.data.status in ['disputed', 'released']
-        )
-      );
+      allow create, update, delete: if false;
     }
 
     match /reviews/{reviewId} {
@@ -202,13 +151,8 @@ service cloud.firestore {
       allow read: if signedIn()
         && (resource.data.clientId == request.auth.uid
             || resource.data.detailerId == request.auth.uid);
-      allow create: if signedIn()
-        && request.resource.data.clientId == request.auth.uid;
-      // Either party may post a response / mark resolved.
-      allow update: if signedIn()
-        && (resource.data.clientId == request.auth.uid
-            || resource.data.detailerId == request.auth.uid);
-      allow delete: if false;
+      // Created and responded to through transactional server workflows.
+      allow create, update, delete: if false;
     }
 
     match /reports/{reportId} {
@@ -222,17 +166,23 @@ service cloud.firestore {
       // knows who was reported; one of them must be the reporter.
       allow create: if signedIn()
         && request.resource.data.reporterId == request.auth.uid
+        && request.resource.data.bookingId is string
+        && exists(/databases/$(database)/documents/bookings/$(request.resource.data.bookingId))
         && (request.resource.data.reporterRole == 'client'
             || request.resource.data.reporterRole == 'detailer')
-        && (request.resource.data.clientId == request.auth.uid
-            || request.resource.data.detailerId == request.auth.uid);
+        && request.resource.data.clientId == get(/databases/$(database)/documents/bookings/$(request.resource.data.bookingId)).data.clientId
+        && request.resource.data.detailerId == get(/databases/$(database)/documents/bookings/$(request.resource.data.bookingId)).data.detailerId
+        && (get(/databases/$(database)/documents/bookings/$(request.resource.data.bookingId)).data.clientId == request.auth.uid
+            || get(/databases/$(database)/documents/bookings/$(request.resource.data.bookingId)).data.detailerId == request.auth.uid);
       // Immutable — reports are handled by the team off-platform.
       allow update, delete: if false;
     }
 
     match /emailLookup/{emailId} {
-      // Readable pre-auth so signup can resolve an existing account's type.
-      allow read: if true;
+      // Never expose account existence, role or uid to unauthenticated callers.
+      allow read: if signedIn()
+        && request.auth.token.email != null
+        && emailId == request.auth.token.email.lower();
       // A user may only write the lookup for their OWN email (the doc id is the
       // lowercased email), and only point it at their own uid. Stops a signed-in
       // user from overwriting someone else's email→userType/uid mapping and

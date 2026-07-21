@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -17,6 +17,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { db } from '@/firebaseConfig';
+import { updateInvoiceReach } from '@/lib/payments';
 import { toTitleCase } from '@/lib/format';
 
 const C = {
@@ -102,7 +103,7 @@ export default function RevvReachScreen() {
       if (result.action === Share.sharedAction) {
         setShared(true);
         if (id) {
-          await updateDoc(doc(db, 'invoices', id), { reachShared: true });
+          await updateInvoiceReach(id, { reachShared: true });
         }
       }
     } catch {

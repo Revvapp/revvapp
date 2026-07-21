@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { doc, onSnapshot, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { db } from '@/firebaseConfig';
 import { toTitleCase } from '@/lib/format';
+import { transitionBooking } from '@/lib/payments';
 
 const COLORS = {
   bg: '#0D1B2A',
@@ -180,12 +181,7 @@ export default function TimerScreen() {
     setSaving(true);
     try {
       const checklist = buildChecklist(booking.service);
-      await updateDoc(doc(db, 'bookings', id), {
-        status: 'in_progress',
-        timerStartMs: Date.now(),
-        timerAccumulatedSeconds: 0,
-        serviceChecklist: checklist,
-      });
+      await transitionBooking(id, 'start', { serviceChecklist: checklist });
     } catch {
       Alert.alert('Error', 'Could not start timer.');
     } finally {
@@ -197,14 +193,7 @@ export default function TimerScreen() {
     if (!id || !booking) return;
     setSaving(true);
     try {
-      const elapsed = (booking.timerAccumulatedSeconds ?? 0) +
-        Math.floor((Date.now() - (booking.timerStartMs ?? Date.now())) / 1000);
-      await updateDoc(doc(db, 'bookings', id), {
-        status: 'paused',
-        timerStartMs: null,
-        timerAccumulatedSeconds: elapsed,
-        pauseReason: selectedPauseReason,
-      });
+      await transitionBooking(id, 'pause', { pauseReason: selectedPauseReason });
     } catch {
       Alert.alert('Error', 'Could not pause timer.');
     } finally {
@@ -216,10 +205,7 @@ export default function TimerScreen() {
     if (!id) return;
     setSaving(true);
     try {
-      await updateDoc(doc(db, 'bookings', id), {
-        status: 'in_progress',
-        timerStartMs: Date.now(),
-      });
+      await transitionBooking(id, 'resume');
     } catch {
       Alert.alert('Error', 'Could not resume timer.');
     } finally {
@@ -240,18 +226,7 @@ export default function TimerScreen() {
           onPress: async () => {
             setSaving(true);
             try {
-              // Accumulated time plus any still-running segment, so the recorded
-              // total is correct regardless of which state we end from.
-              const runningSegment = booking.timerStartMs
-                ? Math.floor((Date.now() - booking.timerStartMs) / 1000)
-                : 0;
-              const elapsed = (booking.timerAccumulatedSeconds ?? 0) + runningSegment;
-              await updateDoc(doc(db, 'bookings', id), {
-                status: 'completed',
-                timerStartMs: null,
-                timerAccumulatedSeconds: elapsed,
-                completedAt: serverTimestamp(),
-              });
+              await transitionBooking(id, 'complete');
               // The client is notified server-side (onBookingStatusChanged → completed).
               router.replace({ pathname: '/detailer/before-after/[id]', params: { id: id! } });
             } catch {
@@ -275,7 +250,7 @@ export default function TimerScreen() {
         completedMinutes: !item.completed ? Math.floor(displaySeconds / 60) : undefined,
       };
     });
-    await updateDoc(doc(db, 'bookings', id), { serviceChecklist: updated });
+    await transitionBooking(id, 'update_checklist', { serviceChecklist: updated });
   }
 
   if (loading) {

@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { collection, doc, getDocs, onSnapshot, query, updateDoc, where } from 'firebase/firestore';
+import { collection, doc, getDocs, onSnapshot, query, where } from 'firebase/firestore';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
@@ -17,6 +17,7 @@ import { db } from '@/firebaseConfig';
 import { formatJobDate } from '@/lib/dateKeys';
 import { mapFirestoreError } from '@/lib/firestoreErrors';
 import { toTitleCase } from '@/lib/format';
+import { transitionBooking } from '@/lib/payments';
 import type { BookingDocument } from '@/types/firestore';
 
 const COLORS = {
@@ -124,7 +125,7 @@ export default function JobDetailScreen() {
         }
       }
 
-      await updateDoc(doc(db, 'bookings', id), { status });
+      await transitionBooking(id, status === 'active' ? 'accept' : 'decline');
       // The client is notified of accept/decline server-side (onBookingStatusChanged).
       if (status === 'declined') {
         router.back();

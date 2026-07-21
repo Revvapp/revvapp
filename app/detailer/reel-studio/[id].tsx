@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -16,6 +16,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { db } from '@/firebaseConfig';
+import { updateInvoiceReach } from '@/lib/payments';
 import {
   generateContent,
   renderReel,
@@ -535,7 +536,7 @@ export default function ReelStudioScreen() {
       vehicleLabel: jobData.vehicleLabel,
     });
     if (result.status !== 'mock') {
-      await updateDoc(doc(db, 'invoices', id), { reachShared: true, reelUrl: result.videoUrl });
+      await updateInvoiceReach(id, { reachShared: true, reelUrl: result.videoUrl ?? undefined });
     }
     setIsMock(result.status === 'mock');
     setRendering(false);

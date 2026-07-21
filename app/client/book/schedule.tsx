@@ -62,7 +62,9 @@ function generateSlots(from: string, to: string): string[] {
 function getBookableDates(workingDays: number[]): Date[] {
   const dates: Date[] = [];
   const now = new Date();
-  for (let i = 1; i <= 30; i++) {
+  // Stripe manual-capture holds are short-lived. Four days leaves room for the
+  // appointment and Revv's 24-hour dispute window before server-side capture.
+  for (let i = 1; i <= 4; i++) {
     const d = new Date(now);
     d.setDate(now.getDate() + i);
     if (workingDays.length === 0 || workingDays.includes(d.getDay())) {

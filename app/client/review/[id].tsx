@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { collection, doc, getDoc, getDocs, onSnapshot, query, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, onSnapshot, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -87,7 +87,6 @@ export default function ClientReviewScreen() {
         verified: true,
       });
 
-      await updateDoc(doc(db, 'bookings', id), { hasReview: true });
 
       // The detailer is notified server-side by the onReviewCreated Cloud Function.
 

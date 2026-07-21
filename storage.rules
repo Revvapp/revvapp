@@ -20,22 +20,48 @@ service firebase.storage {
         );
     }
 
+    function booking(bookingId) {
+      return firestore.get(/databases/(default)/documents/bookings/$(bookingId)).data;
+    }
+
+    function validImage(maxBytes) {
+      return request.resource != null
+        && request.resource.size > 0
+        && request.resource.size <= maxBytes
+        && request.resource.contentType.matches('image/(jpeg|png|heic|heif|webp)');
+    }
+
     match /detailers/{uid}/{allPaths=**} {
       allow read: if true;
-      allow write: if request.auth != null && request.auth.uid == uid;
+      allow write: if request.auth != null
+        && request.auth.uid == uid
+        && validImage(10 * 1024 * 1024);
     }
 
     match /vir-photos/{bookingId}/{allPaths=**} {
-      allow read, write: if isBookingParty(bookingId);
+      allow read: if isBookingParty(bookingId);
+      allow write: if request.auth != null
+        && booking(bookingId).detailerId == request.auth.uid
+        && booking(bookingId).status == 'active'
+        && validImage(12 * 1024 * 1024);
     }
 
     match /after-photos/{bookingId}/{allPaths=**} {
-      allow read, write: if isBookingParty(bookingId);
+      allow read: if isBookingParty(bookingId);
+      allow write: if request.auth != null
+        && booking(bookingId).detailerId == request.auth.uid
+        && booking(bookingId).status == 'completed'
+        && booking(bookingId).get('afterPhotosFinalizedAt', null) == null
+        && validImage(12 * 1024 * 1024);
     }
 
-    match /disputes/{uid}/{allPaths=**} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == uid;
+    match /disputes/{bookingId}/{uid}/{allPaths=**} {
+      allow read: if isBookingParty(bookingId);
+      allow write: if request.auth != null
+        && request.auth.uid == uid
+        && booking(bookingId).clientId == request.auth.uid
+        && booking(bookingId).status == 'completed'
+        && validImage(12 * 1024 * 1024);
     }
 
   }

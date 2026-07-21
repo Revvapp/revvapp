@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
-import { doc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { getDownloadURL, ref as storageRef, uploadBytes } from 'firebase/storage';
 import { useState } from 'react';
 import {
@@ -19,7 +18,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { db, storage } from '@/firebaseConfig';
+import { storage } from '@/firebaseConfig';
+import { transitionBooking } from '@/lib/payments';
 
 const C = {
   bg:      '#0D1B2A',
@@ -208,7 +208,7 @@ export default function VIRCaptureScreen() {
       for (const p of PANELS) {
         virPanels[p.key] = { photoUrl: panels[p.key].photoUrl!, notes: panels[p.key].notes.trim() };
       }
-      await updateDoc(doc(db, 'bookings', id!), { status: 'vir_submitted', virSubmittedAt: serverTimestamp(), virPanels });
+      await transitionBooking(id!, 'submit_vir', { virPanels });
       // The client is notified to sign server-side (onBookingStatusChanged → vir_submitted).
       Alert.alert(
         'Inspection Submitted',

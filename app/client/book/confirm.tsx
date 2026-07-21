@@ -1,7 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useStripe } from '@stripe/stripe-react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { addDoc, collection, doc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { useState } from 'react';
 import {
   ActivityIndicator,
@@ -16,10 +14,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { db } from '@/firebaseConfig';
 import { useAuth } from '@/hooks/useAuth';
+import { useNativeStripe } from '@/hooks/useNativeStripe';
 import { toTitleCase } from '@/lib/format';
-import { createBookingPaymentIntent } from '@/lib/payments';
+import { createBookingPaymentIntent, finalizeBooking } from '@/lib/payments';
 
 const COLORS = {
   bg: '#0D1B2A',
@@ -80,7 +78,7 @@ type ConfirmParams = {
 export default function BookConfirmScreen() {
   const params = useLocalSearchParams<ConfirmParams>();
   const { user } = useAuth();
-  const { initPaymentSheet, presentPaymentSheet } = useStripe();
+  const { initPaymentSheet, presentPaymentSheet } = useNativeStripe();
 
   const [address, setAddress] = useState('');
   const [notes, setNotes] = useState('');
@@ -119,30 +117,14 @@ export default function BookConfirmScreen() {
         return;
       }
 
-      const clientSnap = await getDoc(doc(db, 'clients', user.uid));
-      const clientName = clientSnap.exists()
-        ? String(clientSnap.data().fullName ?? user.email ?? '')
-        : (user.email ?? '');
-
-      await addDoc(collection(db, 'bookings'), {
-        clientId: user.uid,
-        detailerId: params.detailerId,
-        detailerName: params.detailerName ?? '',
-        service: params.service,
-        // The authorized amount is authoritative — a stale rate passed through
-        // navigation params must not disagree with what the card holds.
-        price: sheet.amountCents / 100,
-        status: 'pending',
+      await finalizeBooking({
+        paymentIntentId: sheet.paymentIntentId,
         date: params.date,
         time: params.time,
         vehicleId: params.vehicleId,
-        vehicleLabel: params.vehicleLabel,
+        vehicleLabel: params.vehicleLabel ?? '',
         address: address.trim(),
-        notes: notes.trim() || null,
-        clientName,
-        paymentIntentId: sheet.paymentIntentId,
-        paymentStatus: 'requires_capture',
-        createdAt: serverTimestamp(),
+        notes: notes.trim(),
       });
 
       // The detailer is notified server-side by the onBookingCreated Cloud Function.

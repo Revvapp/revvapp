@@ -7,21 +7,17 @@ Status as of the current branch. ✅ done · 🟠 in progress / needs verificati
 
 ## 🔴 Blockers — must clear before real transactions
 
-### Payments (Stripe) — Phases 1–2 built, Phase 3 missing
-The layer is real: Connect Express onboarding, manual-capture card holds at
-booking, hold cancellation on decline/cancel, and a signature-verified idempotent
-webhook all exist in `functions/src/stripe.ts` + `lib/payments.ts`.
+### Payments (Stripe) — test-mode transaction path deployed
+The layer uses Accounts v2 recipient onboarding, manual-capture platform charges,
+separate Transfers, hold cancellation, and a signature-verified idempotent webhook.
 
-- ✅ Connect onboarding (`createConnectAccount`, `getConnectStatus`, `account.updated`)
+- ✅ Accounts v2 recipient onboarding (`createConnectAccount`, `getConnectStatus`)
 - ✅ Card hold at booking (`createBookingPaymentIntent`, manual capture, server-derived amount)
 - ✅ Cancel hold on booking end (`cancelHoldOnBookingEnd`)
 - ✅ Webhook w/ signature verification + `stripeEvents` idempotency ledger
-- 🟠 **Capture / auto-release — DRAFT written, not deployed.**
-  `releaseHoldsAfterDisputeWindow` (scheduled, `functions/src/stripe.ts`) captures
-  the manual-capture destination charge once the 24h window closes with no dispute
-  — which both charges the client and settles the payout in one step. **Must be
-  verified end-to-end in Stripe TEST mode before deploying** (it moves real money).
-  Until deployed, holds are placed but never captured, so no one is charged/paid.
+- ✅ Capture / auto-release deployed. `releaseHoldsAfterDisputeWindow` captures an
+  eligible charge after 24 hours and creates one idempotent 90% Transfer.
+- 🟠 Full Stripe test-mode transaction and retry-path QA still required.
 - ⬜ Dispute → refund / partial-refund path
 - ⬜ Detailer subscription billing ($34.99/mo) + trial/Founding Pro
 - ⬜ Revv Care fund accrual + claims
@@ -29,20 +25,15 @@ webhook all exist in `functions/src/stripe.ts` + `lib/payments.ts`.
   still flips status in the UI; it does not move money and should be replaced by the
   server-side release above.
 
-### Security rules — fixed in code, NOT deployed
+### Security rules — deployed
 - ✅ Hardened rules committed (review-target binding, VIR/after photo access,
   detailer trust fields, invoice financials).
-- 🔴 **Not deployed** — the live project still runs the old vulnerable rules.
-  Run `firebase login --reauth` then
-  `firebase deploy --only firestore:rules,storage --project revv-app2026`.
+- ✅ Firestore and Storage rules deployed to `revv-app2026`.
 
-### Cloud Functions — deployment unverified
+### Cloud Functions — deployed
 - ✅ Code exists: notifications, reports, ratings aggregation, vehicle sync, Stripe.
-- 🔴 `firebase functions:list` failed on auth, so deployment is **unconfirmed**.
-  If not deployed: no push sends, no report logging, ratings never aggregate, and
-  **no Stripe function works**. Requires Blaze plan + `firebase login --reauth`
-  + `firebase deploy --only functions`. Verify secrets are set:
-  `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` (`firebase functions:secrets:set`).
+- ✅ All functions run on Node.js 22; the Stripe functions and release scheduler
+  were successfully deployed to `revv-app2026`.
 
 ### Push notifications — non-functional
 - 🔴 No EAS `projectId` and no `eas.json`, so `getExpoPushTokenAsync` fails and no

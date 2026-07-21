@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -11,9 +11,10 @@ import {
   View,
 } from 'react-native';
 
-import MapView, { Marker, Region } from 'react-native-maps';
 import Animated, { FadeIn, FadeInDown, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { DetailerMap } from '@/components/DetailerMap';
 
 import {
   DetailerWithDistance,
@@ -176,7 +177,6 @@ export default function ClientFindScreen() {
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<Filter>('All');
-  const mapRef = useRef<MapView>(null);
 
   const filtered = activeFilter === 'All'
     ? detailers
@@ -186,7 +186,7 @@ export default function ClientFindScreen() {
 
   const selected = detailers.find((d) => d.uid === selectedId) ?? null;
 
-  const defaultRegion: Region = {
+  const defaultRegion = {
     latitude: clientLat ?? 37.7749,
     longitude: clientLng ?? -122.4194,
     latitudeDelta: 0.15,
@@ -278,29 +278,17 @@ export default function ClientFindScreen() {
           </ScrollView>
         ) : (
           <View style={styles.mapWrap}>
-            <MapView
-              ref={mapRef}
-              style={styles.map}
-              initialRegion={defaultRegion}
-              showsUserLocation
-              showsMyLocationButton={false}
-            >
-              {filtered
-                .filter((d) => d.lat != null && d.lng != null)
-                .map((d) => (
-                  <Marker
-                    key={d.uid}
-                    coordinate={{ latitude: d.lat!, longitude: d.lng! }}
-                    onPress={() => setSelectedId(d.uid)}
-                  >
-                    <View style={[styles.pin, selectedId === d.uid && styles.pinSelected]}>
-                      <Text style={[styles.pinText, selectedId === d.uid && styles.pinTextSelected]}>
-                        {lowestRate(d.rates ?? {}) ?? '★'}
-                      </Text>
-                    </View>
-                  </Marker>
-                ))}
-            </MapView>
+            <DetailerMap
+              points={filtered.map((d) => ({
+                uid: d.uid,
+                lat: d.lat,
+                lng: d.lng,
+                label: lowestRate(d.rates ?? {}) ?? '★',
+              }))}
+              selectedId={selectedId}
+              region={defaultRegion}
+              onSelect={setSelectedId}
+            />
 
             {selected && (
               <View style={styles.mapCard}>

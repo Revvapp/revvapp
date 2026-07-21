@@ -17,6 +17,16 @@ type BookingPaymentSheet = {
   amountCents: number;
 };
 
+type FinalizeBookingInput = {
+  paymentIntentId: string;
+  date: string;
+  time: string;
+  vehicleId: string;
+  vehicleLabel: string;
+  address: string;
+  notes?: string;
+};
+
 /** Mint a fresh Stripe Express onboarding link for the signed-in detailer. */
 export async function createConnectAccount(): Promise<ConnectLink> {
   const call = httpsCallable<void, ConnectLink>(functions, 'createConnectAccount');
@@ -43,4 +53,58 @@ export async function createBookingPaymentIntent(
     'createBookingPaymentIntent'
   );
   return (await call({ detailerId, service })).data;
+}
+
+/** Finalize exactly one booking for a confirmed PaymentIntent hold. */
+export async function finalizeBooking(input: FinalizeBookingInput): Promise<{ bookingId: string }> {
+  const call = httpsCallable<FinalizeBookingInput, { bookingId: string }>(functions, 'finalizeBooking');
+  return (await call(input)).data;
+}
+
+export async function transitionBooking(
+  bookingId: string,
+  action: string,
+  data: Record<string, unknown> = {}
+): Promise<void> {
+  const call = httpsCallable<Record<string, unknown>, { ok: boolean }>(functions, 'transitionBooking');
+  await call({ bookingId, action, ...data });
+}
+
+export async function attachAfterPhotos(bookingId: string, afterPhotos: string[]): Promise<void> {
+  const call = httpsCallable<{ bookingId: string; afterPhotos: string[] }, { ok: boolean }>(
+    functions,
+    'attachAfterPhotos'
+  );
+  await call({ bookingId, afterPhotos });
+}
+
+export async function createDispute(input: {
+  bookingId: string;
+  category: string;
+  description: string;
+  photoUrls: string[];
+}): Promise<{ disputeId: string }> {
+  const call = httpsCallable<typeof input, { disputeId: string }>(functions, 'createDispute');
+  return (await call(input)).data;
+}
+
+export async function respondToDispute(disputeId: string, response: string): Promise<void> {
+  const call = httpsCallable<{ disputeId: string; response: string }, { ok: boolean }>(
+    functions,
+    'respondToDispute'
+  );
+  await call({ disputeId, response });
+}
+
+export async function updateInvoiceReach(
+  invoiceId: string,
+  input: { reachShared: boolean; reelUrl?: string }
+): Promise<void> {
+  const call = httpsCallable<Record<string, unknown>, { ok: boolean }>(functions, 'updateInvoiceReach');
+  await call({ invoiceId, ...input });
+}
+
+export async function deleteMyAccount(): Promise<void> {
+  const call = httpsCallable<void, { ok: boolean }>(functions, 'deleteMyAccount');
+  await call();
 }
