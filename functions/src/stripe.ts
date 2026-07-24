@@ -1,6 +1,6 @@
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { logger } from 'firebase-functions/v2';
-import { defineSecret } from 'firebase-functions/params';
+import { defineSecret, defineString } from 'firebase-functions/params';
 import { onDocumentCreated, onDocumentUpdated } from 'firebase-functions/v2/firestore';
 import { HttpsError, onCall, onRequest } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
@@ -8,6 +8,7 @@ import { randomUUID } from 'node:crypto';
 import Stripe from 'stripe';
 
 import { db } from './admin';
+import { requireAdmin } from './workflows';
 
 /**
  * Stripe payment layer — Phase 1 (Connect onboarding) and Phase 2 (card hold
@@ -21,6 +22,15 @@ import { db } from './admin';
 
 const STRIPE_SECRET_KEY = defineSecret('STRIPE_SECRET_KEY');
 const STRIPE_WEBHOOK_SECRET = defineSecret('STRIPE_WEBHOOK_SECRET');
+
+// The recurring price for the $34.99/mo detailer plan. A price id is not secret;
+// set it as a param (env / functions config), e.g. STRIPE_SUBSCRIPTION_PRICE_ID=price_...
+const STRIPE_SUBSCRIPTION_PRICE_ID = defineString('STRIPE_SUBSCRIPTION_PRICE_ID');
+
+// Revv Care reserve set aside per released booking, as a fraction of the booking
+// price. Finance can tune this single constant; it is an accounting accrual of
+// platform-retained funds, not a money movement.
+const CARE_RESERVE_RATE = 0.01;
 
 // Callables must be pinned to the same region as the Firestore-trigger
 // functions (which follow the database's location) so the client can build a
@@ -75,6 +85,83 @@ async function recipientTransfersActive(stripe: Stripe, accountId: string): Prom
     const legacy = await stripe.accounts.retrieve(accountId);
     return !legacy.deleted && legacy.capabilities?.transfers === 'active';
   }
+}
+
+/**
+ * Accrues the Revv Care reserve for a released booking (CARE_RESERVE_RATE of the
+ * booking price). Writes an idempotent per-booking ledger entry and increments
+ * the fund total — an accounting record of platform-retained funds, never a money
+ * movement. Best-effort: a failure must not fail the payment release.
+ */
+async function accrueRevvCare(bookingId: string, priceCents: number): Promise<void> {
+  const reserveCents = Math.round(priceCents * CARE_RESERVE_RATE);
+  if (reserveCents <= 0) return;
+  try {
+    // create() throws if it already exists — accrual is idempotent per booking.
+    await db.collection('revvCareLedger').doc(bookingId).create({
+      bookingId, reserveCents, accruedAt: FieldValue.serverTimestamp(),
+    });
+    await db.collection('revvCareFund').doc('summary').set(
+      { totalCents: FieldValue.increment(reserveCents), updatedAt: FieldValue.serverTimestamp() },
+      { merge: true }
+    );
+  } catch {
+    // Already accrued for this booking — no-op.
+  }
+}
+
+/**
+ * Captures a manual-capture hold (if still uncaptured) and creates the idempotent
+ * 90% Transfer to the detailer. Shared by the auto-release scheduler and admin
+ * dispute resolution so both move money identically. Returns the transfer id (or
+ * null when the intent uses the non-separate funds flow).
+ */
+async function captureAndTransfer(
+  stripe: Stripe,
+  bookingId: string,
+  paymentIntentId: string
+): Promise<string | null> {
+  let intent = await stripe.paymentIntents.retrieve(paymentIntentId, { expand: ['latest_charge'] });
+  if (intent.status === 'requires_capture') {
+    intent = await stripe.paymentIntents.capture(paymentIntentId, { expand: ['latest_charge'] });
+  }
+  if (intent.status !== 'succeeded') throw new Error(`Unexpected PaymentIntent status: ${intent.status}`);
+  if (intent.metadata?.fundsFlow !== 'separate') return null;
+
+  const charge = intent.latest_charge;
+  const chargeId = typeof charge === 'string' ? charge : charge?.id;
+  const detailerAccountId = String(
+    (await db.collection('detailers').doc(String(intent.metadata.detailerId)).get()).data()?.stripeAccountId ?? ''
+  );
+  if (!chargeId || !detailerAccountId) throw new Error('Captured payment is missing transfer details.');
+
+  const transferAmount = intent.amount - Math.round(intent.amount * PLATFORM_FEE_RATE);
+  const transfer = await stripe.transfers.create({
+    amount: transferAmount,
+    currency: intent.currency,
+    destination: detailerAccountId,
+    source_transaction: chargeId,
+    transfer_group: intent.transfer_group ?? undefined,
+    metadata: { bookingId, paymentIntentId },
+  }, { idempotencyKey: `release_${bookingId}` });
+  return transfer.id;
+}
+
+/**
+ * Resolves the subscription state for the detailer who owns `customerId`: mirrors
+ * the Stripe status onto users.subscriptionStatus and gates marketplace visibility
+ * via detailers.isActive (active/trialing → visible). Called from the webhook only,
+ * so the state is always Stripe-authoritative.
+ */
+async function syncSubscriptionState(customerId: string, status: string): Promise<void> {
+  const match = await db.collection('detailers').where('stripeCustomerId', '==', customerId).limit(1).get();
+  if (match.empty) return;
+  const uid = match.docs[0].id;
+  const entitled = status === 'active' || status === 'trialing';
+  await Promise.all([
+    db.collection('users').doc(uid).set({ subscriptionStatus: status }, { merge: true }),
+    match.docs[0].ref.set({ isActive: entitled }, { merge: true }),
+  ]);
 }
 
 /**
@@ -398,50 +485,124 @@ export const stripeWebhook = onRequest(
       return;
     }
 
-    // create() throws if the doc exists — that's the idempotency check.
+    // Idempotency lock: create() throws if this event id was already claimed.
+    // The doc is written as a lock BEFORE handling and only marked 'processed'
+    // once the handler succeeds — if the handler throws we release the lock so
+    // Stripe's automatic retry reprocesses the event instead of it being
+    // permanently swallowed as a duplicate.
+    const ledgerRef = db.collection('stripeEvents').doc(event.id);
     try {
-      await db.collection('stripeEvents').doc(event.id).create({
+      await ledgerRef.create({
         type: event.type,
         receivedAt: FieldValue.serverTimestamp(),
+        status: 'processing',
       });
     } catch {
       res.json({ received: true, duplicate: true });
       return;
     }
 
-    switch (event.type) {
-      case 'account.updated': {
-        const account = event.data.object;
-        const match = await db
-          .collection('detailers')
-          .where('stripeAccountId', '==', account.id)
-          .limit(1)
-          .get();
-        if (!match.empty) {
-          const ready = await recipientTransfersActive(stripeClient(), account.id).catch(() => false);
-          await match.docs[0].ref.update({ payoutsEnabled: ready });
+    try {
+      switch (event.type) {
+        case 'account.updated': {
+          const account = event.data.object;
+          const match = await db
+            .collection('detailers')
+            .where('stripeAccountId', '==', account.id)
+            .limit(1)
+            .get();
+          if (!match.empty) {
+            const ready = await recipientTransfersActive(stripeClient(), account.id).catch(() => false);
+            await match.docs[0].ref.update({ payoutsEnabled: ready });
+          }
+          break;
         }
-        break;
-      }
-      case 'payment_intent.amount_capturable_updated':
-      case 'payment_intent.canceled': {
-        const intent = event.data.object;
-        const status = event.type === 'payment_intent.canceled' ? 'canceled' : 'requires_capture';
-        const match = await db
-          .collection('bookings')
-          .where('paymentIntentId', '==', intent.id)
-          .limit(1)
-          .get();
-        if (!match.empty) {
-          await match.docs[0].ref.update({ paymentStatus: status });
+        case 'payment_intent.amount_capturable_updated':
+        case 'payment_intent.canceled': {
+          const intent = event.data.object;
+          const status = event.type === 'payment_intent.canceled' ? 'canceled' : 'requires_capture';
+          const match = await db
+            .collection('bookings')
+            .where('paymentIntentId', '==', intent.id)
+            .limit(1)
+            .get();
+          if (!match.empty) {
+            await match.docs[0].ref.update({ paymentStatus: status });
+          }
+          break;
         }
-        break;
+        case 'charge.dispute.created': {
+          // A cardholder filed a chargeback with their bank (distinct from an
+          // in-app Revv dispute). Flag the booking so the trust & safety team can
+          // respond in the Stripe Dashboard; funds handling stays a manual process.
+          const dispute = event.data.object;
+          const piId = typeof dispute.payment_intent === 'string'
+            ? dispute.payment_intent
+            : dispute.payment_intent?.id;
+          if (piId) {
+            const match = await db
+              .collection('bookings')
+              .where('paymentIntentId', '==', piId)
+              .limit(1)
+              .get();
+            if (!match.empty) {
+              await match.docs[0].ref.update({
+                chargebackStatus: dispute.status,
+                chargebackReason: dispute.reason,
+                chargebackAt: FieldValue.serverTimestamp(),
+              });
+              logger.warn(`Chargeback opened on booking ${match.docs[0].id} (${dispute.reason})`);
+            }
+          }
+          break;
+        }
+        case 'charge.refunded': {
+          const charge = event.data.object;
+          const piId = typeof charge.payment_intent === 'string'
+            ? charge.payment_intent
+            : charge.payment_intent?.id;
+          if (piId) {
+            const match = await db
+              .collection('bookings')
+              .where('paymentIntentId', '==', piId)
+              .limit(1)
+              .get();
+            if (!match.empty) {
+              const fullyRefunded = charge.amount_refunded >= charge.amount;
+              await match.docs[0].ref.update({
+                refundedAmount: charge.amount_refunded,
+                refundedAt: FieldValue.serverTimestamp(),
+                ...(fullyRefunded ? { paymentStatus: 'refunded' } : {}),
+              });
+              logger.warn(`Refund recorded on booking ${match.docs[0].id}: ${charge.amount_refunded}`);
+            }
+          }
+          break;
+        }
+        case 'customer.subscription.created':
+        case 'customer.subscription.updated':
+        case 'customer.subscription.deleted': {
+          const sub = event.data.object;
+          const status = event.type === 'customer.subscription.deleted' ? 'canceled' : sub.status;
+          await syncSubscriptionState(String(sub.customer), status);
+          break;
+        }
+        case 'invoice.payment_failed': {
+          const invoice = event.data.object;
+          if (invoice.customer) await syncSubscriptionState(String(invoice.customer), 'past_due');
+          break;
+        }
+        default:
+          break;
       }
-      default:
-        break;
-    }
 
-    res.json({ received: true });
+      await ledgerRef.update({ status: 'processed', processedAt: FieldValue.serverTimestamp() });
+      res.json({ received: true });
+    } catch (err) {
+      logger.error(`Webhook handler failed for ${event.type} (${event.id})`, err as Error);
+      await ledgerRef.delete().catch(() => {});
+      res.status(500).send('Handler error');
+    }
   }
 );
 
@@ -542,6 +703,7 @@ export const releaseHoldsAfterDisputeWindow = onSchedule(
             releasedAt: FieldValue.serverTimestamp(),
           });
         }
+        await accrueRevvCare(bookingDoc.id, intent.amount);
         logger.info(`Released hold ${paymentIntentId} for booking ${bookingDoc.id}`);
       } catch (err) {
         // Leave paymentStatus untouched so a transient failure retries next run.
@@ -556,16 +718,16 @@ export const releaseHoldsAfterDisputeWindow = onSchedule(
 );
 
 /**
- * ⚠️ DRAFT — verify in Stripe TEST mode before deploying (watch for false
- * positives around hold-authorization timing).
+ * Defense-in-depth validation of every new booking's card hold.
  *
- * Bookings are written client-side after the PaymentSheet confirms a card hold.
- * Firestore rules can't call Stripe, so nothing stops a client from writing a
- * booking with a fake or missing paymentIntentId and getting free work from a
- * detailer. This trigger closes that hole: it retrieves the PaymentIntent and
- * voids the booking unless it is a real, uncaptured hold whose amount and parties
- * match the booking. Legit app bookings pass untouched (the hold is created by
- * createBookingPaymentIntent with matching metadata and a server-priced amount).
+ * Bookings can only be created by finalizeBooking — Firestore rules deny direct
+ * client writes to the collection — and finalizeBooking already verifies the
+ * hold, so this trigger is a belt-and-suspenders backstop rather than the
+ * primary guard. It retrieves the PaymentIntent and voids the booking unless it
+ * is a real, uncaptured hold whose amount and parties match the booking. Because
+ * finalizeBooking derives all of those fields FROM the same PaymentIntent,
+ * legitimate bookings always match and are never voided; only an out-of-band
+ * write that disagreed with its hold would be caught here.
  */
 export const validateBookingHold = onDocumentCreated(
   { document: 'bookings/{bookingId}', region: REGION, secrets: [STRIPE_SECRET_KEY] },
@@ -605,5 +767,203 @@ export const validateBookingHold = onDocumentCreated(
     } catch (err) {
       return voidBooking(`could not retrieve hold: ${(err as Error).message}`);
     }
+  }
+);
+
+/**
+ * Admin-only dispute resolution — the missing counterpart to createDispute.
+ * Without it a disputed booking's hold is frozen indefinitely. Resolves one of
+ * three ways and unfreezes the payment:
+ *   • release_detailer — capture + 90% transfer (the detailer keeps the job).
+ *   • refund_client    — cancel the uncaptured hold, or refund a captured charge.
+ *   • partial_refund   — capture, refund `clientRefundCents` to the client, and
+ *                        transfer the detailer 90% of the retained remainder.
+ *
+ * ⚠️ TEST MODE: this moves real money. Verify every branch in Stripe test mode
+ * (uncaptured vs. captured holds, full/partial refunds) before live enablement,
+ * and have finance sign off on the partial-refund math.
+ */
+export const resolveDispute = onCall(
+  { region: REGION, secrets: [STRIPE_SECRET_KEY] },
+  async (request) => {
+    requireAdmin(request.auth);
+    const disputeId = String(request.data?.disputeId ?? '').trim();
+    const resolution = String(request.data?.resolution ?? '');
+    const note = String(request.data?.note ?? '').trim().slice(0, 1_000);
+    if (!disputeId) throw new HttpsError('invalid-argument', 'disputeId is required.');
+    if (!['release_detailer', 'refund_client', 'partial_refund'].includes(resolution)) {
+      throw new HttpsError('invalid-argument', 'Invalid resolution.');
+    }
+    const clientRefundCents = resolution === 'partial_refund'
+      ? Math.round(Number(request.data?.clientRefundCents ?? 0))
+      : 0;
+
+    // dispute id == booking id == invoice id (all keyed by the booking).
+    const bookingRef = db.collection('bookings').doc(disputeId);
+    const invoiceRef = db.collection('invoices').doc(disputeId);
+    const disputeRef = db.collection('disputes').doc(disputeId);
+
+    // Atomically claim the resolution so it can't race the release scheduler or a
+    // second admin action.
+    const claim = await db.runTransaction(async (tx) => {
+      const [bSnap, dSnap] = await Promise.all([tx.get(bookingRef), tx.get(disputeRef)]);
+      if (!bSnap.exists || !dSnap.exists) throw new HttpsError('not-found', 'Dispute not found.');
+      const b = bSnap.data()!;
+      if (dSnap.data()!.status !== 'open') throw new HttpsError('failed-precondition', 'Dispute is not open.');
+      if (b.captureState === 'processing') {
+        throw new HttpsError('failed-precondition', 'A capture is already in progress.');
+      }
+      const paymentIntentId = b.paymentIntentId as string | undefined;
+      if (!paymentIntentId) throw new HttpsError('failed-precondition', 'Booking has no payment.');
+      const priceCents = Math.round(Number(b.price ?? 0) * 100);
+      if (resolution === 'partial_refund' && !(clientRefundCents > 0 && clientRefundCents < priceCents)) {
+        throw new HttpsError('invalid-argument', 'Partial refund must be between 0 and the full price.');
+      }
+      tx.update(bookingRef, { captureState: 'processing', captureStartedAt: FieldValue.serverTimestamp() });
+      tx.update(disputeRef, { status: 'resolving' });
+      return { paymentIntentId, detailerId: String(b.detailerId ?? ''), priceCents };
+    });
+
+    const stripe = stripeClient();
+    try {
+      if (resolution === 'refund_client') {
+        const pi = await stripe.paymentIntents.retrieve(claim.paymentIntentId);
+        if (pi.status === 'requires_capture') {
+          await stripe.paymentIntents.cancel(claim.paymentIntentId);
+        } else if (pi.status === 'succeeded') {
+          await stripe.refunds.create(
+            { payment_intent: claim.paymentIntentId },
+            { idempotencyKey: `refund_${disputeId}` }
+          );
+        }
+        await bookingRef.update({
+          paymentStatus: 'refunded', captureState: 'complete', refundedAt: FieldValue.serverTimestamp(),
+        });
+        await invoiceRef.update({ status: 'refunded', resolvedAt: FieldValue.serverTimestamp() }).catch(() => {});
+      } else if (resolution === 'release_detailer') {
+        const transferId = await captureAndTransfer(stripe, disputeId, claim.paymentIntentId);
+        await bookingRef.update({
+          paymentStatus: 'captured', captureState: 'complete', capturedAt: FieldValue.serverTimestamp(),
+          ...(transferId ? { transferId } : {}),
+        });
+        await invoiceRef.update({ status: 'released', releasedAt: FieldValue.serverTimestamp() }).catch(() => {});
+        await accrueRevvCare(disputeId, claim.priceCents);
+      } else {
+        // partial_refund: capture the full hold, refund the client's portion, and
+        // transfer the detailer 90% of the retained remainder (platform keeps 10%).
+        let pi = await stripe.paymentIntents.retrieve(claim.paymentIntentId, { expand: ['latest_charge'] });
+        if (pi.status === 'requires_capture') {
+          pi = await stripe.paymentIntents.capture(claim.paymentIntentId, { expand: ['latest_charge'] });
+        }
+        if (pi.status !== 'succeeded') throw new Error(`Unexpected PaymentIntent status: ${pi.status}`);
+        await stripe.refunds.create(
+          { payment_intent: claim.paymentIntentId, amount: clientRefundCents },
+          { idempotencyKey: `prefund_${disputeId}` }
+        );
+        const retained = claim.priceCents - clientRefundCents;
+        const detailerAmount = retained - Math.round(retained * PLATFORM_FEE_RATE);
+        const charge = pi.latest_charge;
+        const chargeId = typeof charge === 'string' ? charge : charge?.id;
+        const detailerAccountId = String(
+          (await db.collection('detailers').doc(claim.detailerId).get()).data()?.stripeAccountId ?? ''
+        );
+        if (chargeId && detailerAccountId && detailerAmount > 0 && pi.metadata?.fundsFlow === 'separate') {
+          await stripe.transfers.create({
+            amount: detailerAmount, currency: pi.currency, destination: detailerAccountId,
+            source_transaction: chargeId, transfer_group: pi.transfer_group ?? undefined,
+            metadata: { bookingId: disputeId, partialResolution: 'true' },
+          }, { idempotencyKey: `ptransfer_${disputeId}` });
+        }
+        await bookingRef.update({
+          paymentStatus: 'captured', captureState: 'complete', capturedAt: FieldValue.serverTimestamp(),
+          partialRefundCents: clientRefundCents,
+        });
+        await invoiceRef.update({ status: 'resolved_partial', resolvedAt: FieldValue.serverTimestamp() }).catch(() => {});
+        await accrueRevvCare(disputeId, retained);
+      }
+
+      await disputeRef.update({
+        status: 'resolved', resolution, resolutionNote: note || null,
+        resolvedAt: FieldValue.serverTimestamp(),
+      });
+      return { ok: true };
+    } catch (err) {
+      // Reopen the dispute for retry; the payment is untouched unless a Stripe
+      // call already succeeded (all are idempotent, so a retry is safe).
+      await bookingRef.update({ captureState: 'failed', captureErrorAt: FieldValue.serverTimestamp() }).catch(() => {});
+      await disputeRef.update({ status: 'open' }).catch(() => {});
+      logger.error(`resolveDispute failed for ${disputeId}`, err as Error);
+      throw new HttpsError('internal', 'Could not resolve the dispute; it was left open for retry.');
+    }
+  }
+);
+
+/**
+ * Detailer subscription billing (⚠️ TEST MODE) — the $34.99/mo plan that gates
+ * marketplace visibility. Creates the detailer's Stripe customer and starts a
+ * subscription on STRIPE_SUBSCRIPTION_PRICE_ID with a trial (60 days for Founding
+ * Pro, else 14), using a SetupIntent so the app can collect the card that auto-
+ * charges at trial end. Subscription STATE is owned by the webhook
+ * (customer.subscription.*), which sets users.subscriptionStatus and
+ * detailers.isActive — never trusted from the client.
+ *
+ * Verify the trial → active → past_due → canceled lifecycle in Stripe test mode
+ * before live enablement. Requires STRIPE_SUBSCRIPTION_PRICE_ID to be set.
+ */
+export const createSubscription = onCall(
+  { region: REGION, secrets: [STRIPE_SECRET_KEY] },
+  async (request) => {
+    const uid = request.auth?.uid;
+    if (!uid) throw new HttpsError('unauthenticated', 'Sign in required.');
+    const userSnap = await db.collection('users').doc(uid).get();
+    if (userSnap.data()?.userType !== 'detailer') {
+      throw new HttpsError('permission-denied', 'Detailer access required.');
+    }
+    await enforceRateLimit(uid, 'subscription', 5, 60 * 60 * 1_000);
+
+    const priceId = STRIPE_SUBSCRIPTION_PRICE_ID.value();
+    if (!priceId) throw new HttpsError('failed-precondition', 'Subscription plan is not configured.');
+
+    const stripe = stripeClient();
+    const detailerRef = db.collection('detailers').doc(uid);
+    const detailer = (await detailerRef.get()).data() ?? {};
+    let customerId = detailer.stripeCustomerId as string | undefined;
+    if (!customerId) {
+      const customer = await stripe.customers.create({
+        email: (request.auth?.token.email as string | undefined) ?? undefined,
+        name: (detailer.businessName as string | undefined)
+          ?? (detailer.fullName as string | undefined)
+          ?? undefined,
+        metadata: { uid, role: 'detailer' },
+      });
+      customerId = customer.id;
+      await detailerRef.set({ stripeCustomerId: customerId }, { merge: true });
+    }
+
+    const trialDays = userSnap.data()?.isFoundingPro === true ? 60 : 14;
+    const subscription = await stripe.subscriptions.create({
+      customer: customerId,
+      items: [{ price: priceId }],
+      trial_period_days: trialDays,
+      payment_behavior: 'default_incomplete',
+      payment_settings: { save_default_payment_method: 'on_subscription' },
+      trial_settings: { end_behavior: { missing_payment_method: 'cancel' } },
+      metadata: { uid },
+      expand: ['pending_setup_intent'],
+    });
+
+    const setupIntent = subscription.pending_setup_intent as Stripe.SetupIntent | null;
+    const ephemeralKey = await stripe.ephemeralKeys.create(
+      { customer: customerId },
+      { apiVersion: EPHEMERAL_KEY_API_VERSION }
+    );
+
+    return {
+      subscriptionId: subscription.id,
+      customerId,
+      ephemeralKeySecret: ephemeralKey.secret,
+      setupIntentClientSecret: setupIntent?.client_secret ?? null,
+      trialDays,
+    };
   }
 );

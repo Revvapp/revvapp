@@ -39,7 +39,12 @@ service cloud.firestore {
     }
 
     match /detailers/{uid} {
-      allow read: if true;
+      // Marketplace profiles are readable by any signed-in user (clients browse
+      // and book detailers), but NOT by anonymous callers. A detailer doc carries
+      // phone number and precise lat/lng; `if true` exposed that to unauthenticated
+      // scraping. Every legitimate reader (find screen, profile screen) is already
+      // signed in, so this is transparent to the app.
+      allow read: if signedIn();
 
       // A detailer manages their own public profile, but must never forge trust
       // signals. rating/reviewCount/ratingSum are owned by the
@@ -59,6 +64,10 @@ service cloud.firestore {
         && request.resource.data.get('payoutsEnabled', false) == false
         && request.resource.data.get('stripeAccountId', '') == ''
         && request.resource.data.get('stripeAccountVersion', '') == ''
+        // The Stripe *customer* id (subscription billing) is server-owned too: a
+        // detailer who could set it to a known active customer's id would have the
+        // subscription webhook flip their isActive on for free.
+        && request.resource.data.get('stripeCustomerId', '') == ''
         && request.resource.data.get('isActive', false) == false;
 
       // Updates may not change any protected trust field — each must carry
@@ -74,6 +83,7 @@ service cloud.firestore {
         && request.resource.data.get('ratingSum', 0) == resource.data.get('ratingSum', 0)
         && request.resource.data.get('stripeAccountId', '') == resource.data.get('stripeAccountId', '')
         && request.resource.data.get('stripeAccountVersion', '') == resource.data.get('stripeAccountVersion', '')
+        && request.resource.data.get('stripeCustomerId', '') == resource.data.get('stripeCustomerId', '')
         && request.resource.data.get('payoutsEnabled', false) == resource.data.get('payoutsEnabled', false)
         && request.resource.data.get('isActive', false) == resource.data.get('isActive', false);
 
@@ -135,6 +145,12 @@ service cloud.firestore {
         && request.resource.data.bookingId is string
         && get(/databases/$(database)/documents/bookings/$(request.resource.data.bookingId)).data.clientId == request.auth.uid
         && get(/databases/$(database)/documents/bookings/$(request.resource.data.bookingId)).data.status == 'completed'
+        // A "verified" review must be backed by a real, released transaction —
+        // not merely a job the detailer marked complete. Payment releases (hold
+        // captured + transfer) flip the booking's paymentStatus to 'captured'
+        // after the 24h dispute window, so gating on it enforces the documented
+        // rule "reviews only unlock after payment releases" at the database level.
+        && get(/databases/$(database)/documents/bookings/$(request.resource.data.bookingId)).data.get('paymentStatus', '') == 'captured'
         // The review must target the SAME detailer as the booking, and the score
         // must be a real 1–5. Without this a client could set detailerId to any
         // (publicly listed) detailer and rating to any magnitude, poisoning that
@@ -176,6 +192,17 @@ service cloud.firestore {
             || get(/databases/$(database)/documents/bookings/$(request.resource.data.bookingId)).data.detailerId == request.auth.uid);
       // Immutable — reports are handled by the team off-platform.
       allow update, delete: if false;
+    }
+
+    match /careClaims/{claimId} {
+      // A Revv Care damage claim is confidential to the filing client and the
+      // REVV team — the reported detailer must never see it. Claims are created
+      // and decided only through server workflows (createCareClaim /
+      // resolveCareClaim), which enforce the 72-hour window, party, and cap; the
+      // Revv Care reserve ledger (revvCareLedger / revvCareFund) is server-only
+      // and unlisted here, so it is default-denied to every client.
+      allow read: if signedIn() && resource.data.clientId == request.auth.uid;
+      allow create, update, delete: if false;
     }
 
     match /emailLookup/{emailId} {

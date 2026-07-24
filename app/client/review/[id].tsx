@@ -53,6 +53,14 @@ export default function ClientReviewScreen() {
         setGateLoading(false);
         return;
       }
+      // A verified review requires the payment to have actually released (hold
+      // captured after the 24h dispute window). Firestore rules enforce this;
+      // gating here gives a clear message instead of a generic write failure.
+      if (snap.data().paymentStatus !== 'captured') {
+        setGateError('You can leave a review once payment is released — about 24 hours after the job is completed.');
+        setGateLoading(false);
+        return;
+      }
       const existing = await getDocs(query(collection(db, 'reviews'), where('bookingId', '==', id)));
       if (!cancelled) {
         if (existing.size > 0) setGateError('You have already reviewed this booking.');

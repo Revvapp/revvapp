@@ -108,3 +108,33 @@ export async function deleteMyAccount(): Promise<void> {
   const call = httpsCallable<void, { ok: boolean }>(functions, 'deleteMyAccount');
   await call();
 }
+
+type SubscriptionSetup = {
+  subscriptionId: string;
+  customerId: string;
+  ephemeralKeySecret: string;
+  setupIntentClientSecret: string | null;
+  trialDays: number;
+};
+
+/**
+ * Start the detailer's $34.99/mo subscription (with a 14- or 60-day trial). The
+ * returned SetupIntent lets PaymentSheet collect the card that auto-charges at
+ * trial end; subscription status/marketplace visibility is set server-side by the
+ * Stripe webhook, never by the app.
+ */
+export async function createSubscription(): Promise<SubscriptionSetup> {
+  const call = httpsCallable<void, SubscriptionSetup>(functions, 'createSubscription');
+  return (await call()).data;
+}
+
+/** File a Revv Care damage-protection claim (allowed within 72h of completion). */
+export async function createCareClaim(input: {
+  bookingId: string;
+  description: string;
+  photoUrls: string[];
+  amountRequestedCents: number;
+}): Promise<{ claimId: string }> {
+  const call = httpsCallable<typeof input, { claimId: string }>(functions, 'createCareClaim');
+  return (await call(input)).data;
+}

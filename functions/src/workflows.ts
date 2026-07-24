@@ -238,8 +238,14 @@ export const createDispute = onCall({ region: REGION }, async (request) => {
     const booking = bookingSnap.data() as Booking;
     assertRole(booking, uid, 'client');
     assertStatus(booking, ['completed']);
+    // Anchor the window to the same server-owned field the release scheduler
+    // uses (releaseEligibleAt), falling back to completedAt+24h for legacy docs,
+    // so "dispute still open" and "auto-release eligible" can never disagree.
+    const releaseEligibleAt = booking.releaseEligibleAt as Timestamp | undefined;
     const completedAt = booking.completedAt as Timestamp | undefined;
-    if (!completedAt || Date.now() > completedAt.toMillis() + 24 * 60 * 60 * 1_000) {
+    const windowClosesAt = releaseEligibleAt?.toMillis()
+      ?? (completedAt ? completedAt.toMillis() + 24 * 60 * 60 * 1_000 : undefined);
+    if (!windowClosesAt || Date.now() > windowClosesAt) {
       throw new HttpsError('failed-precondition', 'The dispute window has closed.');
     }
     if (booking.paymentStatus === 'captured') {
@@ -323,5 +329,155 @@ export const deleteMyAccount = onCall({ region: REGION }, async (request) => {
     getStorage().bucket().deleteFiles({ prefix: `detailers/${uid}/` }),
   ]);
   await getAuth().deleteUser(uid);
+  return { ok: true };
+});
+
+/**
+ * Requires an authenticated caller carrying the `admin` custom claim. Admin-only
+ * operations (dispute resolution, detailer verification, Founding Pro grants, Care
+ * claim decisions) gate on this. Set the claim out-of-band with the Admin SDK:
+ * `getAuth().setCustomUserClaims(uid, { admin: true })`.
+ */
+export function requireAdmin(auth: { uid: string; token: Record<string, unknown> } | undefined): string {
+  const uid = requireUid(auth);
+  if (auth?.token?.admin !== true) {
+    throw new HttpsError('permission-denied', 'Admin access required.');
+  }
+  return uid;
+}
+
+/**
+ * Admin-only manual identity verification — the interim standing in for the
+ * Checkr background-check integration. Sets the server-owned `idVerified` flag
+ * that Firestore rules forbid a detailer from granting themselves. Replace the
+ * call site with the Checkr webhook once that integration exists.
+ */
+export const setDetailerVerified = onCall({ region: REGION }, async (request) => {
+  requireAdmin(request.auth);
+  const detailerId = text(request.data?.detailerId, 'detailerId', 200);
+  const verified = request.data?.verified === true;
+  const ref = db.collection('detailers').doc(detailerId);
+  if (!(await ref.get()).exists) throw new HttpsError('not-found', 'Detailer not found.');
+  await ref.update({
+    idVerified: verified,
+    idVerifiedAt: verified ? FieldValue.serverTimestamp() : null,
+  });
+  return { ok: true };
+});
+
+const FOUNDING_PRO_LIMIT = 25;
+const FOUNDING_PRO_TRIAL_DAYS = 60;
+
+/**
+ * Admin-only: grants Founding Pro status to one of the first 25 detailers — a
+ * 60-day trial with no card and a permanent badge. A transactional counter caps
+ * the program. isFoundingPro/trial fields are server-owned (rules lock them), so
+ * this is the only legitimate writer.
+ */
+export const grantFoundingPro = onCall({ region: REGION }, async (request) => {
+  requireAdmin(request.auth);
+  const detailerId = text(request.data?.detailerId, 'detailerId', 200);
+  const userRef = db.collection('users').doc(detailerId);
+  const counterRef = db.collection('programCounters').doc('foundingPro');
+  await db.runTransaction(async (tx) => {
+    const [userSnap, counterSnap] = await Promise.all([tx.get(userRef), tx.get(counterRef)]);
+    if (!userSnap.exists || userSnap.data()?.userType !== 'detailer') {
+      throw new HttpsError('not-found', 'Detailer account not found.');
+    }
+    if (userSnap.data()?.isFoundingPro === true) return; // idempotent
+    const granted = Number(counterSnap.data()?.count ?? 0);
+    if (granted >= FOUNDING_PRO_LIMIT) {
+      throw new HttpsError('resource-exhausted', 'All Founding Pro slots have been claimed.');
+    }
+    tx.set(counterRef, { count: granted + 1, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+    tx.set(userRef, {
+      isFoundingPro: true,
+      trialDays: FOUNDING_PRO_TRIAL_DAYS,
+      trialStartDate: FieldValue.serverTimestamp(),
+    }, { merge: true });
+  });
+  return { ok: true };
+});
+
+const CARE_CLAIM_WINDOW_MS = 72 * 60 * 60 * 1_000;
+const CARE_CLAIM_CAP_CENTS = 250_000; // $2,500 coverage cap per booking.
+
+/**
+ * A client files a Revv Care damage-protection claim. Allowed only within 72h of
+ * job completion (a documented business rule) and one per booking — the doc id is
+ * the booking id. Created server-side so the window, party, and cap are
+ * authoritative. Disbursement of an approved claim is handled off-platform.
+ */
+export const createCareClaim = onCall({ region: REGION }, async (request) => {
+  const uid = requireUid(request.auth);
+  const bookingId = text(request.data?.bookingId, 'bookingId', 200);
+  const description = text(request.data?.description, 'description', MAX_TEXT);
+  if (description.length < 20) {
+    throw new HttpsError('invalid-argument', 'Please describe the damage in more detail.');
+  }
+  const photoUrls = stringArray(request.data?.photoUrls, 'photoUrls', 8);
+  if (photoUrls.length < 1) throw new HttpsError('invalid-argument', 'Photo evidence is required.');
+  const amountRequestedCents = Math.round(Number(request.data?.amountRequestedCents ?? 0));
+  if (!(amountRequestedCents > 0 && amountRequestedCents <= CARE_CLAIM_CAP_CENTS)) {
+    throw new HttpsError('invalid-argument', 'Requested amount must be within the $2,500 coverage cap.');
+  }
+
+  const bookingRef = db.collection('bookings').doc(bookingId);
+  const claimRef = db.collection('careClaims').doc(bookingId);
+  await db.runTransaction(async (tx) => {
+    const [bookingSnap, claimSnap] = await Promise.all([tx.get(bookingRef), tx.get(claimRef)]);
+    if (!bookingSnap.exists) throw new HttpsError('not-found', 'Booking not found.');
+    const booking = bookingSnap.data() as Booking;
+    assertRole(booking, uid, 'client');
+    assertStatus(booking, ['completed']);
+    const completedAt = booking.completedAt as Timestamp | undefined;
+    if (!completedAt || Date.now() > completedAt.toMillis() + CARE_CLAIM_WINDOW_MS) {
+      throw new HttpsError('failed-precondition', 'Revv Care claims must be filed within 72 hours of completion.');
+    }
+    if (claimSnap.exists) throw new HttpsError('already-exists', 'A claim already exists for this booking.');
+    tx.create(claimRef, {
+      bookingId,
+      clientId: booking.clientId,
+      detailerId: booking.detailerId,
+      description,
+      photoUrls,
+      amountRequestedCents,
+      status: 'open',
+      createdAt: FieldValue.serverTimestamp(),
+    });
+  });
+  return { claimId: bookingId };
+});
+
+/**
+ * Admin-only Revv Care claim decision. Records the outcome and approved amount
+ * (capped at $2,500) as the audited decision record. Payout to the client is made
+ * off-platform from the platform reserve — Revv Care is not a Connect transfer —
+ * so this moves no money.
+ */
+export const resolveCareClaim = onCall({ region: REGION }, async (request) => {
+  requireAdmin(request.auth);
+  const claimId = text(request.data?.claimId, 'claimId', 200);
+  const decision = text(request.data?.decision, 'decision', 20);
+  if (decision !== 'approved' && decision !== 'denied') {
+    throw new HttpsError('invalid-argument', 'Decision must be approved or denied.');
+  }
+  const note = optionalText(request.data?.note, MAX_TEXT);
+  const approvedCents = decision === 'approved' ? Math.round(Number(request.data?.approvedCents ?? 0)) : 0;
+  if (decision === 'approved' && !(approvedCents > 0 && approvedCents <= CARE_CLAIM_CAP_CENTS)) {
+    throw new HttpsError('invalid-argument', 'Approved amount must be within the $2,500 cap.');
+  }
+  const ref = db.collection('careClaims').doc(claimId);
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) throw new HttpsError('not-found', 'Claim not found.');
+    if (snap.data()?.status !== 'open') throw new HttpsError('failed-precondition', 'Claim is already resolved.');
+    tx.update(ref, {
+      status: decision,
+      approvedCents,
+      resolutionNote: note,
+      resolvedAt: FieldValue.serverTimestamp(),
+    });
+  });
   return { ok: true };
 });

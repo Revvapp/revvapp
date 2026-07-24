@@ -11,6 +11,7 @@ import { AuthProvider } from '@/context/AuthContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/hooks/useAuth';
 import { useNotificationRouting } from '@/hooks/useNotificationRouting';
+import { setupAppCheck } from '@/lib/appCheck';
 
 const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN;
 if (SENTRY_DSN) {
@@ -20,6 +21,10 @@ if (SENTRY_DSN) {
     enableAutoSessionTracking: true,
   });
 }
+
+// Attach App Check tokens as early as possible, before the first Firestore read.
+// Guarded + inert until App Check is activated (see docs/APP_CHECK.md); no-op on web.
+void setupAppCheck();
 
 function RootNavigator() {
   const colorScheme = useColorScheme();
