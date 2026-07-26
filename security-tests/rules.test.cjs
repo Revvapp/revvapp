@@ -179,6 +179,41 @@ test('care claims are private to the filing client and never client-writable', a
   await assertFails(getDoc(doc(clientDb, 'revvCareLedger/booking-1')));
 });
 
+test('the admin claim widens reads for the review console but never grants writes', async () => {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'careClaims/booking-1'), {
+      bookingId: 'booking-1', clientId: 'client', detailerId: 'detailer',
+      status: 'open', description: 'scratch on the driver door', amountRequestedCents: 15000,
+    });
+  });
+  // An admin is a third party to this booking — reads work only via the claim.
+  const adminDb = env.authenticatedContext('staff', { email: 'staff@revvapp.net', admin: true }).firestore();
+  await assertSucceeds(getDoc(doc(adminDb, 'disputes/booking-1')));
+  await assertSucceeds(getDoc(doc(adminDb, 'careClaims/booking-1')));
+  await assertSucceeds(getDoc(doc(adminDb, 'invoices/booking-1')));
+
+  // Reads only. Every admin action is a callable that re-checks the claim
+  // server-side, so the console can never write directly.
+  await assertFails(updateDoc(doc(adminDb, 'disputes/booking-1'), { status: 'resolved' }));
+  await assertFails(updateDoc(doc(adminDb, 'careClaims/booking-1'), { status: 'approved' }));
+  await assertFails(updateDoc(doc(adminDb, 'invoices/booking-1'), { status: 'released' }));
+  await assertFails(updateDoc(doc(adminDb, 'detailers/detailer'), { idVerified: true }));
+  // Bookings were deliberately not widened — the invoice carries what's needed.
+  await assertFails(getDoc(doc(adminDb, 'bookings/booking-1')));
+
+  // A signed-in non-admin third party still sees nothing.
+  const strangerDb = env.authenticatedContext('stranger', { email: 'stranger@example.com' }).firestore();
+  await assertFails(getDoc(doc(strangerDb, 'disputes/booking-1')));
+  await assertFails(getDoc(doc(strangerDb, 'careClaims/booking-1')));
+  await assertFails(getDoc(doc(strangerDb, 'invoices/booking-1')));
+
+  // A forged claim is only trusted from the token, which clients cannot mint —
+  // an unauthenticated caller gets nothing either.
+  const guestDb = env.unauthenticatedContext().firestore();
+  await assertFails(getDoc(doc(guestDb, 'disputes/booking-1')));
+  await assertFails(getDoc(doc(guestDb, 'careClaims/booking-1')));
+});
+
 test('a detailer cannot self-assign a Stripe customer id to forge subscription state', async () => {
   const detailerDb = env.authenticatedContext('detailer', { email: 'detailer@example.com' }).firestore();
   // Base profile is fine.

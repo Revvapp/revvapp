@@ -138,3 +138,50 @@ export async function createCareClaim(input: {
   const call = httpsCallable<typeof input, { claimId: string }>(functions, 'createCareClaim');
   return (await call(input)).data;
 }
+
+// ── Admin-only callables ──────────────────────────────────────────────────────
+// Every one of these is gated server-side on the `admin` custom claim; the app
+// only hides the UI. Nothing here is trusted from the client.
+
+export type DisputeResolution = 'release_detailer' | 'refund_client' | 'partial_refund';
+
+/**
+ * Resolve a dispute and move the money: release the hold to the detailer, refund
+ * the client in full, or capture and split (partial). `clientRefundCents` is
+ * required for — and only read on — `partial_refund`.
+ */
+export async function resolveDispute(input: {
+  disputeId: string;
+  resolution: DisputeResolution;
+  clientRefundCents?: number;
+  note?: string;
+}): Promise<void> {
+  const call = httpsCallable<typeof input, { ok: boolean }>(functions, 'resolveDispute');
+  await call(input);
+}
+
+/** Approve (with an amount, capped at $2,500) or deny a Revv Care claim. */
+export async function resolveCareClaim(input: {
+  claimId: string;
+  decision: 'approved' | 'denied';
+  approvedCents?: number;
+  note?: string;
+}): Promise<void> {
+  const call = httpsCallable<typeof input, { ok: boolean }>(functions, 'resolveCareClaim');
+  await call(input);
+}
+
+/** Interim manual identity verification, standing in for Checkr. */
+export async function setDetailerVerified(detailerId: string, verified: boolean): Promise<void> {
+  const call = httpsCallable<{ detailerId: string; verified: boolean }, { ok: boolean }>(
+    functions,
+    'setDetailerVerified'
+  );
+  await call({ detailerId, verified });
+}
+
+/** Grant one of the 25 Founding Pro slots (60-day trial + permanent badge). */
+export async function grantFoundingPro(detailerId: string): Promise<void> {
+  const call = httpsCallable<{ detailerId: string }, { ok: boolean }>(functions, 'grantFoundingPro');
+  await call({ detailerId });
+}

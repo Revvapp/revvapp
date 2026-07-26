@@ -45,6 +45,7 @@ function RootNavigator() {
         <Stack.Screen name="signup" />
         <Stack.Screen name="detailer" />
         <Stack.Screen name="client" />
+        <Stack.Screen name="admin" />
         <Stack.Screen name="preview-splash" />
         <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
       </Stack>

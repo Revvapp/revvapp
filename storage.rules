@@ -64,5 +64,21 @@ service firebase.storage {
         && validImage(12 * 1024 * 1024);
     }
 
+    match /care-claims/{bookingId}/{uid}/{allPaths=**} {
+      // Revv Care damage evidence is confidential to the filing client and the
+      // REVV team — unlike a dispute, the detailer named in the claim must never
+      // see it (this mirrors the careClaims Firestore rule). Reviewers open the
+      // tokenized download URLs stored on the claim doc, which is why no
+      // detailer-side read is granted here.
+      allow read: if request.auth != null
+        && request.auth.uid == uid
+        && booking(bookingId).clientId == request.auth.uid;
+      allow write: if request.auth != null
+        && request.auth.uid == uid
+        && booking(bookingId).clientId == request.auth.uid
+        && booking(bookingId).status == 'completed'
+        && validImage(12 * 1024 * 1024);
+    }
+
   }
 }

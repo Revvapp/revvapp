@@ -17,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { db } from '@/firebaseConfig';
 import { useAuth } from '@/hooks/useAuth';
+import { useIsAdmin } from '@/hooks/useIsAdmin';
 import { toTitleCase } from '@/lib/format';
 import { createConnectAccount, getConnectStatus } from '@/lib/payments';
 import type { DetailerDocument } from '@/types/firestore';
@@ -81,6 +82,7 @@ type Review = { id: string; clientName: string; rating: number; body: string; se
 
 export default function DetailerProfileScreen() {
   const { user, signOut } = useAuth();
+  const { isAdmin } = useIsAdmin();
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<Partial<DetailerDocument> | null>(null);
   const [error, setError] = useState('');
@@ -252,6 +254,35 @@ export default function DetailerProfileScreen() {
           </View>
         )}
 
+        <Text style={styles.sectionLabel}>SUBSCRIPTION</Text>
+        <Pressable style={[styles.card, styles.payoutCard]} onPress={() => router.push('/detailer/subscription')}>
+          <View style={styles.payoutRow}>
+            <View
+              style={[
+                styles.infoIconWrap,
+                profile?.isActive ? { backgroundColor: 'rgba(39,174,96,0.12)' } : null,
+              ]}
+            >
+              <Ionicons
+                name={profile?.isActive ? 'checkmark-circle' : 'rocket-outline'}
+                size={16}
+                color={profile?.isActive ? C.green : C.gold}
+              />
+            </View>
+            <View style={styles.infoContent}>
+              <Text style={styles.infoValue}>
+                {profile?.isActive ? 'Revv Pro active' : 'Start your free trial'}
+              </Text>
+              <Text style={styles.payoutHint}>
+                {profile?.isActive
+                  ? 'Your profile is visible to clients.'
+                  : 'Subscribe to appear in client search and take bookings.'}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={C.gray} />
+          </View>
+        </Pressable>
+
         <Text style={styles.sectionLabel}>ACCOUNT DETAILS</Text>
         <View style={styles.card}>
           <InfoRow icon="mail-outline" label="Email" value={user?.email ?? ''} />
@@ -301,6 +332,13 @@ export default function DetailerProfileScreen() {
           <Ionicons name="pencil-outline" size={16} color={C.navy} />
           <Text style={styles.editBtnText}>Edit Profile</Text>
         </Pressable>
+
+        {isAdmin && (
+          <Pressable style={styles.editBtn} onPress={() => router.push('/admin')}>
+            <Ionicons name="shield-outline" size={16} color={C.navy} />
+            <Text style={styles.editBtnText}>Admin Console</Text>
+          </Pressable>
+        )}
 
         <Pressable style={styles.signOutBtn} onPress={onSignOut}>
           <Text style={styles.signOutText}>Sign Out</Text>

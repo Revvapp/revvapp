@@ -15,6 +15,15 @@ service cloud.firestore {
       return signedIn() && request.auth.uid == uid;
     }
 
+    // The `admin` custom claim, set out-of-band on the REVV team's own accounts
+    // and never grantable from the app. It widens READS only (the in-app review
+    // console needs to list open disputes and Revv Care claims); every admin
+    // ACTION stays a callable that re-checks the same claim server-side, so
+    // writes remain closed to everyone including admins.
+    function isAdmin() {
+      return signedIn() && request.auth.token.get('admin', false) == true;
+    }
+
     match /users/{uid} {
       allow read: if isOwner(uid);
       allow create: if isOwner(uid)
@@ -126,7 +135,10 @@ service cloud.firestore {
       allow read: if signedIn() && (
         resource == null ||
         resource.data.detailerId == request.auth.uid ||
-        resource.data.clientId == request.auth.uid
+        resource.data.clientId == request.auth.uid ||
+        // The dispute console adjudicates against the invoice (price, parties,
+        // payout split); it is keyed by bookingId, same as the dispute doc.
+        isAdmin()
       );
       allow create, update, delete: if false;
     }
@@ -166,7 +178,8 @@ service cloud.firestore {
     match /disputes/{disputeId} {
       allow read: if signedIn()
         && (resource.data.clientId == request.auth.uid
-            || resource.data.detailerId == request.auth.uid);
+            || resource.data.detailerId == request.auth.uid
+            || isAdmin());
       // Created and responded to through transactional server workflows.
       allow create, update, delete: if false;
     }
@@ -201,7 +214,7 @@ service cloud.firestore {
       // resolveCareClaim), which enforce the 72-hour window, party, and cap; the
       // Revv Care reserve ledger (revvCareLedger / revvCareFund) is server-only
       // and unlisted here, so it is default-denied to every client.
-      allow read: if signedIn() && resource.data.clientId == request.auth.uid;
+      allow read: if signedIn() && (resource.data.clientId == request.auth.uid || isAdmin());
       allow create, update, delete: if false;
     }
 

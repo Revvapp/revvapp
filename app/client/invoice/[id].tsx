@@ -54,6 +54,17 @@ function disputeWindowOpen(createdSeconds: number | null): boolean {
   return Date.now() < createdSeconds * 1000 + 24 * 60 * 60 * 1000;
 }
 
+/**
+ * Revv Care runs on a longer clock than disputes: damage often isn't noticed
+ * until after the 24-hour payment hold has already released, so a claim can be
+ * filed for 72 hours. The callable enforces the real window server-side against
+ * the booking's completedAt — this only decides whether to offer the link.
+ */
+function careWindowOpen(createdSeconds: number | null): boolean {
+  if (!createdSeconds) return true;
+  return Date.now() < createdSeconds * 1000 + 72 * 60 * 60 * 1000;
+}
+
 function windowLabel(createdSeconds: number | null): { line1: string; line2: string } {
   if (!createdSeconds) return { line1: 'Dispute window open', line2: 'Auto-closes 24 hours after job completion.' };
   const releaseMs = createdSeconds * 1000 + 24 * 60 * 60 * 1000;
@@ -132,6 +143,9 @@ export default function ClientInvoiceScreen() {
   const invoiceNum = `REV-${invoice.date.replace(/-/g, '')}-${(id ?? '').slice(-4).toUpperCase()}`;
   const createdSeconds = invoice.createdAt?.seconds ?? null;
   const disputeOpen = invoice.status === 'pending_release' && disputeWindowOpen(createdSeconds);
+  // Damage claims stay available after the payment has released, and while a
+  // dispute is being reviewed — they cover different things.
+  const careOpen = invoice.status !== 'refunded' && careWindowOpen(createdSeconds);
   const window =
     invoice.status === 'disputed'
       ? {
@@ -274,6 +288,16 @@ export default function ClientInvoiceScreen() {
           >
             <Ionicons name="flag-outline" size={16} color={C.red} />
             <Text style={styles.btnDisputeText}>Raise a Dispute</Text>
+          </Pressable>
+        )}
+
+        {careOpen && (
+          <Pressable
+            style={styles.btnCare}
+            onPress={() => router.push({ pathname: '/client/care-claim/[id]', params: { id: id! } })}
+          >
+            <Ionicons name="shield-checkmark-outline" size={16} color={C.gold} />
+            <Text style={styles.btnCareText}>Report Damage (Revv Care)</Text>
           </Pressable>
         )}
 
@@ -426,6 +450,19 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   btnDisputeText: { color: C.red, fontSize: 14, fontWeight: '700' },
+
+  btnCare: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: C.gold,
+    paddingVertical: 15,
+    marginBottom: 12,
+  },
+  btnCareText: { color: C.gold, fontSize: 14, fontWeight: '700' },
 
   btnDone: {
     backgroundColor: C.gold,

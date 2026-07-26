@@ -11,7 +11,8 @@
     "serve": "npm run build && firebase emulators:start --only functions",
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log",
-    "backfill": "ts-node scripts/backfillRatings.ts"
+    "backfill": "ts-node scripts/backfillRatings.ts",
+    "set-admin": "ts-node scripts/setAdminClaim.ts"
   },
   "dependencies": {
     "firebase-admin": "^14.2.0",

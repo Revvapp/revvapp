@@ -13,6 +13,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.revvapp.revv",
       "buildNumber": "1",
+      "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       },
@@ -22,6 +23,7 @@
     },
     "android": {
       "package": "com.revvapp.revv",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#060F1E",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
