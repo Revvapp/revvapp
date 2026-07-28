@@ -1,0 +1,46 @@
+{
+  "project_info": {
+    "project_number": "87072671490",
+    "project_id": "revv-app2026",
+    "storage_bucket": "revv-app2026.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:87072671490:android:3beced78ace37bac30e41b",
+        "android_client_info": {
+          "package_name": "com.revvapp.revv"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "87072671490-17j1i4pj75lnv6jmsmabida9m9ael8fh.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC--GA4R16OC3QWQrKeRC7sviEJZ6E2b-w"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "87072671490-17j1i4pj75lnv6jmsmabida9m9ael8fh.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "87072671490-ofga4i8vnuc5d08ignrp119e8vb9h398.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.revvapp.revv"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
