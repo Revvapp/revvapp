@@ -62,6 +62,16 @@ export function useNotificationRouting() {
         return;
       }
 
+      if (type === 'care_claim' && bookingId && !isDetailer) {
+        router.push({ pathname: '/client/care-claim/[id]', params: { id: bookingId } });
+        return;
+      }
+
+      if (type === 'subscription' && isDetailer) {
+        router.push('/detailer/subscription');
+        return;
+      }
+
       // Fallback: a booking-related notification with no specific type — land the
       // user on a sensible list rather than doing nothing.
       if (bookingId) {

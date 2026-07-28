@@ -100,6 +100,15 @@ price id is `price_1TsqgEBT8U6J4a3bFadu5wED`).
   Stripe subscription webhook (now correctly receiving its events).
 - ⬜ Checkr, Twilio (email/SMS), Shotstack/Creatomate + AI captions for Reach.
 - ⬜ **Stripe LIVE mode.** Everything is test mode today.
+- ✅ **1099 tax reporting — code already delegates correctly to Stripe.**
+  `createConnectAccount` uses Accounts v2 recipient onboarding with
+  `collection_options: { fields: 'eventually_due', future_requirements: 'include' }`,
+  which is Stripe's own hosted flow for collecting the identity/tax info (SSN or
+  EIN) 1099 reporting needs — no custom W-9 form should be built. The one
+  remaining step is a Stripe **Dashboard** setting, not code: enable 1099 tax
+  reporting for connected accounts under Connect settings → Tax forms, before
+  switching to LIVE mode. Nothing in code or CI can verify this — it has to be
+  checked by hand in the dashboard.
 
 ---
 
@@ -116,6 +125,31 @@ price id is `price_1TsqgEBT8U6J4a3bFadu5wED`).
   now exist, but it still needs console registration (App Attest / Play
   Integrity), a native rebuild, and a monitor→enforce rollout. See
   `docs/APP_CHECK.md`.
+- ✅ **CI added** (`.github/workflows/ci.yml`) — lint, typecheck and unit tests
+  on the app, a build (typecheck) on `functions`, and the Firestore/Storage
+  rules tests against the emulator, all on push/PR to `main`. Previously none
+  of this ran automatically; this session alone found two silent bugs (the
+  webhook's missing event subscriptions, a stale gitignore rule hiding the
+  Firebase config files) that only manual checking caught.
+- ✅ **Trust & safety reports now have an admin console** (`/admin/reports`) —
+  previously logged to Cloud Logging only with no way to ever clear one. New
+  `resolveReport` callable marks a report reviewed/dismissed; `reports` reads
+  widened for `isAdmin()` the same way disputes/claims were.
+- ✅ **Notification gaps closed**: dispute resolution now sends the actual
+  outcome (release/refund/partial) to *both* parties — previously the message
+  was hardcoded to "payment released" regardless of outcome, and the detailer
+  was never notified of a resolution at all. Revv Care claim decisions now
+  notify the filing client (there was no trigger previously — a client had no
+  way to learn a claim's outcome short of emailing support), and the
+  `care-claim/[id]` screen now shows status/outcome if a claim already exists
+  instead of only ever being a filing form. Subscription `past_due`/`canceled`
+  transitions now notify the detailer (previously silent — a detailer could
+  lose marketplace visibility with no idea why).
+- ✅ **Rate limiting extended** to `createDispute` and `createCareClaim` (5 per
+  24h per user) — previously only Connect onboarding, booking payment intents,
+  and subscription creation were limited.
+- ✅ **In-app Help & Support screen** (`/help`) — FAQ + support email, linked
+  from both profile screens.
 
 ---
 
@@ -128,5 +162,7 @@ price id is `price_1TsqgEBT8U6J4a3bFadu5wED`).
    fix.
 4. App Store Connect: record, App Privacy, screenshots, ToS legal review +
    hosting, Sentry DSN.
-5. Checkr, Twilio, Reach AI captions, Stripe LIVE mode — the remaining
+5. Enable 1099 tax reporting for connected accounts in the Stripe Dashboard
+   (Connect settings → Tax forms) before LIVE mode.
+6. Checkr, Twilio, Reach AI captions, Stripe LIVE mode — the remaining
    externally-blocked or intentionally-deferred items.

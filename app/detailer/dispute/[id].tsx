@@ -51,9 +51,17 @@ type DisputeData = {
   description: string;
   photoUrls: string[];
   status: string;
+  resolution: string;
+  resolutionNote: string;
   clientId: string;
   detailerResponse: string;
   createdAt: { seconds: number } | null;
+};
+
+const RESOLUTION_COPY: Record<string, string> = {
+  release_detailer: 'This dispute was resolved in your favor — payment has been released to you.',
+  refund_client: "This dispute was resolved in the client's favor. The charge was refunded and no payout was made.",
+  partial_refund: 'This dispute was resolved with a partial refund to the client. You received your share of the remaining amount.',
 };
 
 export default function DetailerDisputeScreen() {
@@ -75,6 +83,8 @@ export default function DetailerDisputeScreen() {
           description: String(d.data().description ?? ''),
           photoUrls:   Array.isArray(d.data().photoUrls) ? d.data().photoUrls : [],
           status:      String(d.data().status ?? 'open'),
+          resolution:  String(d.data().resolution ?? ''),
+          resolutionNote: String(d.data().resolutionNote ?? ''),
           clientId:    String(d.data().clientId ?? ''),
           detailerResponse: String(d.data().detailerResponse ?? ''),
           createdAt:   d.data().createdAt ?? null,
@@ -224,8 +234,15 @@ export default function DetailerDisputeScreen() {
             <View style={styles.noteCard}>
               <Ionicons name="checkmark-circle-outline" size={16} color={C.green} />
               <Text style={styles.noteText}>
-                This dispute has been resolved and the payment released.
+                {RESOLUTION_COPY[dispute.resolution] ?? 'This dispute has been resolved.'}
               </Text>
+            </View>
+          )}
+
+          {isResolved && !!dispute.resolutionNote && (
+            <View style={styles.noteCard}>
+              <Ionicons name="chatbox-ellipses-outline" size={16} color={C.muted} />
+              <Text style={styles.noteText}>{dispute.resolutionNote}</Text>
             </View>
           )}
 

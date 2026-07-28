@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  app:
+    name: App — lint, typecheck, unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      # tsconfig.json includes expo-env.d.ts and .expo/types/**/*.ts, both
+      # generated (and gitignored) rather than committed. Metro only writes
+      # them once its dev server is actually running, so a one-shot command
+      # like `expo export` does not produce them — start the dev server just
+      # long enough for it to generate the files, then stop it.
+      - name: Generate Expo Router types
+        run: |
+          npx expo start --port 8081 --offline &
+          SERVER_PID=$!
+          for i in $(seq 1 40); do
+            if [ -f .expo/types/router.d.ts ] && [ -f expo-env.d.ts ]; then
+              break
+            fi
+            sleep 2
+          done
+          kill "$SERVER_PID" 2>/dev/null || true
+          test -f .expo/types/router.d.ts
+          test -f expo-env.d.ts
+
+      - run: npm run lint
+      - run: npx tsc --noEmit
+      - run: npm test
+
+  functions:
+    name: Functions — build (typecheck)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+      - run: npm ci
+        working-directory: functions
+      - run: npm run build
+        working-directory: functions
+
+  rules:
+    name: Firestore/Storage rules tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - run: npm ci
+      - run: npm run test:security

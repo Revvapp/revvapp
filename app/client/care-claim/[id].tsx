@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { getDownloadURL, ref as storageRef, uploadBytes } from 'firebase/storage';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -18,7 +19,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { storage } from '@/firebaseConfig';
+import { db, storage } from '@/firebaseConfig';
 import { useAuth } from '@/hooks/useAuth';
 import { createCareClaim } from '@/lib/payments';
 
@@ -61,6 +62,19 @@ function toCents(amount: string): number {
   return Number.isFinite(n) ? Math.round(n * 100) : 0;
 }
 
+type ExistingClaim = {
+  status: string;
+  amountRequestedCents: number;
+  approvedCents: number | null;
+  resolutionNote: string | null;
+};
+
+const STATUS_COPY: Record<string, { icon: keyof typeof Ionicons.glyphMap; color: string; title: string }> = {
+  open:     { icon: 'time-outline',          color: '#C9A227', title: 'Under Review' },
+  approved: { icon: 'checkmark-circle',      color: '#27AE60', title: 'Approved' },
+  denied:   { icon: 'close-circle-outline',  color: '#D93025', title: 'Not Approved' },
+};
+
 export default function CareClaimScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user } = useAuth();
@@ -70,6 +84,35 @@ export default function CareClaimScreen() {
   const [photos, setPhotos]           = useState<string[]>([]);
   const [uploading, setUploading]     = useState(false);
   const [submitting, setSubmitting]   = useState(false);
+
+  const [checkingExisting, setCheckingExisting] = useState(true);
+  const [existingClaim, setExistingClaim]       = useState<ExistingClaim | null>(null);
+
+  // A claim's doc id is its bookingId (one claim per booking), so this screen
+  // doubles as both the filing form and the status view — check first whether
+  // one already exists rather than only ever offering to file a new one.
+  useEffect(() => {
+    if (!id) return;
+    const unsub = onSnapshot(
+      doc(db, 'careClaims', id),
+      (snap) => {
+        const d = snap.data();
+        setExistingClaim(
+          d
+            ? {
+                status: String(d.status ?? 'open'),
+                amountRequestedCents: Number(d.amountRequestedCents ?? 0),
+                approvedCents: d.approvedCents != null ? Number(d.approvedCents) : null,
+                resolutionNote: d.resolutionNote ? String(d.resolutionNote) : null,
+              }
+            : null
+        );
+        setCheckingExisting(false);
+      },
+      () => setCheckingExisting(false)
+    );
+    return () => unsub();
+  }, [id]);
 
   async function takePhoto() {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
@@ -137,11 +180,59 @@ export default function CareClaimScreen() {
           </Pressable>
           <View style={styles.headerCenter}>
             <Text style={styles.eyebrow}>REVV CARE</Text>
-            <Text style={styles.headerTitle}>File a Damage Claim</Text>
+            <Text style={styles.headerTitle}>
+              {existingClaim ? 'Claim Status' : 'File a Damage Claim'}
+            </Text>
           </View>
           <View style={{ width: 30 }} />
         </View>
 
+        {checkingExisting ? (
+          <View style={styles.centerBody}>
+            <ActivityIndicator color={C.gold} />
+          </View>
+        ) : existingClaim ? (
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {(() => {
+              const copy = STATUS_COPY[existingClaim.status] ?? STATUS_COPY.open;
+              return (
+                <View style={[styles.statusCard, { borderColor: `${copy.color}40` }]}>
+                  <Ionicons name={copy.icon} size={32} color={copy.color} />
+                  <Text style={[styles.statusTitle, { color: copy.color }]}>{copy.title}</Text>
+                  <Text style={styles.statusAmount}>
+                    ${(existingClaim.amountRequestedCents / 100).toFixed(2)} requested
+                  </Text>
+                  {existingClaim.status === 'approved' && existingClaim.approvedCents != null && (
+                    <Text style={styles.statusApproved}>
+                      ${(existingClaim.approvedCents / 100).toFixed(2)} approved
+                    </Text>
+                  )}
+                  {!!existingClaim.resolutionNote && (
+                    <View style={styles.statusNoteBox}>
+                      <Text style={styles.statusNoteLabel}>Note from our team</Text>
+                      <Text style={styles.statusNoteText}>{existingClaim.resolutionNote}</Text>
+                    </View>
+                  )}
+                  {existingClaim.status === 'open' && (
+                    <Text style={styles.statusHint}>
+                      We review Revv Care claims within 3 business days. You&apos;ll be notified the
+                      moment there&apos;s a decision.
+                    </Text>
+                  )}
+                </View>
+              );
+            })()}
+
+            <Pressable style={styles.cancelLink} onPress={() => router.back()}>
+              <Text style={styles.cancelLinkText}>Back</Text>
+            </Pressable>
+            <View style={{ height: 40 }} />
+          </ScrollView>
+        ) : (
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
@@ -250,13 +341,38 @@ export default function CareClaimScreen() {
 
           <View style={{ height: 40 }} />
         </ScrollView>
+        )}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: C.bg },
+  safe:       { flex: 1, backgroundColor: C.bg },
+  centerBody: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: C.surface, borderTopLeftRadius: 28, borderTopRightRadius: 28 },
+
+  statusCard: {
+    alignItems: 'center',
+    backgroundColor: C.card,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    padding: 28,
+    gap: 6,
+    marginTop: 8,
+  },
+  statusTitle:    { fontSize: 20, fontWeight: '900', marginTop: 6 },
+  statusAmount:   { color: C.muted, fontSize: 14, fontWeight: '600' },
+  statusApproved: { color: '#27AE60', fontSize: 16, fontWeight: '800', marginTop: 2 },
+  statusHint:     { color: C.muted, fontSize: 12.5, lineHeight: 18, textAlign: 'center', marginTop: 10 },
+  statusNoteBox: {
+    backgroundColor: C.surface,
+    borderRadius: 12,
+    padding: 14,
+    marginTop: 12,
+    width: '100%',
+  },
+  statusNoteLabel: { color: C.muted, fontSize: 10.5, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 4 },
+  statusNoteText:  { color: C.navy, fontSize: 13, lineHeight: 18 },
 
   header: {
     flexDirection: 'row',

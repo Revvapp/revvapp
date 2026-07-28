@@ -8,6 +8,7 @@ import { randomUUID } from 'node:crypto';
 import Stripe from 'stripe';
 
 import { db } from './admin';
+import { enforceRateLimit } from './rateLimit';
 import { requireAdmin } from './workflows';
 
 /**
@@ -48,25 +49,6 @@ const CONNECT_RETURN_URL = 'https://revvapp.github.io/revvapp/?stripe=return';
 const CONNECT_REFRESH_URL = 'https://revvapp.github.io/revvapp/?stripe=refresh';
 
 const PLATFORM_FEE_RATE = 0.10;
-
-async function enforceRateLimit(uid: string, action: string, max: number, windowMs: number): Promise<void> {
-  const ref = db.collection('rateLimits').doc(`${action}_${uid}`);
-  await db.runTransaction(async (tx) => {
-    const snap = await tx.get(ref);
-    const data = snap.data();
-    const startedAt = data?.startedAt as Timestamp | undefined;
-    const withinWindow = startedAt && Date.now() - startedAt.toMillis() < windowMs;
-    const count = withinWindow ? Number(data?.count ?? 0) : 0;
-    if (count >= max) throw new HttpsError('resource-exhausted', 'Too many requests. Try again later.');
-    tx.set(ref, {
-      uid,
-      action,
-      count: count + 1,
-      startedAt: withinWindow ? startedAt : FieldValue.serverTimestamp(),
-      updatedAt: FieldValue.serverTimestamp(),
-    });
-  });
-}
 
 function stripeClient(): Stripe {
   return new Stripe(STRIPE_SECRET_KEY.value());

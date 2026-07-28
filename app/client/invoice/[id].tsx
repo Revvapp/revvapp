@@ -152,11 +152,25 @@ export default function ClientInvoiceScreen() {
           line1: 'Dispute in review',
           line2: 'Payment is paused while our team reviews your dispute.',
         }
+      : invoice.status === 'refunded'
+      ? {
+          line1: 'Refunded',
+          line2: 'Your dispute was resolved and the charge was refunded to your card.',
+        }
+      : invoice.status === 'resolved_partial'
+      ? {
+          line1: 'Partially refunded',
+          line2: 'Your dispute was resolved with a partial refund to your card.',
+        }
       : windowLabel(createdSeconds);
   const detailerDisplay = invoice.businessName ? toTitleCase(invoice.businessName) : toTitleCase(invoice.detailerName);
   const statusPill =
     invoice.status === 'disputed'
       ? { label: 'Disputed', bg: '#FDECEA', fg: '#C0392B' }
+      : invoice.status === 'refunded'
+      ? { label: 'Refunded', bg: '#FDECEA', fg: '#C0392B' }
+      : invoice.status === 'resolved_partial'
+      ? { label: 'Partial Refund', bg: '#FFF3CD', fg: '#8A6D0B' }
       : invoice.status === 'released'
       ? { label: 'Paid', bg: '#D4EDDA', fg: '#155724' }
       : { label: 'Completed', bg: '#D4EDDA', fg: '#155724' };

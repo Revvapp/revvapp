@@ -4,6 +4,7 @@ import { getStorage } from 'firebase-admin/storage';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 
 import { db } from './admin';
+import { enforceRateLimit } from './rateLimit';
 
 const REGION = 'us-west2';
 const MAX_TEXT = 1_000;
@@ -217,6 +218,7 @@ export const attachAfterPhotos = onCall({ region: REGION }, async (request) => {
 /** Creates one immutable dispute per booking and atomically freezes release. */
 export const createDispute = onCall({ region: REGION }, async (request) => {
   const uid = requireUid(request.auth);
+  await enforceRateLimit(uid, 'dispute', 5, 24 * 60 * 60 * 1_000);
   const bookingId = text(request.data?.bookingId, 'bookingId', 200);
   const category = text(request.data?.category, 'category', 40);
   if (!DISPUTE_CATEGORIES.has(category)) throw new HttpsError('invalid-argument', 'Invalid category.');
@@ -410,6 +412,7 @@ const CARE_CLAIM_CAP_CENTS = 250_000; // $2,500 coverage cap per booking.
  */
 export const createCareClaim = onCall({ region: REGION }, async (request) => {
   const uid = requireUid(request.auth);
+  await enforceRateLimit(uid, 'care_claim', 5, 24 * 60 * 60 * 1_000);
   const bookingId = text(request.data?.bookingId, 'bookingId', 200);
   const description = text(request.data?.description, 'description', MAX_TEXT);
   if (description.length < 20) {
@@ -476,6 +479,36 @@ export const resolveCareClaim = onCall({ region: REGION }, async (request) => {
       status: decision,
       approvedCents,
       resolutionNote: note,
+      resolvedAt: FieldValue.serverTimestamp(),
+    });
+  });
+  return { ok: true };
+});
+
+/**
+ * Admin-only: marks a trust & safety report reviewed or dismissed.
+ *
+ * Reports were previously logged to Cloud Logging only (onReportCreated in
+ * reports.ts) with no way to ever clear one — the admin console's queue would
+ * only ever grow. Resolution here is bookkeeping for the team, not a money or
+ * account action; it doesn't touch the reported user's account directly.
+ */
+export const resolveReport = onCall({ region: REGION }, async (request) => {
+  requireAdmin(request.auth);
+  const reportId = text(request.data?.reportId, 'reportId', 200);
+  const decision = text(request.data?.decision, 'decision', 20);
+  if (decision !== 'reviewed' && decision !== 'dismissed') {
+    throw new HttpsError('invalid-argument', 'Decision must be reviewed or dismissed.');
+  }
+  const note = optionalText(request.data?.note, MAX_TEXT);
+  const ref = db.collection('reports').doc(reportId);
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) throw new HttpsError('not-found', 'Report not found.');
+    if (snap.data()?.status !== 'open') throw new HttpsError('failed-precondition', 'Report is already resolved.');
+    tx.update(ref, {
+      status: decision,
+      adminNote: note,
       resolvedAt: FieldValue.serverTimestamp(),
     });
   });

@@ -189,7 +189,7 @@ service cloud.firestore {
       // message to the other party — so the reported user must never be able to
       // read it. Only the author can read their own reports; the team uses the
       // Admin SDK (which bypasses these rules).
-      allow read: if signedIn() && resource.data.reporterId == request.auth.uid;
+      allow read: if signedIn() && (resource.data.reporterId == request.auth.uid || isAdmin());
       // Only a party on the underlying booking may file one, stamped as
       // themselves. clientId/detailerId carry the booking parties so the team
       // knows who was reported; one of them must be the reporter.

@@ -177,6 +177,11 @@ export default function ClientProfileScreen() {
           <Text style={styles.editBtnText}>Edit Profile</Text>
         </Pressable>
 
+        <Pressable style={styles.editBtn} onPress={() => router.push('/help')}>
+          <Ionicons name="help-circle-outline" size={16} color={C.navy} />
+          <Text style={styles.editBtnText}>Help & Support</Text>
+        </Pressable>
+
         {isAdmin && (
           <Pressable style={styles.editBtn} onPress={() => router.push('/admin')}>
             <Ionicons name="shield-outline" size={16} color={C.navy} />

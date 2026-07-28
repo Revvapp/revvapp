@@ -187,22 +187,51 @@ export const onDisputeCreated = onDocumentCreated('disputes/{disputeId}', async 
   );
 });
 
-// 5. Dispute response / resolution → notify the client of the update.
+// 5. Dispute response / resolution → notify both parties of the actual outcome.
+//
+// resolveDispute (functions/src/stripe.ts) writes one of three `resolution`
+// values, each of which moves money differently — a single "resolved, payment
+// released" message was wrong for two of the three, and previously only the
+// client was ever told the outcome at all; the detailer had no way to learn a
+// dispute against them had been decided.
+const DISPUTE_OUTCOME_COPY: Record<string, { client: string; detailer: string }> = {
+  release_detailer: {
+    client: 'Your dispute was reviewed and the payment has been released to your detailer.',
+    detailer: 'Good news — a dispute on your job was resolved in your favor and payment has been released to you.',
+  },
+  refund_client: {
+    client: 'Your dispute was resolved and you have been refunded in full.',
+    detailer:
+      "A dispute on your job was resolved in the client's favor. The charge was refunded and no payout will be made.",
+  },
+  partial_refund: {
+    client: 'Your dispute was resolved with a partial refund to your card.',
+    detailer:
+      'A dispute on your job was resolved with a partial refund to the client. You will receive your share of the remaining amount.',
+  },
+};
+
 export const onDisputeUpdated = onDocumentUpdated('disputes/{disputeId}', async (event) => {
   const before = event.data?.before.data();
   const after = event.data?.after.data();
   if (!before || !after) return;
 
   const clientId = after.clientId as string | undefined;
+  const detailerId = after.detailerId as string | undefined;
   const invoiceId = String(after.invoiceId ?? after.bookingId ?? event.params.disputeId);
 
   if (before.status !== 'resolved' && after.status === 'resolved') {
-    await notifyUser(
-      clientId,
-      'Dispute Resolved',
-      'Your dispute has been marked resolved and the payment released.',
-      { type: 'dispute', invoiceId }
-    );
+    const copy = DISPUTE_OUTCOME_COPY[String(after.resolution ?? '')];
+    await Promise.all([
+      notifyUser(clientId, 'Dispute Resolved', copy?.client ?? 'Your dispute has been resolved.', {
+        type: 'dispute',
+        invoiceId,
+      }),
+      notifyUser(detailerId, 'Dispute Resolved', copy?.detailer ?? 'A dispute on your job has been resolved.', {
+        type: 'dispute',
+        invoiceId,
+      }),
+    ]);
     return;
   }
 
@@ -215,7 +244,73 @@ export const onDisputeUpdated = onDocumentUpdated('disputes/{disputeId}', async 
   }
 });
 
-// 6. New review → notify the detailer.
+// 6. Revv Care claim decision → notify the filing client of the outcome. There
+// was previously no trigger here at all: a client who filed a claim had no way
+// to learn it was approved/denied short of emailing support.
+export const onCareClaimUpdated = onDocumentUpdated('careClaims/{claimId}', async (event) => {
+  const before = event.data?.before.data();
+  const after = event.data?.after.data();
+  if (!before || !after) return;
+  if (before.status !== 'open' || after.status === 'open') return;
+
+  const clientId = after.clientId as string | undefined;
+  const bookingId = String(after.bookingId ?? event.params.claimId);
+
+  if (after.status === 'approved') {
+    const amount = (Number(after.approvedCents ?? 0) / 100).toFixed(2);
+    await notifyUser(
+      clientId,
+      'Revv Care Claim Approved',
+      `Your damage claim was approved for $${amount}. Our team will follow up on payout details.`,
+      { type: 'care_claim', bookingId }
+    );
+  } else if (after.status === 'denied') {
+    await notifyUser(
+      clientId,
+      'Revv Care Claim Update',
+      'Your damage claim was reviewed and was not approved. Open the claim for details.',
+      { type: 'care_claim', bookingId }
+    );
+  }
+});
+
+// 7. Subscription state changes → notify the detailer when their marketplace
+// visibility is at risk or has changed. The Stripe webhook is the only writer
+// of subscriptionStatus (syncSubscriptionState in stripe.ts), so this is the
+// one place these transitions can be observed; previously they were silent —
+// a detailer could lose visibility to clients with no idea why.
+export const onSubscriptionStatusChanged = onDocumentUpdated('users/{uid}', async (event) => {
+  const before = event.data?.before.data();
+  const after = event.data?.after.data();
+  if (!before || !after) return;
+
+  const prev = String(before.subscriptionStatus ?? '');
+  const next = String(after.subscriptionStatus ?? '');
+  if (prev === next) return;
+
+  const uid = event.params.uid;
+  if (next === 'past_due') {
+    await notifyUser(
+      uid,
+      'Payment Failed',
+      'We could not charge your card for Revv Pro. Update your payment method or you will lose marketplace visibility.',
+      { type: 'subscription' }
+    );
+  } else if (next === 'canceled') {
+    await notifyUser(
+      uid,
+      'Subscription Canceled',
+      'Your Revv Pro subscription has ended and your profile is no longer visible to clients.',
+      { type: 'subscription' }
+    );
+  } else if (next === 'active' && (prev === 'past_due' || prev === 'canceled')) {
+    await notifyUser(uid, 'Subscription Active', 'Your payment succeeded — you are visible to clients again.', {
+      type: 'subscription',
+    });
+  }
+});
+
+// 8. New review → notify the detailer.
 export const onReviewCreated = onDocumentCreated('reviews/{reviewId}', async (event) => {
   const r = event.data?.data();
   if (!r) return;

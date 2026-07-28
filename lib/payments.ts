@@ -185,3 +185,13 @@ export async function grantFoundingPro(detailerId: string): Promise<void> {
   const call = httpsCallable<{ detailerId: string }, { ok: boolean }>(functions, 'grantFoundingPro');
   await call({ detailerId });
 }
+
+/** Mark a trust & safety report reviewed or dismissed. */
+export async function resolveReport(input: {
+  reportId: string;
+  decision: 'reviewed' | 'dismissed';
+  note?: string;
+}): Promise<void> {
+  const call = httpsCallable<typeof input, { ok: boolean }>(functions, 'resolveReport');
+  await call(input);
+}

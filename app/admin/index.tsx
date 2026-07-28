@@ -63,6 +63,7 @@ function Tile({
 export default function AdminHubScreen() {
   const openDisputes = useOpenCount('disputes');
   const openClaims   = useOpenCount('careClaims');
+  const openReports  = useOpenCount('reports');
 
   return (
     <SafeAreaView edges={['top']} style={styles.safe}>
@@ -96,6 +97,14 @@ export default function AdminHubScreen() {
           badge={openClaims}
           tone="alert"
           onPress={() => router.push('/admin/claims')}
+        />
+        <Tile
+          icon="warning-outline"
+          title="Trust & safety reports"
+          body="Off-platform solicitation, safety and conduct reports."
+          badge={openReports}
+          tone="alert"
+          onPress={() => router.push('/admin/reports')}
         />
         <Tile
           icon="person-circle-outline"
