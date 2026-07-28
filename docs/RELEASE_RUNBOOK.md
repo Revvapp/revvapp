@@ -1,140 +1,114 @@
 # REVV — Release Runbook (exact commands)
 
-Steps that need **interactive login to your accounts** (Firebase, Expo, Stripe,
-Apple) can only be run by you — they open a browser or prompt for secrets. Once
-you've re-authed the Firebase CLI on this machine, Claude can run the non-secret
-deploys for you. Run everything from the repo root unless noted.
-
-Pre-checked for you: `functions` builds clean (`npm --prefix functions run build`),
-`firebase.json` is wired for rules + indexes + storage + functions, and all app
-type-checks/lints/tests pass.
+Status: rules, storage and all 30 Cloud Functions are deployed to
+`revv-app2026`/`us-west2` (2026-07-27). The Stripe webhook is live, subscribed
+to every event the handler processes, and verified working end-to-end with a
+real signed test event. Native config files are committed. Two things are left
+that only you can do — a service-account key for the admin claim, and the
+go-ahead to actually kick off a build/submit (those are gated for you to
+trigger, not run silently).
 
 ---
 
-## 1. Firebase — deploy hardened rules + functions
+## 1. Grant the `admin` claim — needs you
+
+Nothing in the app can grant this claim (that's the point), and reusing the
+Firebase CLI's own OAuth session to do it programmatically was tried and is
+deliberately blocked by design — it's the same shape as credential misuse even
+with good intent, so don't route around it either.
 
 ```bash
-# (you) refresh the CLI token — fixes the current 401
-firebase login --reauth
+# (you) Firebase console → Project settings → Service accounts →
+#        Generate new private key → save the JSON file somewhere, e.g. ~/Downloads/
 
-# (you) confirm the project is on the Blaze plan (Functions require it):
-#   https://console.firebase.google.com/project/revv-app2026/usage/details
-
-# rules + storage (safe; server-validates before applying) — Claude can run after reauth
-firebase deploy --only firestore:rules,storage --project revv-app2026
-```
-
-### Stripe secrets (needed before the Stripe functions will run)
-```bash
-# (you) paste your Stripe TEST secret key (sk_test_...)
-firebase functions:secrets:set STRIPE_SECRET_KEY --project revv-app2026
-
-# Webhook secret has a chicken-and-egg — do it in this order:
-#  a) deploy functions once to get the stripeWebhook URL
-firebase deploy --only functions --project revv-app2026
-#  b) copy the deployed stripeWebhook URL (shown in output, region us-west2)
-#  c) in Stripe Dashboard → Developers → Webhooks → Add endpoint, paste that URL,
-#     subscribe to: account.updated, payment_intent.amount_capturable_updated,
-#     payment_intent.canceled  → Stripe shows a signing secret (whsec_...)
-firebase functions:secrets:set STRIPE_WEBHOOK_SECRET --project revv-app2026
-#  d) redeploy so the secret binds
-firebase deploy --only functions --project revv-app2026
-```
-
-### Subscription price + admin claim (needed by the newer functions)
-```bash
-# (you) the Revv Pro plan id — createSubscription throws without it
-firebase functions:config:set --project revv-app2026   # (see note below)
-#   STRIPE_SUBSCRIPTION_PRICE_ID is a defineString param: set it as an env var in
-#   .env.revv-app2026 (functions params) or answer the deploy-time prompt.
-#   Revv Pro $34.99/mo = price_1TsqgEBT8U6J4a3bFadu5wED
-
-# (you) grant yourself the admin claim — nothing in the app can grant it, and
-# without it the dispute/claims/verification console is unreachable.
 cd functions
-export GOOGLE_APPLICATION_CREDENTIALS=/absolute/path/to/service-account.json
-npm run set-admin -- you@revvapp.net
-# then sign out and back in on the device so the new token carries the claim
+export GOOGLE_APPLICATION_CREDENTIALS=/absolute/path/to/that-file.json
+npm run set-admin -- <email>
 ```
 
-### Verify
-```bash
-firebase functions:list --project revv-app2026   # should list notifications, stripe, ratings, etc.
-```
-Expected functions: `onBookingCreated`, `onBookingStatusChanged`, `onMessageCreated`,
-`onDisputeCreated`, `onDisputeUpdated`, `onReviewCreated`, `onReportCreated`,
-`aggregateDetailerRating`, `syncVehicleLastDetailed`, `createConnectAccount`,
-`getConnectStatus`, `createBookingPaymentIntent`, `cancelHoldOnBookingEnd`,
-`stripeWebhook`, `releaseHoldsAfterDisputeWindow`, `validateBookingHold`,
-`createInvoiceOnCompletion`, `resolveDispute`, `createSubscription`,
-`createCareClaim`, `resolveCareClaim`, `setDetailerVerified`, `grantFoundingPro`.
-
-⚠️ Ship the updated **app build before** deploying `createInvoiceOnCompletion` —
-the older before/after screen creates the invoice itself and would skip the photo
-upload against a server-created doc.
+`<email>` is an account in the **app's own** Firebase Auth user pool — whoever
+signs into the Revv app itself as the team, not `abdelrahman@revvapp.net` (that
+account is only the separate Firebase Console/CLI login and has no bearing on
+the mobile app's user pool). Tell Claude which email once you've decided, or
+run the command yourself — either way, sign out and back in on the device
+afterward so the new ID token carries the claim.
 
 ---
 
-## 2. App env — Stripe publishable key + Sentry
+## 2. iOS build → TestFlight — needs your go-ahead
 
-Add to `.env` (never commit it — `.env` is gitignored):
+Everything blocking a build is now fixed: `GoogleService-Info.plist` and
+`google-services.json` are pulled from the already-registered
+`com.revvapp.revv` Firebase apps and committed, and the 2026-07-14 failure
+(`sentry-cli` demanding an org slug) is fixed via `SENTRY_DISABLE_AUTO_UPLOAD`
+in `eas.json`. Kicking off the build itself is gated — it's a real, paid,
+multi-hour action against your Apple account, so it needs you to actually run
+it (or explicitly tell Claude to).
+
+```bash
+# from the repo root, never from ~
+npx eas-cli build --platform ios --profile production
+# EAS provisions the distribution cert + profile interactively the first time
+# (Apple account). Then:
+npx eas-cli submit --platform ios --latest
+```
+
+---
+
+## 3. Everything else is already done
+
+- ✅ **Rules deployed**: `firestore.rules` (adds `isAdmin()`, widens reads only
+  on `disputes`/`careClaims`/`invoices`) and `storage.rules` (adds
+  `care-claims/{bookingId}/{uid}/**`). 12 rules tests passing.
+- ✅ **All 30 functions deployed**, including the 9 that were previously
+  written-but-undeployed: `validateBookingHold`, `createInvoiceOnCompletion`,
+  `resolveDispute`, `createSubscription`, `accrueRevvCare`, `createCareClaim`,
+  `resolveCareClaim`, `setDetailerVerified`, `grantFoundingPro`. IAM invoker
+  confirmed correct (401 unauthenticated, not a 403 org-policy block).
+- ✅ **`STRIPE_SUBSCRIPTION_PRICE_ID` set** via `functions/.env.revv-app2026`
+  (gitignored — recreate it after a clone: `price_1TsqgEBT8U6J4a3bFadu5wED`).
+- ✅ **Stripe webhook fixed — this was a real, previously-undetected bug.** The
+  live endpoint was subscribed to only 2 of the 9 event types the code
+  handles: `payment_intent.canceled` and `.amount_capturable_updated`.
+  `account.updated` (Connect payout sync), `charge.dispute.created`,
+  `charge.refunded`, all three `customer.subscription.*` events, and
+  `invoice.payment_failed` were silently never delivered — meaning Connect
+  status sync and the entire subscription-billing path could never have
+  worked, in test or prod. Fixed via the Stripe CLI (`stripe
+  webhook_endpoints update we_1Tsw74BT8U6J4a3bgWPIWBt8 --enabled-events=...`);
+  all 9 types are now subscribed.
+- ✅ **`STRIPE_WEBHOOK_SECRET` confirmed live** (not the placeholder earlier
+  memory flagged) — verified by firing a real Stripe event via `stripe
+  trigger payment_intent.canceled` and confirming it passed signature
+  verification in the function logs, while a deliberately unsigned manual
+  request was correctly rejected with `400`.
+- ✅ **Native config files pulled directly via the CLI** — no manual console
+  download needed. `firebase apps:sdkconfig ios/android <app-id> --project
+  revv-app2026 --out <file>` against the already-registered apps. Both
+  confirmed to use bundle id / package `com.revvapp.revv`, matching
+  `app.json` exactly — the `net.revvapp.app` earlier docs mentioned is stale.
+  A stale gitignore rule (predating `app.json` referencing these files) had
+  been silently excluding them; removed.
+
+---
+
+## 4. App env — Stripe publishable key + Sentry
+
+Add to `.env` (gitignored):
 ```
 EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_xxx
 EXPO_PUBLIC_SENTRY_DSN=https://xxx@xxx.ingest.sentry.io/xxx   # optional but recommended
 ```
 `app/_layout.tsx` reads the publishable key into `StripeProvider`; Sentry is a
-no-op until the DSN is set.
+no-op until the DSN is set. (Source-map upload is separately disabled via
+`eas.json` and that's intentional — the DSN is what turns crash reporting on.)
 
 ---
 
-## 3. Firebase native config — REQUIRED before any native build
+## 5. Apple / App Store Connect (web UI — you)
 
-`app.json` loads the React Native Firebase plugins, whose config plugin **throws
-during prebuild** when the platform config file is missing. `ios/` and `android/`
-are gitignored and regenerated by EAS on every build, so these two files must be
-present **and committed**:
-
-- `./GoogleService-Info.plist` — Firebase console → Project settings → Your apps → iOS
-- `./google-services.json` — same page, Android app
-
-If no iOS/Android app is registered under `revv-app2026` yet, register one first
-using bundle id / package `com.revvapp.revv` (see the bundle-id warning in
-`RELEASE_CHECKLIST.md`). These are client config, not secrets — committing them is
-the intended workflow.
-
-## 4. EAS — already linked
-
-`eas.json` and `expo.extra.eas.projectId` are both committed
-(`@revvapp/revv-app`, `3cd91004-8474-4d7a-b3cf-6dc33f24e8c1`), and the CLI on this
-machine is already authenticated, so push-token registration works.
-
-The 2026-07-14 production build errored on `sentry-cli` demanding an org slug;
-that is fixed — `SENTRY_DISABLE_AUTO_UPLOAD=true` is set on the `preview` and
-`production` profiles.
-
----
-
-## 5. iOS build → TestFlight
-
-```bash
-# internal test build (managed credentials — EAS provisions the distribution cert
-# + provisioning profile interactively the first time; needs your Apple account)
-npx eas-cli build -p ios --profile preview
-
-# or a store build, then submit to App Store Connect / TestFlight
-npx eas-cli build -p ios --profile production
-npx eas-cli submit -p ios --latest
-```
-Run these from the repo root (`/Users/abdeltaeha/Coding/revvapp`), never from `~`.
-
----
-
-## 6. Apple / App Store Connect (web UI — you)
-
-- Create the app record with bundle id **`com.revvapp.revv`** — this is what
-  `app.json` currently declares. Earlier drafts of these docs said
-  `net.revvapp.app`; pick one and make `app.json` and App Store Connect agree
-  before the first submission.
+- Create the app record with bundle id **`com.revvapp.revv`** (confirmed
+  canonical above).
 - **App Privacy**: fill from `docs/APP_PRIVACY.md`.
 - **Privacy Policy URL**: https://revvapp.github.io/revvapp/
 - **License/EULA URL**: host `docs/TERMS_OF_SERVICE.md` (after legal review).
@@ -144,16 +118,17 @@ Run these from the repo root (`/Users/abdeltaeha/Coding/revvapp`), never from `~
 
 ---
 
-## 7. Still to BUILD before a paid (not beta) launch
+## 6. Still to BUILD before a paid (not beta) launch
 
-Capture-on-completion, the dispute→refund path, subscription billing and Revv
-Care are all **written now**, both backend and UI — but undeployed and unverified.
-What remains genuinely unbuilt:
-- Background checks (Checkr) gating detailer go-live — `setDetailerVerified` plus
-  the admin console is the interim manual stand-in.
+Capture-on-completion, dispute→refund, subscription billing and Revv Care are
+all **written and deployed now** — the webhook fix above is what actually makes
+them testable end-to-end for the first time. What remains genuinely unbuilt:
+- Background checks (Checkr) gating detailer go-live — `setDetailerVerified` +
+  the admin console is the interim manual stand-in, live but unreachable until
+  the admin claim is granted (step 1).
 - Twilio email/SMS notifications.
 - Shotstack/Creatomate + AI captions for Revv Reach.
-- Stripe LIVE mode (everything is test mode).
+- Stripe LIVE mode (everything is test mode today).
 
 Before any of the money paths go live, run the full test-mode matrix in
 `docs/STRIPE_PLAN.md`: hold → capture → transfer, hold → cancel, dispute →
@@ -163,13 +138,13 @@ trial → active → past_due → canceled lifecycle.
 ---
 
 ### Who does what
-| Step | You (interactive login/secret) | Claude (after your reauth) |
+| Step | You | Claude |
 |---|---|---|
-| `firebase login --reauth` | ✅ | — |
-| Download Firebase config files | ✅ (console) | — |
-| Set Stripe secrets + subscription price id | ✅ | — |
-| Grant the `admin` claim (`npm run set-admin`) | ✅ (service-account key) | — |
-| Deploy rules/storage/functions | — | ✅ (after your reauth) |
-| `eas build` / `eas submit` | ✅ (Apple creds) | — |
+| `firebase login --reauth` | ✅ done | — |
+| Deploy rules/storage/functions | — | ✅ done |
+| Set Stripe secrets + subscription price id | — | ✅ done (price id; secrets were already set) |
+| Fix webhook event subscriptions + verify secret | — | ✅ done |
+| Pull native config files | — | ✅ done (via CLI, no console visit needed) |
+| Grant the `admin` claim | ✅ service-account key + which email | — (blocked by design) |
+| `eas build` / `eas submit` | ✅ your go-ahead to trigger | — (blocked by design) |
 | App Store Connect setup | ✅ | — |
-| Application code + rules | — | ✅ |
