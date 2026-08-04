@@ -32,7 +32,8 @@ can do it if you grant the permission or make the one decision it hangs on.
 | 2.3 | **App Store Connect record** | You | Bundle id `com.revvapp.revv`. Category, age rating, support + marketing URLs. |
 | 2.4 | **App Privacy nutrition label** | You | Answers already prepared in `docs/APP_PRIVACY.md`. |
 | 2.5 | **Screenshots** | You | 6.7" + 6.5", plus iPad if `supportsTablet` stays on. |
-| 2.6 | **iOS push (APNs) key** | You | `eas credentials` → push key. Push code is wired and the EAS `projectId` is present, but iOS notifications won't deliver without this. |
+| 2.6 | **iOS push (APNs) key** | You | `eas credentials` → push key. Push code is wired and the EAS `projectId` is present, but iOS notifications won't deliver without this. Less urgent now that email/SMS exist as a fallback — but push is still the primary channel. |
+| 2.9 | **SendGrid + Twilio accounts** | You | Turns on the email/SMS layer built in 4.2. See `RELEASE_RUNBOOK.md` §3b. |
 | 2.7 | **Sentry DSN** | You | Set `EXPO_PUBLIC_SENTRY_DSN` in **both** `.env` and EAS. Crash reporting is a no-op until then. |
 | 2.8 | **TestFlight beta** | You | `eas submit` after 2.3 exists. |
 
@@ -51,9 +52,26 @@ Deliberately deferred — none block a beta.
 
 | # | Task | Notes |
 |---|---|---|
-| 4.1 | **Checkr background checks** | `setDetailerVerified` + admin console is the interim manual stand-in (and is itself blocked on 1.4). Needs FCRA-compliant consent flow. |
-| 4.2 | **Twilio email/SMS** | In-app push exists; no email or SMS channel at all. |
-| 4.3 | **Revv Reach video + AI captions** | Shotstack/Creatomate integration. `updateInvoiceReach` and the opt-in exist; the rendering pipeline does not. |
+| 4.2 | ✅ **Email + SMS notifications — BUILT** | Only the accounts are left. Add SendGrid / Twilio credentials per `RELEASE_RUNBOOK.md` §3b and redeploy; each channel activates independently and is a logged no-op until then. |
+| 4.1 | **Checkr background checks** | **Deliberately not built** — see below. `setDetailerVerified` + admin console remains the interim manual stand-in (itself blocked on 1.4). |
+| 4.3 | **Revv Reach video + AI captions** | **Deliberately not built** — see below. `updateInvoiceReach` and the opt-in exist; the rendering pipeline does not. |
+
+### Why 4.1 and 4.3 were not built blind
+
+Both need a decision before they need code, and building them speculatively
+would produce something that has to be thrown away.
+
+- **Checkr** is FCRA-regulated. The hard part is not the API call — it is the
+  disclosure and written consent flow, adverse-action notices, and how a failed
+  check is surfaced without creating a defamation or discrimination exposure.
+  That has to be designed with counsel, not reverse-engineered from API docs.
+  Guessing at it would create a compliance surface that *looks* finished.
+- **Revv Reach** needs a vendor decision (Shotstack vs Creatomate — different
+  templating models, so the integration is not portable between them), a
+  per-render cost model, and creative direction for the output. None of those
+  are engineering calls.
+
+Both are genuinely ready to build the moment those decisions are made.
 
 ## 5. Quality (no known defects — hardening)
 

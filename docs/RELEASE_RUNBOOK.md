@@ -117,6 +117,50 @@ npx eas-cli submit --platform ios --latest
 
 ---
 
+## 3b. Turn on email + SMS notifications
+
+The code is built, deployed-safe and inert until credentials exist. It reads
+plain environment variables rather than declaring `defineSecret`, deliberately:
+Functions v2 refuses to deploy a function that declares a secret which does not
+exist yet, so declaring these up front would have broken `firebase deploy` for
+everyone until the accounts were created.
+
+**Email (SendGrid)** — create a sender identity for `support@revvapp.net` and an
+API key with Mail Send permission, then:
+```bash
+# functions/.env.revv-app2026  (gitignored)
+SENDGRID_API_KEY=SG.xxxx
+NOTIFY_EMAIL_FROM=support@revvapp.net     # optional, this is the default
+NOTIFY_EMAIL_FROM_NAME=Revv               # optional
+```
+
+**SMS (Twilio)** — buy a number, then:
+```bash
+TWILIO_ACCOUNT_SID=ACxxxx
+TWILIO_AUTH_TOKEN=xxxx
+TWILIO_FROM_NUMBER=+15551234567
+```
+
+Redeploy functions after either. Each channel activates independently — email
+works with no Twilio account and vice versa, and with neither set every send is
+a logged no-op, so nothing breaks.
+
+**Before real traffic**, move the two credentials to Secret Manager:
+```bash
+npx firebase-tools functions:secrets:set SENDGRID_API_KEY
+npx firebase-tools functions:secrets:set TWILIO_AUTH_TOKEN
+```
+then add `secrets: ['SENDGRID_API_KEY', 'TWILIO_AUTH_TOKEN']` to the trigger
+options in `functions/src/notifications.ts`. No change is needed in
+`messaging.ts` — bound secrets arrive as environment variables too.
+
+Which events use which channel is a deliberate policy in
+`functions/src/notifyChannels.ts` (asserted by tests). SMS is limited to four
+events where a slow response costs someone money; chat messages are never
+emailed or texted. Users opt out per channel at Profile → Notifications.
+
+---
+
 ## 4. App env — local `.env` *and* EAS both matter
 
 This bit was silently broken until 2026-08-04 and is worth understanding, because

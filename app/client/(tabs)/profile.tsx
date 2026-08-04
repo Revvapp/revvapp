@@ -177,6 +177,11 @@ export default function ClientProfileScreen() {
           <Text style={styles.editBtnText}>Edit Profile</Text>
         </Pressable>
 
+        <Pressable style={styles.editBtn} onPress={() => router.push('/notification-settings')}>
+          <Ionicons name="notifications-outline" size={16} color={C.navy} />
+          <Text style={styles.editBtnText}>Notifications</Text>
+        </Pressable>
+
         <Pressable style={styles.editBtn} onPress={() => router.push('/help')}>
           <Ionicons name="help-circle-outline" size={16} color={C.navy} />
           <Text style={styles.editBtnText}>Help & Support</Text>

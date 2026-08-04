@@ -2,9 +2,13 @@ import { logger } from 'firebase-functions/v2';
 import { onDocumentCreated, onDocumentUpdated } from 'firebase-functions/v2/firestore';
 
 import { db } from './admin';
+import { deliverOutOfApp } from './messaging';
+import type { NotificationEvent } from './notifyChannels';
 
 /**
- * Server-side push notifications.
+ * Server-side notifications: push, plus email and SMS where the event warrants
+ * it (see `notifyChannels.ts` for the policy and why each event sits where it
+ * does).
  *
  * Notifications used to be sent from the *sender's* device, right after it wrote
  * the triggering document. That only fired if the app stayed foregrounded long
@@ -36,13 +40,12 @@ async function getPushToken(uid: string): Promise<string | null> {
 }
 
 /** Send one Expo push to a single user. Best-effort; never throws. */
-async function notifyUser(
-  uid: string | undefined | null,
+async function pushToUser(
+  uid: string,
   title: string,
   body: string,
-  data: PushData = {}
+  data: PushData
 ): Promise<void> {
-  if (!uid) return;
   try {
     const token = await getPushToken(uid);
     if (!token) return;
@@ -65,6 +68,38 @@ async function notifyUser(
   }
 }
 
+/**
+ * Notifies one user across every channel the event's policy allows.
+ *
+ * Push and the out-of-app channels are dispatched concurrently and independently
+ * — a user with no Expo token still gets the email, and a SendGrid outage still
+ * leaves the push delivered. Nothing here throws: a failed notification must
+ * never fail the trigger that produced it.
+ *
+ * `smsBody` overrides the copy for SMS only, where a shorter, blunter phrasing
+ * fits a single billable segment.
+ */
+async function notifyUser(
+  uid: string | undefined | null,
+  event: NotificationEvent,
+  title: string,
+  body: string,
+  data: PushData = {},
+  smsBody?: string
+): Promise<void> {
+  if (!uid) return;
+  const [, delivered] = await Promise.all([
+    pushToUser(uid, title, body, data),
+    deliverOutOfApp(uid, event, title, body, smsBody).catch((err) => {
+      logger.warn(`Out-of-app delivery for ${uid} failed`, err as Error);
+      return [] as const;
+    }),
+  ]);
+  if (delivered.length > 0) {
+    logger.info(`Notified ${uid} of ${event} via ${delivered.join(', ')}`);
+  }
+}
+
 // 1. New booking → notify the detailer that a request came in.
 export const onBookingCreated = onDocumentCreated('bookings/{bookingId}', async (event) => {
   const b = event.data?.data();
@@ -74,9 +109,11 @@ export const onBookingCreated = onDocumentCreated('bookings/{bookingId}', async 
   const service = titleCase(String(b.service ?? 'a detail')) || 'a detail';
   await notifyUser(
     b.detailerId as string | undefined,
+    'booking_request',
     'New Booking Request!',
     `${who} wants to book ${service}.`,
-    { type: 'booking_request', bookingId: event.params.bookingId }
+    { type: 'booking_request', bookingId: event.params.bookingId },
+    `Revv: ${who} wants to book ${service}. Open the app to accept or decline.`
   );
 });
 
@@ -92,13 +129,13 @@ export const onBookingStatusChanged = onDocumentUpdated('bookings/{bookingId}', 
 
   switch (String(after.status)) {
     case 'active':
-      await notifyUser(clientId, 'Booking Accepted!', 'Your detailer accepted your booking.', {
-        bookingId,
-      });
+      await notifyUser(clientId, 'booking_accepted', 'Booking Accepted!',
+        'Your detailer accepted your booking.', { bookingId });
       break;
     case 'declined':
       await notifyUser(
         clientId,
+        'booking_declined',
         'Booking Declined',
         "Your detailer couldn't take this booking. Browse others nearby.",
         { bookingId }
@@ -107,14 +144,17 @@ export const onBookingStatusChanged = onDocumentUpdated('bookings/{bookingId}', 
     case 'vir_submitted':
       await notifyUser(
         clientId,
+        'vir_ready',
         'Inspection Ready to Sign',
         'Your detailer completed the pre-inspection. Review and sign to start the job.',
-        { type: 'vir', bookingId }
+        { type: 'vir', bookingId },
+        'Revv: your detailer is ready to start. Open the app to review and sign the inspection.'
       );
       break;
     case 'vir_signed':
       await notifyUser(
         detailerId,
+        'vir_signed',
         'Inspection Signed',
         'The client signed off — you can now start the job timer.',
         { bookingId }
@@ -123,19 +163,24 @@ export const onBookingStatusChanged = onDocumentUpdated('bookings/{bookingId}', 
     case 'completed':
       await notifyUser(
         clientId,
+        'job_complete',
         'Your Detail is Complete!',
         'Your detailer has finished. Check your invoice and leave a review.',
         { type: 'job_complete', bookingId }
       );
       break;
-    case 'cancelled':
+    case 'cancelled': {
+      const who = after.clientName ? String(after.clientName) : 'A client';
       await notifyUser(
         detailerId,
+        'booking_cancelled',
         'Booking Cancelled',
-        `${after.clientName ? String(after.clientName) : 'A client'} cancelled their booking.`,
-        { bookingId }
+        `${who} cancelled their booking.`,
+        { bookingId },
+        `Revv: ${who} cancelled their booking. That slot is now free.`
       );
       break;
+    }
     default:
       break;
   }
@@ -169,7 +214,7 @@ export const onMessageCreated = onDocumentCreated(
       senderId === clientId ? String(convo.clientName ?? '') : String(convo.detailerName ?? '');
     const title = senderName || 'New message';
     const body = String(m.text ?? '').replace(/\s+/g, ' ').trim().slice(0, 160) || 'Sent you a message.';
-    await notifyUser(recipientId, title, body, { type: 'message', conversationId });
+    await notifyUser(recipientId, 'message', title, body, { type: 'message', conversationId });
   }
 );
 
@@ -181,6 +226,7 @@ export const onDisputeCreated = onDocumentCreated('disputes/{disputeId}', async 
   const invoiceId = String(d.invoiceId ?? d.bookingId ?? event.params.disputeId);
   await notifyUser(
     d.detailerId as string | undefined,
+    'dispute_created',
     'Dispute Raised',
     'A client raised a dispute on a recent job. Payment is paused pending review.',
     { type: 'dispute', invoiceId }
@@ -223,24 +269,18 @@ export const onDisputeUpdated = onDocumentUpdated('disputes/{disputeId}', async 
   if (before.status !== 'resolved' && after.status === 'resolved') {
     const copy = DISPUTE_OUTCOME_COPY[String(after.resolution ?? '')];
     await Promise.all([
-      notifyUser(clientId, 'Dispute Resolved', copy?.client ?? 'Your dispute has been resolved.', {
-        type: 'dispute',
-        invoiceId,
-      }),
-      notifyUser(detailerId, 'Dispute Resolved', copy?.detailer ?? 'A dispute on your job has been resolved.', {
-        type: 'dispute',
-        invoiceId,
-      }),
+      notifyUser(clientId, 'dispute_resolved', 'Dispute Resolved',
+        copy?.client ?? 'Your dispute has been resolved.', { type: 'dispute', invoiceId }),
+      notifyUser(detailerId, 'dispute_resolved', 'Dispute Resolved',
+        copy?.detailer ?? 'A dispute on your job has been resolved.', { type: 'dispute', invoiceId }),
     ]);
     return;
   }
 
   // A detailer response was just added (the field went from empty to set).
   if (!before.detailerResponse && after.detailerResponse) {
-    await notifyUser(clientId, 'Detailer Responded', 'The detailer responded to your dispute.', {
-      type: 'dispute',
-      invoiceId,
-    });
+    await notifyUser(clientId, 'dispute_response', 'Detailer Responded',
+      'The detailer responded to your dispute.', { type: 'dispute', invoiceId });
   }
 });
 
@@ -260,6 +300,7 @@ export const onCareClaimUpdated = onDocumentUpdated('careClaims/{claimId}', asyn
     const amount = (Number(after.approvedCents ?? 0) / 100).toFixed(2);
     await notifyUser(
       clientId,
+      'care_claim_resolved',
       'Revv Care Claim Approved',
       `Your damage claim was approved for $${amount}. Our team will follow up on payout details.`,
       { type: 'care_claim', bookingId }
@@ -267,6 +308,7 @@ export const onCareClaimUpdated = onDocumentUpdated('careClaims/{claimId}', asyn
   } else if (after.status === 'denied') {
     await notifyUser(
       clientId,
+      'care_claim_resolved',
       'Revv Care Claim Update',
       'Your damage claim was reviewed and was not approved. Open the claim for details.',
       { type: 'care_claim', bookingId }
@@ -292,21 +334,23 @@ export const onSubscriptionStatusChanged = onDocumentUpdated('users/{uid}', asyn
   if (next === 'past_due') {
     await notifyUser(
       uid,
+      'subscription_past_due',
       'Payment Failed',
       'We could not charge your card for Revv Pro. Update your payment method or you will lose marketplace visibility.',
-      { type: 'subscription' }
+      { type: 'subscription' },
+      'Revv: your Revv Pro payment failed. Update your card in the app to stay visible to clients.'
     );
   } else if (next === 'canceled') {
     await notifyUser(
       uid,
+      'subscription_canceled',
       'Subscription Canceled',
       'Your Revv Pro subscription has ended and your profile is no longer visible to clients.',
       { type: 'subscription' }
     );
   } else if (next === 'active' && (prev === 'past_due' || prev === 'canceled')) {
-    await notifyUser(uid, 'Subscription Active', 'Your payment succeeded — you are visible to clients again.', {
-      type: 'subscription',
-    });
+    await notifyUser(uid, 'subscription_active', 'Subscription Active',
+      'Your payment succeeded — you are visible to clients again.', { type: 'subscription' });
   }
 });
 
@@ -319,6 +363,7 @@ export const onReviewCreated = onDocumentCreated('reviews/{reviewId}', async (ev
   const stars = rating > 0 ? `${rating}-star ` : '';
   await notifyUser(
     r.detailerId as string | undefined,
+    'review',
     'New Review!',
     `You received a ${stars}review. Open your profile to read it.`,
     { type: 'review' }
