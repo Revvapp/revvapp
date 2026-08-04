@@ -8,6 +8,12 @@ import { randomUUID } from 'node:crypto';
 import Stripe from 'stripe';
 
 import { db } from './admin';
+import {
+  MAX_BOOKING_DAYS_AHEAD,
+  MIN_BOOKING_DAYS_AHEAD,
+  bookingDaysAhead,
+} from './bookingRules';
+import { careReserveCents, parseRateToCents, splitPartialRefund, splitPayout } from './money';
 import { enforceRateLimit } from './rateLimit';
 import { requireAdmin } from './workflows';
 
@@ -28,11 +34,6 @@ const STRIPE_WEBHOOK_SECRET = defineSecret('STRIPE_WEBHOOK_SECRET');
 // set it as a param (env / functions config), e.g. STRIPE_SUBSCRIPTION_PRICE_ID=price_...
 const STRIPE_SUBSCRIPTION_PRICE_ID = defineString('STRIPE_SUBSCRIPTION_PRICE_ID');
 
-// Revv Care reserve set aside per released booking, as a fraction of the booking
-// price. Finance can tune this single constant; it is an accounting accrual of
-// platform-retained funds, not a money movement.
-const CARE_RESERVE_RATE = 0.01;
-
 // Callables must be pinned to the same region as the Firestore-trigger
 // functions (which follow the database's location) so the client can build a
 // single region-scoped functions instance.
@@ -47,8 +48,6 @@ const EPHEMERAL_KEY_API_VERSION = '2026-06-24.dahlia';
 // regains focus, so nothing on that page has to do anything.
 const CONNECT_RETURN_URL = 'https://revvapp.github.io/revvapp/?stripe=return';
 const CONNECT_REFRESH_URL = 'https://revvapp.github.io/revvapp/?stripe=refresh';
-
-const PLATFORM_FEE_RATE = 0.10;
 
 function stripeClient(): Stripe {
   return new Stripe(STRIPE_SECRET_KEY.value());
@@ -70,13 +69,13 @@ async function recipientTransfersActive(stripe: Stripe, accountId: string): Prom
 }
 
 /**
- * Accrues the Revv Care reserve for a released booking (CARE_RESERVE_RATE of the
- * booking price). Writes an idempotent per-booking ledger entry and increments
- * the fund total — an accounting record of platform-retained funds, never a money
- * movement. Best-effort: a failure must not fail the payment release.
+ * Accrues the Revv Care reserve for a released booking. Writes an idempotent
+ * per-booking ledger entry and increments the fund total — an accounting record
+ * of platform-retained funds, never a money movement. Best-effort: a failure
+ * must not fail the payment release.
  */
 async function accrueRevvCare(bookingId: string, priceCents: number): Promise<void> {
-  const reserveCents = Math.round(priceCents * CARE_RESERVE_RATE);
+  const reserveCents = careReserveCents(priceCents);
   if (reserveCents <= 0) return;
   try {
     // create() throws if it already exists — accrual is idempotent per booking.
@@ -95,20 +94,26 @@ async function accrueRevvCare(bookingId: string, priceCents: number): Promise<vo
 /**
  * Captures a manual-capture hold (if still uncaptured) and creates the idempotent
  * 90% Transfer to the detailer. Shared by the auto-release scheduler and admin
- * dispute resolution so both move money identically. Returns the transfer id (or
- * null when the intent uses the non-separate funds flow).
+ * dispute resolution so both move money through exactly one code path.
+ *
+ * Returns the captured amount alongside the transfer id (null when the intent
+ * uses the non-separate funds flow); callers need the amount to accrue the Revv
+ * Care reserve against what Stripe actually charged rather than against the
+ * booking document's copy of the price.
  */
 async function captureAndTransfer(
   stripe: Stripe,
   bookingId: string,
   paymentIntentId: string
-): Promise<string | null> {
+): Promise<{ transferId: string | null; amountCents: number }> {
   let intent = await stripe.paymentIntents.retrieve(paymentIntentId, { expand: ['latest_charge'] });
   if (intent.status === 'requires_capture') {
     intent = await stripe.paymentIntents.capture(paymentIntentId, { expand: ['latest_charge'] });
   }
   if (intent.status !== 'succeeded') throw new Error(`Unexpected PaymentIntent status: ${intent.status}`);
-  if (intent.metadata?.fundsFlow !== 'separate') return null;
+  if (intent.metadata?.fundsFlow !== 'separate') {
+    return { transferId: null, amountCents: intent.amount };
+  }
 
   const charge = intent.latest_charge;
   const chargeId = typeof charge === 'string' ? charge : charge?.id;
@@ -117,16 +122,15 @@ async function captureAndTransfer(
   );
   if (!chargeId || !detailerAccountId) throw new Error('Captured payment is missing transfer details.');
 
-  const transferAmount = intent.amount - Math.round(intent.amount * PLATFORM_FEE_RATE);
   const transfer = await stripe.transfers.create({
-    amount: transferAmount,
+    amount: splitPayout(intent.amount).detailerCents,
     currency: intent.currency,
     destination: detailerAccountId,
     source_transaction: chargeId,
     transfer_group: intent.transfer_group ?? undefined,
     metadata: { bookingId, paymentIntentId },
   }, { idempotencyKey: `release_${bookingId}` });
-  return transfer.id;
+  return { transferId: transfer.id, amountCents: intent.amount };
 }
 
 /**
@@ -279,9 +283,8 @@ export const createBookingPaymentIntent = onCall(
 
     const rate = (detailer.rates as Record<string, string> | undefined)?.[service];
     if (!rate) throw new HttpsError('invalid-argument', 'Unknown service for this detailer.');
-    const dollars = parseFloat(String(rate).replace(/[^0-9.]/g, ''));
-    const amountCents = Math.round(dollars * 100);
-    if (!Number.isFinite(amountCents) || amountCents < 100 || amountCents > 1_000_000) {
+    const amountCents = parseRateToCents(rate);
+    if (amountCents === null) {
       throw new HttpsError('failed-precondition', 'This service has an invalid price.');
     }
 
@@ -356,15 +359,9 @@ export const finalizeBooking = onCall(
     if (date.length > 20 || time.length > 20 || vehicleLabel.length > 200 || address.length > 500 || notes.length > 1_000) {
       throw new HttpsError('invalid-argument', 'A booking field is too long.');
     }
-    const dateMatch = date.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if (!dateMatch) throw new HttpsError('invalid-argument', 'Booking date is invalid.');
-    const bookingDay = Date.UTC(Number(dateMatch[1]), Number(dateMatch[2]) - 1, Number(dateMatch[3]));
-    const normalizedDate = new Date(bookingDay).toISOString().slice(0, 10);
-    if (normalizedDate !== date) throw new HttpsError('invalid-argument', 'Booking date is invalid.');
-    const now = new Date();
-    const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-    const daysAhead = Math.round((bookingDay - today) / (24 * 60 * 60 * 1_000));
-    if (daysAhead < 1 || daysAhead > 4) {
+    const daysAhead = bookingDaysAhead(date, Date.now());
+    if (daysAhead === null) throw new HttpsError('invalid-argument', 'Booking date is invalid.');
+    if (daysAhead < MIN_BOOKING_DAYS_AHEAD || daysAhead > MAX_BOOKING_DAYS_AHEAD) {
       throw new HttpsError('failed-precondition', 'Bookings must be scheduled 1–4 days ahead.');
     }
 
@@ -650,31 +647,9 @@ export const releaseHoldsAfterDisputeWindow = onSchedule(
       if (!claimed) continue;
 
       try {
-        let intent = await stripe.paymentIntents.retrieve(paymentIntentId, { expand: ['latest_charge'] });
-        if (intent.status === 'requires_capture') {
-          intent = await stripe.paymentIntents.capture(paymentIntentId, { expand: ['latest_charge'] });
-        }
-        if (intent.status !== 'succeeded') throw new Error(`Unexpected PaymentIntent status: ${intent.status}`);
-
-        let transferId: string | null = null;
-        if (intent.metadata?.fundsFlow === 'separate') {
-          const charge = intent.latest_charge;
-          const chargeId = typeof charge === 'string' ? charge : charge?.id;
-          const detailerAccountId = String(
-            (await db.collection('detailers').doc(String(intent.metadata.detailerId)).get()).data()?.stripeAccountId ?? ''
-          );
-          if (!chargeId || !detailerAccountId) throw new Error('Captured payment is missing transfer details.');
-          const transferAmount = intent.amount - Math.round(intent.amount * PLATFORM_FEE_RATE);
-          const transfer = await stripe.transfers.create({
-            amount: transferAmount,
-            currency: intent.currency,
-            destination: detailerAccountId,
-            source_transaction: chargeId,
-            transfer_group: intent.transfer_group ?? undefined,
-            metadata: { bookingId: bookingDoc.id, paymentIntentId },
-          }, { idempotencyKey: `release_${bookingDoc.id}` });
-          transferId = transfer.id;
-        }
+        const { transferId, amountCents } = await captureAndTransfer(
+          stripe, bookingDoc.id, paymentIntentId
+        );
         await bookingDoc.ref.update({
           paymentStatus: 'captured', captureState: 'complete', capturedAt: FieldValue.serverTimestamp(),
           ...(transferId ? { transferId } : {}),
@@ -685,7 +660,7 @@ export const releaseHoldsAfterDisputeWindow = onSchedule(
             releasedAt: FieldValue.serverTimestamp(),
           });
         }
-        await accrueRevvCare(bookingDoc.id, intent.amount);
+        await accrueRevvCare(bookingDoc.id, amountCents);
         logger.info(`Released hold ${paymentIntentId} for booking ${bookingDoc.id}`);
       } catch (err) {
         // Leave paymentStatus untouched so a transient failure retries next run.
@@ -823,13 +798,15 @@ export const resolveDispute = onCall(
         });
         await invoiceRef.update({ status: 'refunded', resolvedAt: FieldValue.serverTimestamp() }).catch(() => {});
       } else if (resolution === 'release_detailer') {
-        const transferId = await captureAndTransfer(stripe, disputeId, claim.paymentIntentId);
+        const { transferId, amountCents } = await captureAndTransfer(
+          stripe, disputeId, claim.paymentIntentId
+        );
         await bookingRef.update({
           paymentStatus: 'captured', captureState: 'complete', capturedAt: FieldValue.serverTimestamp(),
           ...(transferId ? { transferId } : {}),
         });
         await invoiceRef.update({ status: 'released', releasedAt: FieldValue.serverTimestamp() }).catch(() => {});
-        await accrueRevvCare(disputeId, claim.priceCents);
+        await accrueRevvCare(disputeId, amountCents);
       } else {
         // partial_refund: capture the full hold, refund the client's portion, and
         // transfer the detailer 90% of the retained remainder (platform keeps 10%).
@@ -842,8 +819,8 @@ export const resolveDispute = onCall(
           { payment_intent: claim.paymentIntentId, amount: clientRefundCents },
           { idempotencyKey: `prefund_${disputeId}` }
         );
-        const retained = claim.priceCents - clientRefundCents;
-        const detailerAmount = retained - Math.round(retained * PLATFORM_FEE_RATE);
+        const { retainedCents: retained, detailerCents: detailerAmount } =
+          splitPartialRefund(claim.priceCents, clientRefundCents);
         const charge = pi.latest_charge;
         const chargeId = typeof charge === 'string' ? charge : charge?.id;
         const detailerAccountId = String(

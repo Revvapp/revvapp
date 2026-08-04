@@ -3,10 +3,38 @@
 Status: rules, storage and all 30 Cloud Functions are deployed to
 `revv-app2026`/`us-west2` (2026-07-27). The Stripe webhook is live, subscribed
 to every event the handler processes, and verified working end-to-end with a
-real signed test event. Native config files are committed. Two things are left
-that only you can do — a service-account key for the admin claim, and the
-go-ahead to actually kick off a build/submit (those are gated for you to
-trigger, not run silently).
+real signed test event. Native config files are committed. The EAS build
+environment was empty and the Storage bucket was wrong; both were fixed
+2026-08-04 (see §0). What is left needs a credential, a payment or a web UI.
+
+---
+
+## 0. Re-authenticate the Firebase CLI — needs you
+
+The stored session expired again as of 2026-08-04. Everything that touches the
+project server-side (deploying functions or rules, listing registered apps) is
+blocked until this is run:
+
+```bash
+npx firebase-tools login --reauth      # as abdelrahman@revvapp.net
+npx firebase-tools functions:list --project revv-app2026   # confirm it worked
+```
+
+While you are there, the one open config question: `EXPO_PUBLIC_FIREBASE_APP_ID`
+is currently an **Android** app id but is consumed by the Firebase **JS** SDK on
+both platforms. Auth and Storage were verified working regardless (they key off
+`apiKey`/`projectId`), so this is not urgent, but the correct fix is to register
+a Web app and use its id:
+
+```bash
+npx firebase-tools apps:list --project revv-app2026
+# if no WEB app exists:
+npx firebase-tools apps:create web Revv --project revv-app2026
+# then update .env AND EAS:
+npx eas-cli env:set --scope project --environment production --environment preview \
+  --name EXPO_PUBLIC_FIREBASE_APP_ID --value <web app id> \
+  --visibility plaintext --type string --non-interactive
+```
 
 ---
 
@@ -92,16 +120,35 @@ npx eas-cli submit --platform ios --latest
 
 ---
 
-## 4. App env — Stripe publishable key + Sentry
+## 4. App env — local `.env` *and* EAS both matter
 
-Add to `.env` (gitignored):
+This bit was silently broken until 2026-08-04 and is worth understanding, because
+the failure mode is invisible locally.
+
+`firebaseConfig.js` reads `EXPO_PUBLIC_*` from `process.env`. Expo inlines those
+at **bundle** time, and `.env` is gitignored — so it is read on your machine and
+is *never* seen by an EAS build server. EAS had no variables set at all, meaning
+a production build would have inlined `apiKey: undefined` and crashed on launch
+for every user, with nothing in the build log to suggest a problem.
+
+Both places must be kept in sync. To change a value:
+
+```bash
+# 1. local .env (for `expo start`)
+# 2. EAS (for every real build)
+npx eas-cli env:set --scope project --environment production --environment preview \
+  --name EXPO_PUBLIC_FOO --value bar --visibility plaintext --type string --non-interactive
+
+npx eas-cli env:list --environment production   # verify
 ```
-EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_xxx
-EXPO_PUBLIC_SENTRY_DSN=https://xxx@xxx.ingest.sentry.io/xxx   # optional but recommended
-```
-`app/_layout.tsx` reads the publishable key into `StripeProvider`; Sentry is a
-no-op until the DSN is set. (Source-map upload is separately disabled via
-`eas.json` and that's intentional — the DSN is what turns crash reporting on.)
+
+`plaintext` is the right visibility here: every `EXPO_PUBLIC_*` value is inlined
+into the shipped client bundle, so marking them secret would be false comfort,
+not protection.
+
+**Sentry** is still unset. Add `EXPO_PUBLIC_SENTRY_DSN` in *both* places to turn
+crash reporting on; it is a no-op until then. (Source-map upload is separately
+disabled via `eas.json` and that is intentional — the DSN is the on switch.)
 
 ---
 
@@ -140,11 +187,15 @@ trial → active → past_due → canceled lifecycle.
 ### Who does what
 | Step | You | Claude |
 |---|---|---|
-| `firebase login --reauth` | ✅ done | — |
-| Deploy rules/storage/functions | — | ✅ done |
-| Set Stripe secrets + subscription price id | — | ✅ done (price id; secrets were already set) |
+| Deploy rules/storage/functions | — | ✅ done 2026-07-27 |
+| Set Stripe secrets + subscription price id | — | ✅ done |
 | Fix webhook event subscriptions + verify secret | — | ✅ done |
 | Pull native config files | — | ✅ done (via CLI, no console visit needed) |
+| Populate EAS build environment | — | ✅ done 2026-08-04 |
+| Fix the Storage bucket (pointed at a 404) | — | ✅ done 2026-08-04 |
+| Money / state-machine test coverage | — | ✅ done (59 tests, in CI) |
+| Terms of Service page | ✅ counsel + entity details | ✅ page built, figures verified |
+| `firebase login --reauth` | ✅ **expired again** | — |
 | Grant the `admin` claim | ✅ service-account key + which email | — (blocked by design) |
-| `eas build` / `eas submit` | ✅ your go-ahead to trigger | — (blocked by design) |
+| `eas submit` → TestFlight | ✅ | — (needs an App Store Connect record first) |
 | App Store Connect setup | ✅ | — |

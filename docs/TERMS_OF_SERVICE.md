@@ -5,12 +5,18 @@
 > California consumer law) review and revise it — especially the payments,
 > liability, Revv Care, arbitration, and background-check sections. Replace every
 > `[BRACKETED]` placeholder.
+>
+> Every figure stated below (fees, windows, caps, trial lengths) has been checked
+> against what the code actually enforces, so counsel is reviewing the real
+> product rather than illustrative numbers. The remaining brackets are the items
+> only you or counsel can supply: the operating entity, its state, the mailing
+> address, and the arbitration/liability language.
 
 # REVV — Terms of Service
 
 **Last updated:** [DATE]
 **Operator:** [LEGAL ENTITY NAME], [STATE] ("REVV", "we", "us")
-**Contact:** [SUPPORT EMAIL]
+**Contact:** support@revvapp.net
 
 By creating an account or using the REVV mobile application (the "App"), you agree
 to these Terms. If you do not agree, do not use the App.
@@ -32,9 +38,10 @@ party to the service agreement between a Client and a Detailer.
   Delete Account). Deletion is subject to Section 9 (records we retain).
 
 ## 3. Bookings & the Job Flow
-1. A Client requests a booking; the Client's payment card is **pre-authorized**
-   (a hold) for the service price. No booking is confirmed without a valid card
-   authorization.
+1. A Client requests a booking for a date **between one and four days ahead**;
+   the Client's payment card is **pre-authorized** (a hold) for the service
+   price. No booking is confirmed without a valid card authorization. The price
+   is taken from the Detailer's published rate card at the time of booking.
 2. The Detailer accepts, performs a Vehicle Inspection Report ("VIR"), and the
    Client signs off on the pre-existing condition of the vehicle.
 3. The Detailer completes the job and uploads before/after documentation; an
@@ -55,13 +62,21 @@ condition at the start of service and may be used to resolve disputes.
   is completed. **Detailers** authorize REVV to deduct the platform fee and
   processing fees and to remit the remainder to the Detailer's connected account.
 - All bookings are card-only. No cash transactions occur through REVV.
-- Detailer subscription (if applicable): [$34.99/month after any free trial;
-  billed via Stripe; cancel anytime; describe trial terms]. **[Confirm current
-  subscription terms before launch.]**
+- **Detailer subscription.** Appearing in the marketplace requires an active
+  subscription of **$34.99 per month**, billed via Stripe. New Detailers receive
+  a **14-day free trial** (**60 days** for those admitted to the Founding Pro
+  program). A payment method is collected up front and is charged automatically
+  when the trial ends; if no valid payment method is on file at that point the
+  subscription is canceled rather than charged. You may cancel at any time. If a
+  subscription lapses or a payment fails, the Detailer's listing is hidden from
+  the marketplace until it is brought current. Fees already paid are not
+  refundable except where required by law.
 
 ## 5. Disputes & Refunds
-- A Client may raise a dispute within the 24-hour window through the App. Payment
-  is paused pending review.
+- A Client may raise a dispute within the 24-hour window through the App, giving
+  a category (damage, service quality, no-show, wrong service, overcharge, or
+  other), a description, and photo evidence. Payment is paused pending review,
+  and the Detailer may submit one written response.
 - REVV may, at its discretion, mediate and determine an outcome (release, partial
   refund, or full refund) based on the VIR, photos, and information provided.
   REVV's determination of a platform dispute is final as between the parties for
@@ -70,10 +85,15 @@ condition at the start of service and may be used to resolve disputes.
 
 ## 6. Revv Care (Damage Protection)
 - REVV may offer "Revv Care," a limited damage-protection program funded from a
-  portion of the platform fee. **[Coverage terms, eligibility, the per-booking cap
-  (e.g., $2,500), claim window (e.g., 72 hours), exclusions, and the claims
-  process MUST be defined and reviewed by counsel and insurance advisors before
-  this section is relied upon.]**
+  portion of the platform fee (a reserve of 1% of each released booking).
+- A Client may file one claim per booking, within **72 hours of job completion**,
+  with a description and photo evidence. Coverage is capped at **$2,500 per
+  booking**. REVV reviews the claim and either approves an amount up to that cap
+  or denies it; approved amounts are paid from the platform reserve and are not
+  taken from the Detailer's payout.
+- **[Exclusions, eligibility conditions, and the appeal path MUST still be
+  defined and reviewed by counsel and insurance advisors before this section is
+  relied upon.]**
 - Revv Care is **not insurance** unless expressly stated and licensed as such.
 
 ## 7. Detailer Obligations & Verification
@@ -128,14 +148,14 @@ We may update these Terms; material changes will be notified in-App. Continued u
 after changes take effect constitutes acceptance.
 
 ## 15. Contact
-Questions: [SUPPORT EMAIL] · [MAILING ADDRESS]
+Questions: support@revvapp.net · [MAILING ADDRESS]
 
 ---
 
 ### Pre-launch legal checklist (for counsel)
-- [ ] Confirm operating legal entity and registration state.
+- [ ] Confirm operating legal entity and registration state, and the mailing address.
 - [ ] Review payments/fees vs. actual Stripe Connect flow (platform fee, payout timing, capture-on-completion).
-- [ ] Define Revv Care coverage, cap, claim window, exclusions; confirm it isn't unlicensed insurance.
+- [ ] Confirm Revv Care exclusions and appeal path; confirm it isn't unlicensed insurance.
 - [ ] FCRA-compliant background-check disclosure/consent if using a CRA.
 - [ ] Arbitration clause + class waiver + governing law/venue.
 - [ ] Liability limits vs. California consumer law.

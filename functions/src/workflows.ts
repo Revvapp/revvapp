@@ -4,6 +4,7 @@ import { getStorage } from 'firebase-admin/storage';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 
 import { db } from './admin';
+import { checkTransition, elapsedSeconds } from './bookingRules';
 import { enforceRateLimit } from './rateLimit';
 
 const REGION = 'us-west2';
@@ -48,12 +49,6 @@ type Booking = Record<string, unknown> & {
   status: string;
 };
 
-function assertParty(booking: Booking, uid: string): void {
-  if (booking.clientId !== uid && booking.detailerId !== uid) {
-    throw new HttpsError('permission-denied', 'You are not a party to this booking.');
-  }
-}
-
 function assertRole(booking: Booking, uid: string, role: 'client' | 'detailer'): void {
   const expected = role === 'client' ? booking.clientId : booking.detailerId;
   if (expected !== uid) throw new HttpsError('permission-denied', `${role} access required.`);
@@ -63,6 +58,15 @@ function assertStatus(booking: Booking, allowed: string[]): void {
   if (!allowed.includes(String(booking.status))) {
     throw new HttpsError('failed-precondition', 'Booking is not in the required state.');
   }
+}
+
+/**
+ * Runs the pure transition rules and rethrows any refusal as the matching
+ * HttpsError, so `bookingRules.ts` stays free of the Functions SDK.
+ */
+function assertTransition(booking: Booking, uid: string, action: string): void {
+  const check = checkTransition(booking, uid, action);
+  if (!check.ok) throw new HttpsError(check.code, check.message);
 }
 
 /**
@@ -79,30 +83,21 @@ export const transitionBooking = onCall({ region: REGION }, async (request) => {
     const snap = await tx.get(ref);
     if (!snap.exists) throw new HttpsError('not-found', 'Booking not found.');
     const booking = snap.data() as Booking;
-    assertParty(booking, uid);
+    // Role, source status and per-action preconditions all live in the pure
+    // rules module; the cases below only describe the resulting write.
+    assertTransition(booking, uid, action);
 
     switch (action) {
       case 'accept':
-        assertRole(booking, uid, 'detailer');
-        assertStatus(booking, ['pending']);
-        if (booking.paymentStatus !== 'requires_capture') {
-          throw new HttpsError('failed-precondition', 'A valid card hold is required.');
-        }
         tx.update(ref, { status: 'active', acceptedAt: FieldValue.serverTimestamp() });
         break;
       case 'decline':
-        assertRole(booking, uid, 'detailer');
-        assertStatus(booking, ['pending']);
         tx.update(ref, { status: 'declined', declinedAt: FieldValue.serverTimestamp() });
         break;
       case 'cancel':
-        assertRole(booking, uid, 'client');
-        assertStatus(booking, ['pending', 'active']);
         tx.update(ref, { status: 'cancelled', cancelledAt: FieldValue.serverTimestamp() });
         break;
       case 'submit_vir': {
-        assertRole(booking, uid, 'detailer');
-        assertStatus(booking, ['active']);
         const panels = request.data?.virPanels;
         if (!panels || typeof panels !== 'object' || Array.isArray(panels)) {
           throw new HttpsError('invalid-argument', 'VIR panels are required.');
@@ -124,14 +119,9 @@ export const transitionBooking = onCall({ region: REGION }, async (request) => {
         break;
       }
       case 'sign_vir':
-        assertRole(booking, uid, 'client');
-        assertStatus(booking, ['vir_submitted']);
-        if (!booking.virPanels) throw new HttpsError('failed-precondition', 'VIR is missing.');
         tx.update(ref, { status: 'vir_signed', virSignedAt: FieldValue.serverTimestamp() });
         break;
       case 'start':
-        assertRole(booking, uid, 'detailer');
-        assertStatus(booking, ['vir_signed']);
         tx.update(ref, {
           status: 'in_progress', timerStartAt: FieldValue.serverTimestamp(),
           timerStartMs: Date.now(), timerAccumulatedSeconds: 0,
@@ -140,46 +130,29 @@ export const transitionBooking = onCall({ region: REGION }, async (request) => {
             : [],
         });
         break;
-      case 'pause': {
-        assertRole(booking, uid, 'detailer');
-        assertStatus(booking, ['in_progress']);
-        const started = Number(booking.timerStartMs ?? Date.now());
-        const accumulated = Number(booking.timerAccumulatedSeconds ?? 0);
-        const elapsed = accumulated + Math.max(0, Math.floor((Date.now() - started) / 1_000));
+      case 'pause':
         tx.update(ref, {
           status: 'paused', timerStartAt: null, timerStartMs: null,
-          timerAccumulatedSeconds: elapsed,
+          timerAccumulatedSeconds: elapsedSeconds(booking, Date.now(), true),
           pauseReason: optionalText(request.data?.pauseReason, 200),
         });
         break;
-      }
       case 'resume':
-        assertRole(booking, uid, 'detailer');
-        assertStatus(booking, ['paused']);
         tx.update(ref, {
           status: 'in_progress', timerStartAt: FieldValue.serverTimestamp(), timerStartMs: Date.now(),
         });
         break;
-      case 'complete': {
-        assertRole(booking, uid, 'detailer');
-        assertStatus(booking, ['in_progress', 'paused']);
-        if (!booking.virSignedAt) throw new HttpsError('failed-precondition', 'Signed VIR required.');
-        const started = Number(booking.timerStartMs ?? Date.now());
-        const accumulated = Number(booking.timerAccumulatedSeconds ?? 0);
-        const running = booking.status === 'in_progress'
-          ? Math.max(0, Math.floor((Date.now() - started) / 1_000))
-          : 0;
+      case 'complete':
         tx.update(ref, {
           status: 'completed', timerStartAt: null, timerStartMs: null,
-          timerAccumulatedSeconds: accumulated + running,
+          // Only a running job has an open segment to add; a paused one already
+          // banked its time when it was paused.
+          timerAccumulatedSeconds: elapsedSeconds(booking, Date.now(), booking.status === 'in_progress'),
           completedAt: FieldValue.serverTimestamp(),
           releaseEligibleAt: Timestamp.fromMillis(Date.now() + 24 * 60 * 60 * 1_000),
         });
         break;
-      }
       case 'update_checklist':
-        assertRole(booking, uid, 'detailer');
-        assertStatus(booking, ['in_progress', 'paused']);
         if (!Array.isArray(request.data?.serviceChecklist) || request.data.serviceChecklist.length > 30) {
           throw new HttpsError('invalid-argument', 'Checklist is invalid.');
         }

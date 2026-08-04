@@ -10,7 +10,35 @@ Companion docs: `RELEASE_RUNBOOK.md` (exact commands), `STRIPE_PLAN.md`,
 
 ## 🔴 Blockers remaining
 
-### iOS build — config unblocked, no build kicked off yet
+### EAS build environment — ✅ fixed 2026-08-04, would have shipped a dead app
+- 🔴→✅ **EAS had no environment variables at all.** `firebaseConfig.js` /
+  `firebaseConfig.native.js` read `EXPO_PUBLIC_FIREBASE_*` from `process.env`,
+  which Expo inlines at bundle time. `.env` is gitignored, so it never reaches
+  the EAS build servers — a production build would have shipped with
+  `apiKey: undefined` and crashed on launch for every user. All seven
+  publishable values are now set on the EAS project for the `production` and
+  `preview` environments (`npx eas-cli env:list --environment production` to
+  verify). They are `plaintext` visibility deliberately: every one of them is
+  already inlined into the client bundle, so treating them as secret would be
+  false comfort.
+- 🔴→✅ **The Storage bucket was wrong and pointed at nothing.** `.env` had
+  `revv-app2026.appspot.com`; both native config files say
+  `revv-app2026.firebasestorage.app`. Confirmed by request: `.appspot.com`
+  returns **404 (no such bucket)** and `.firebasestorage.app` returns 403
+  (exists, anonymous listing correctly denied). Every upload path — VIR photos,
+  before/after photos, dispute evidence, Revv Care claim photos — was aimed at a
+  bucket that does not exist. Fixed in `.env` and on EAS.
+- ⚠️ **`EXPO_PUBLIC_FIREBASE_APP_ID` is the *Android* app id**
+  (`1:87072671490:android:…`) but is used by the Firebase **JS** SDK on both
+  platforms. Auth, Firestore and Storage key off `apiKey` + `projectId` and were
+  verified working, so this is not currently breaking anything, but it is wrong:
+  register a **Web** app in the Firebase console and use that app id. Verifying
+  which apps are registered needs a valid Firebase CLI login.
+- ✅ The web `EXPO_PUBLIC_FIREBASE_API_KEY` was verified valid against the
+  Identity Toolkit API (returns `INVALID_LOGIN_CREDENTIALS`, not
+  `API key not valid`).
+
+### iOS build — config unblocked, no successful build yet
 - ✅ **Firebase native config files are in place.** `GoogleService-Info.plist`
   and `google-services.json` were pulled straight from the already-registered
   Firebase apps via `firebase apps:sdkconfig` and are committed (they were
@@ -75,8 +103,17 @@ price id is `price_1TsqgEBT8U6J4a3bFadu5wED`).
 
 ## 🟠 Required for App Store submission
 
-- ⬜ **Terms of Service** — draft at `docs/TERMS_OF_SERVICE.md`; needs legal
-  review + a hosted URL.
+- 🟠 **Terms of Service — page built, still needs counsel.** `docs/terms.html`
+  is written and styled to match the privacy policy; once merged to `main` it
+  serves at https://revvapp.github.io/revvapp/terms.html. Every figure in it was
+  checked against what the code actually enforces (10% platform fee, 24h dispute
+  window, 72h / $2,500 Revv Care claim, $34.99/mo with 14-day trial — 60 for
+  Founding Pro, 1–4 day booking window), so counsel is reviewing the real
+  product. **Do not merge to `main` or submit the URL to App Store Connect while
+  the highlighted placeholders remain** — legal entity, state, mailing address,
+  liability limits and the arbitration clause are the items only you or counsel
+  can supply. They render as loud dashed-amber boxes so a half-finished page
+  cannot be published by accident.
 - ✅ Privacy Policy — hosted at https://revvapp.github.io/revvapp/
 - ✅ In-app account deletion — wired in both edit-profile screens.
 - ✅ Encryption compliance flag, permission usage strings — in `app.json`.
@@ -114,8 +151,24 @@ price id is `price_1TsqgEBT8U6J4a3bFadu5wED`).
 
 ## ⚪ Quality / hardening
 
-- 🟠 **Tests are thin.** 21 unit tests over pure logic + 12 rules tests. The
-  money math and booking state machine are still uncovered.
+- ✅ **Money math and the booking state machine are now covered.** 59 new tests
+  in `functions/test/` (`npm test` in `functions/`, wired into CI), on top of the
+  21 app tests and 12 rules tests. To make them meaningful rather than a parallel
+  reimplementation, the logic was first extracted out of the Stripe call sites
+  into two pure modules that production now actually calls:
+  - `functions/src/money.ts` — the 90/10 split, the 1% Revv Care accrual, the
+    partial-refund split and rate-card parsing. The 90/10 split had been written
+    out inline in **three** places; it is now one function, asserted to always
+    sum back to the captured amount so rounding can never push a transfer past
+    what the source charge made available.
+  - `functions/src/bookingRules.ts` — the transition table, timer arithmetic and
+    booking-date window. Tests sweep every action against every state and both
+    parties, so "can a client complete their own job?" has an asserted answer.
+  Two robustness fixes fell out of writing them: a corrupt `timerAccumulated‑
+  Seconds` used to produce `NaN` (which Firestore rejects, failing the whole
+  transition and stranding a job mid-service), and `captureAndTransfer` now
+  returns the captured amount so the Care reserve accrues against what Stripe
+  actually charged rather than the booking document's copy of the price.
 - ⬜ **Full manual QA of the critical path**, in Stripe test mode: signup (both
   roles) → Connect onboarding → subscription trial → booking + card hold → VIR →
   client sign → timer → complete → capture → invoice → dispute → resolve →
@@ -154,15 +207,27 @@ price id is `price_1TsqgEBT8U6J4a3bFadu5wED`).
 ---
 
 ## What's left, in order
-1. Grant the `admin` claim (needs a service-account key + a decision on which
-   app-user email).
-2. Kick off `eas build --platform ios --profile production` → submit to
-   TestFlight.
-3. Run the critical-path QA in Stripe test mode — now unblocked by the webhook
-   fix.
-4. App Store Connect: record, App Privacy, screenshots, ToS legal review +
-   hosting, Sentry DSN.
-5. Enable 1099 tax reporting for connected accounts in the Stripe Dashboard
+
+Everything below needs a credential, a payment, a human decision or a web UI —
+there is no remaining code work blocking a build.
+
+1. **`firebase login --reauth`** — the CLI session expired again (2026-08-04),
+   which blocks redeploying functions/rules and enumerating registered Firebase
+   apps (needed to settle the Web-vs-Android app id above).
+2. **Grant the `admin` claim** — needs a service-account key *and* a decision on
+   which app-user email holds it. The admin console (`app/admin/`) is unreachable
+   until then, which also means `setDetailerVerified` cannot be used and no
+   detailer can be marked verified.
+3. **Finish the iOS build → TestFlight.** The build environment is fixed as of
+   this round; the remaining unknown is whether the Apple distribution
+   credentials EAS provisioned for the 2026-07-14 attempt are still valid.
+4. **Critical-path QA in Stripe test mode** — signup → Connect onboarding →
+   subscription trial → booking + hold → VIR → sign → timer → complete →
+   capture → invoice → dispute → resolve → Revv Care claim → review.
+5. **ToS legal review** (see above), then merge `docs/terms.html` to `main`.
+6. **App Store Connect**: app record, App Privacy, screenshots, category, age
+   rating, support/marketing URLs. Sentry DSN.
+7. **Enable 1099 tax reporting** for connected accounts in the Stripe Dashboard
    (Connect settings → Tax forms) before LIVE mode.
-6. Checkr, Twilio, Reach AI captions, Stripe LIVE mode — the remaining
+8. **Checkr, Twilio, Reach AI captions, Stripe LIVE mode** — the remaining
    externally-blocked or intentionally-deferred items.
