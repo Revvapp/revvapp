@@ -9,32 +9,29 @@ environment was empty and the Storage bucket was wrong; both were fixed
 
 ---
 
-## 0. Re-authenticate the Firebase CLI — needs you
+## 0. Deploy the three functions that have never shipped — needs you
 
-The stored session expired again as of 2026-08-04. Everything that touches the
-project server-side (deploying functions or rules, listing registered apps) is
-blocked until this is run:
+`functions:list` returns 30 functions; the source exports 33. The 2026-07-27
+deploy predates commit `61ad6a2`, so `resolveReport`, `onCareClaimUpdated` and
+`onSubscriptionStatusChanged` have never existed in production. Until they do,
+`/admin/reports` calls a function that isn't there, Revv Care claimants are never
+told the outcome, and a detailer whose subscription payment fails loses
+marketplace visibility silently.
 
-```bash
-npx firebase-tools login --reauth      # as abdelrahman@revvapp.net
-npx firebase-tools functions:list --project revv-app2026   # confirm it worked
-```
-
-While you are there, the one open config question: `EXPO_PUBLIC_FIREBASE_APP_ID`
-is currently an **Android** app id but is consumed by the Firebase **JS** SDK on
-both platforms. Auth and Storage were verified working regardless (they key off
-`apiKey`/`projectId`), so this is not urgent, but the correct fix is to register
-a Web app and use its id:
+The Firebase CLI is authenticated (abdelrahman@revvapp.net) — this is blocked
+only by the Claude Code permission classifier, so run it yourself:
 
 ```bash
-npx firebase-tools apps:list --project revv-app2026
-# if no WEB app exists:
-npx firebase-tools apps:create web Revv --project revv-app2026
-# then update .env AND EAS:
-npx eas-cli env:set --scope project --environment production --environment preview \
-  --name EXPO_PUBLIC_FIREBASE_APP_ID --value <web app id> \
-  --visibility plaintext --type string --non-interactive
+npx firebase-tools deploy --only functions --project revv-app2026
+npx firebase-tools functions:list --project revv-app2026 | grep -cE "^│ [a-z]"   # expect 33
 ```
+
+`functions/.env.revv-app2026` must exist first (gitignored; recreate after a
+clone with `STRIPE_SUBSCRIPTION_PRICE_ID=price_1TsqgEBT8U6J4a3bFadu5wED`).
+
+The Firebase app config question raised in the previous revision is **resolved**:
+a Web app was already registered, and `.env` + EAS now carry its exact
+`apps:sdkconfig web` values. Nothing to do there.
 
 ---
 

@@ -3,6 +3,7 @@ import { onDocumentUpdated, onDocumentWritten } from 'firebase-functions/v2/fire
 import { logger } from 'firebase-functions/v2';
 
 import { db } from './admin';
+import { splitPayout } from './money';
 
 // Server-side push notifications (booking, message, dispute and review events).
 export * from './notifications';
@@ -119,9 +120,12 @@ export const createInvoiceOnCompletion = onDocumentUpdated('bookings/{bookingId}
   const invoiceRef = db.collection('invoices').doc(bookingId);
   if ((await invoiceRef.get()).exists) return; // already created client-side
 
+  // Derive the split from the same helper the Transfer uses, so the figures the
+  // invoice shows can never disagree by a cent with what is actually paid out.
   const price = Number(after.price ?? 0);
-  const platformFee = Math.round(price * 0.1 * 100) / 100;
-  const detailerPayout = Math.round((price - platformFee) * 100) / 100;
+  const { detailerCents, platformFeeCents } = splitPayout(Math.round(price * 100));
+  const platformFee = platformFeeCents / 100;
+  const detailerPayout = detailerCents / 100;
 
   await invoiceRef.set({
     bookingId,

@@ -28,15 +28,19 @@ Companion docs: `RELEASE_RUNBOOK.md` (exact commands), `STRIPE_PLAN.md`,
   (exists, anonymous listing correctly denied). Every upload path — VIR photos,
   before/after photos, dispute evidence, Revv Care claim photos — was aimed at a
   bucket that does not exist. Fixed in `.env` and on EAS.
-- ⚠️ **`EXPO_PUBLIC_FIREBASE_APP_ID` is the *Android* app id**
-  (`1:87072671490:android:…`) but is used by the Firebase **JS** SDK on both
-  platforms. Auth, Firestore and Storage key off `apiKey` + `projectId` and were
-  verified working, so this is not currently breaking anything, but it is wrong:
-  register a **Web** app in the Firebase console and use that app id. Verifying
-  which apps are registered needs a valid Firebase CLI login.
-- ✅ The web `EXPO_PUBLIC_FIREBASE_API_KEY` was verified valid against the
-  Identity Toolkit API (returns `INVALID_LOGIN_CREDENTIALS`, not
-  `API key not valid`).
+- 🟠→✅ **App id and API key now match the registered Web app.** A Web app
+  already existed (`revv (web)`), so nothing needed creating. `.env` had been
+  carrying the **Android** app id and a *different* API key than the Web app's;
+  both are now the values `firebase apps:sdkconfig web` returns, in `.env` and on
+  EAS. All six Firebase values are now byte-identical to the official Web SDK
+  config (the Storage bucket fix above matches it exactly, independently
+  confirming that diagnosis).
+- ✅ Verified by building the real bundle: `expo export --platform ios --clear`
+  then `strings` on the Hermes output shows the new web app id, the new API key
+  and the correct bucket present exactly once each, and all three superseded
+  values absent. **Use `--clear`** — Metro caches inlined `EXPO_PUBLIC_*` values
+  and will happily re-emit stale ones otherwise, which is a trap when verifying
+  a config change.
 
 ### iOS build — config unblocked, no successful build yet
 - ✅ **Firebase native config files are in place.** `GoogleService-Info.plist`
@@ -56,7 +60,30 @@ Companion docs: `RELEASE_RUNBOOK.md` (exact commands), `STRIPE_PLAN.md`,
   then `npx eas-cli submit --platform ios --latest`. EAS provisions the
   distribution cert + profile interactively the first time (Apple credentials).
 
-### Cloud Functions — ✅ deployed 2026-07-27
+### Cloud Functions — 🔴 three functions written but never deployed
+`functions:list` on 2026-08-04 returns **30** functions, but the source exports
+**33**. The 2026-07-27 deploy predates commit `61ad6a2`, so these three have
+never existed in production:
+
+| Missing function | What is silently broken without it |
+|---|---|
+| `resolveReport` | `/admin/reports` calls a function that isn't there — a trust & safety report can never be cleared. |
+| `onCareClaimUpdated` | A client who files a Revv Care claim is never notified of the outcome. |
+| `onSubscriptionStatusChanged` | A detailer whose payment fails loses marketplace visibility with no explanation. |
+
+The checklist previously described all three as fixed. They are fixed **in
+code** — the deploy is what's missing. `firebase deploy --only functions` was
+attempted 2026-08-04 and blocked by the Claude Code permission classifier, so it
+needs to be run by hand:
+
+```bash
+npx firebase-tools deploy --only functions --project revv-app2026
+```
+
+That deploy also carries the behaviour-preserving `money.ts` / `bookingRules.ts`
+refactor and the invoice-fee unification.
+
+### Cloud Functions — ✅ first deployed 2026-07-27
 All 30 functions are live on `revv-app2026`/`us-west2`, including the 9 that
 were previously written-but-undeployed: `validateBookingHold`,
 `createInvoiceOnCompletion`, `resolveDispute`, `createSubscription`,
@@ -211,9 +238,9 @@ price id is `price_1TsqgEBT8U6J4a3bFadu5wED`).
 Everything below needs a credential, a payment, a human decision or a web UI —
 there is no remaining code work blocking a build.
 
-1. **`firebase login --reauth`** — the CLI session expired again (2026-08-04),
-   which blocks redeploying functions/rules and enumerating registered Firebase
-   apps (needed to settle the Web-vs-Android app id above).
+1. **`npx firebase-tools deploy --only functions --project revv-app2026`** —
+   three functions have never been deployed (see above). Blocked by the
+   permission classifier, not by credentials; the CLI is authenticated.
 2. **Grant the `admin` claim** — needs a service-account key *and* a decision on
    which app-user email holds it. The admin console (`app/admin/`) is unreachable
    until then, which also means `setDetailerVerified` cannot be used and no
