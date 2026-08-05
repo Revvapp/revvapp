@@ -69,6 +69,8 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          # firebase-tools dropped support for Java below 21; the emulator
+          # refuses to start on anything older.
+          java-version: '21'
       - run: npm ci
       - run: npm run test:security
