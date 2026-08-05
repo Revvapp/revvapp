@@ -54,3 +54,6 @@ app-example
 
 # claude tool artifacts
 .claude/
+
+# Local editor/tooling state, not project source.
+skills-lock.json
