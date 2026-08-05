@@ -1,0 +1,148 @@
+# App Store Listing — draft copy
+
+Item 31. Paste-ready. Character limits are Apple's; counts shown are current.
+
+---
+
+## Name (30 max)
+```
+Revv — Mobile Car Detailing
+```
+*(26)* — Fallback if taken: `Revv: Mobile Car Detailing`
+
+## Subtitle (30 max)
+```
+Book vetted detailers near you
+```
+*(29)*
+
+## Promotional text (170 max — editable without a new build)
+```
+Every job is documented with a signed inspection report and before/after photos,
+and your card isn't charged until the work is done. Damage protection included.
+```
+*(153)*
+
+## Keywords (100 max, comma-separated, no spaces)
+```
+car detailing,auto detail,mobile detailing,car wash,ceramic coating,paint correction,car care,detailer,auto spa
+```
+*(112 — over limit; trim `,auto spa` to land at 103, then `,car care` to reach 94)*
+
+Do not repeat words already in the name or subtitle — Apple indexes those
+separately, so "revv", "mobile", "book" and "detailers" are wasted here.
+
+## Description (4000 max)
+
+```
+Revv connects you with professional mobile detailers who come to you — at home,
+at the office, wherever your car is parked.
+
+BOOK IN UNDER A MINUTE
+Browse detailers near you, compare real ratings and rate cards, and pick a time
+that works. No phone tag, no quotes, no haggling.
+
+YOUR CAR, DOCUMENTED
+Every job starts with a Vehicle Inspection Report. Your detailer photographs the
+car's condition and you sign off before any work begins — so there's never a
+question about what was already there. When the job's done, you get before-and-
+after photos with your invoice.
+
+YOU'RE NOT CHARGED UNTIL IT'S DONE
+Booking places a hold on your card, not a charge. The detailer is paid only after
+the work is complete, and you have a full 24 hours afterward to raise a dispute
+if something isn't right. Our team reviews every one.
+
+REVV CARE
+Every completed job includes damage protection up to $2,500. If something goes
+wrong, file a claim with photos from your invoice and we'll review it.
+
+TRACK THE JOB LIVE
+Watch the work start, pause and finish in real time. Message your detailer
+directly in the app.
+
+FOR DETAILERS
+Run your whole business from your phone. Get discovered by clients nearby, manage
+bookings and your rate card, document jobs with built-in inspection reports, and
+get paid automatically after every job — no invoicing, no chasing.
+
+Revv is a marketplace. Detailers are independent professionals, not Revv
+employees. Payments are processed securely by Stripe; we never see your full card
+number.
+```
+*(~1,430)*
+
+## What's New (first release)
+```
+Welcome to Revv — the first release. Book a mobile detailer, watch the job happen
+in real time, and pay only when the work is finished.
+```
+
+---
+
+## Categories
+- **Primary:** Lifestyle — where consumers browse for car care.
+- **Secondary:** Business — covers the detailer side.
+
+*(Considered and rejected: Shopping. Revv sells a booked service, not goods, and
+the category is dominated by retail apps.)*
+
+## Age rating
+**4+.** No objectionable content. Answer "None" to every content question.
+
+⚠️ **User-generated content:** the app has messaging, reviews and photo upload.
+Apple requires a moderation story — you have in-app reporting (`/report`), an
+admin resolution queue, and blocking via account suspension. Have that answer
+ready; it does not change the 4+ rating, but reviewers do ask.
+
+## URLs
+| Field | Value |
+|---|---|
+| Support URL | Needs a real page — **see gap below** |
+| Marketing URL | https://revvapp.github.io/revvapp/ (or a real landing page) |
+| Privacy Policy URL | https://revvapp.github.io/revvapp/ |
+| EULA / Terms | https://revvapp.github.io/revvapp/terms.html *(after item 27)* |
+
+> **Gap:** there is no support page. Apple requires a Support URL that actually
+> resolves and offers a way to get help. The in-app `/help` screen does not
+> satisfy this. Cheapest fix: a `docs/support.html` page on the same GitHub Pages
+> site with the FAQ from `app/help.tsx` and the support email. **~30 minutes, and
+> it is a hard requirement.**
+
+## App Review Information
+- Demo accounts: run `npm run seed-demo` in `functions/` (item 32) and paste the
+  credentials it prints.
+- Notes field — include this:
+
+```
+Revv is a two-sided marketplace for mobile car detailing.
+
+Sign in with either demo account to see that role. The detailer account is
+already subscribed and payout-enabled, so no card entry is needed to browse.
+
+Payments: booking a detail places a hold on the client's card via Stripe and is
+captured only after the job is completed. These are real-world services performed
+on the customer's vehicle, so per guideline 3.1.3(e) they use a payment method
+other than in-app purchase.
+
+To test a booking, use Stripe test card 4242 4242 4242 4242, any future expiry,
+any CVC.
+```
+
+## Screenshots (item 30)
+
+Six per size, in this order — the first two are what most people actually see:
+
+1. Detailer search results with ratings — *"Find detailers near you"*
+2. A detailer profile with rate card — *"Compare real prices"*
+3. The VIR inspection screen — *"Every job documented"*
+4. The live job timer — *"Track the work in real time"*
+5. Invoice with before/after photos — *"See exactly what you paid for"*
+6. Revv Care claim screen — *"$2,500 damage protection included"*
+
+Required: 6.7" (1290×2796) and 6.5" (1242×2688). Add 12.9" iPad **only if**
+`supportsTablet` stays enabled — if you are not testing on iPad, turn it off in
+`app.json` and skip those.
+
+Use the seeded demo data so screenshots show a populated marketplace, never empty
+states.
