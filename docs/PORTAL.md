@@ -57,15 +57,25 @@ a rules test asserts that. Grant it with the `setDealershipStatus` callable.
 | `respondToFleetQuote` | dealership | Accept or decline |
 | `setDealershipStatus` | admin | Grant or revoke dealership access |
 
+## The loop is now closed
+
+- ✅ **Admin quoting screen** at `/admin/fleet` — lists requests awaiting a
+  quote, pre-filled with the estimate the dealership was shown, and warns before
+  sending anything more than 25% off that figure.
+- ✅ **Accept / decline in the portal.** The server re-checks ownership and that
+  the order is still open, so a stale tab cannot respond to something already
+  resolved.
+- ✅ **Quote-ready notification** (`onFleetOrderQuoted`) — push and email, not
+  SMS: a quote is a commercial decision they want in writing, and it is the
+  reason they filled the form in, but it is not worth interrupting someone for.
+
 ## Still to build
 
-- **An admin UI for quoting.** `quoteFleetOrder` is deployed-ready but there is
-  no screen for it — quotes have to be issued by calling the function directly
-  until one exists. This is the gap that makes the loop manual.
-- **Accept/decline in the portal.** The status is displayed; the buttons that
-  call `respondToFleetQuote` are not wired yet.
-- **Notifications on quote-ready.** Nothing emails the dealership when a quote
-  lands; the notification layer exists and could carry it.
 - **Payment for fleet orders.** Accepting records a commitment; invoicing and
-  collection are off-platform. Deciding whether these ever become card-on-file
-  or net-30 is a business decision, not an engineering one.
+  collection are off-platform. Whether this becomes card-on-file or net-30 is a
+  business decision, not an engineering one — and it is the last thing standing
+  between this and a self-serve product.
+- **Assigning a detailer.** A quote implies someone can do the work; today that
+  confirmation happens in someone's head before they send the number.
+- **A dealership sign-up path.** Accounts are created in the app and promoted
+  with `setDealershipStatus`; there is no self-serve route in.

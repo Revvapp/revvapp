@@ -135,6 +135,10 @@ tbody tr:hover { background: var(--sunk); }
 .quote .row { display: flex; justify-content: space-between; padding: 5px 0; font-size: 14px; }
 .quote .row.tot { border-top: 1px solid var(--rule-strong); margin-top: 8px; padding-top: 10px; font-size: 17px; font-weight: 700; }
 
+.qnote { font-size: 12px; color: var(--ink-soft); margin-top: 4px; max-width: 260px; }
+.linkbtn.decline { color: var(--ink-soft); margin-left: 10px; }
+.linkbtn:disabled { opacity: .5; cursor: default; }
+
 @media print {
   body { background: #fff; color: #000; }
   .noprint { display: none !important; }

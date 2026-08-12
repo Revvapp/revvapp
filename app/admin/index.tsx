@@ -23,6 +23,17 @@ function useOpenCount(collectionName: string): number | null {
   return count;
 }
 
+/** Live count of docs in `collectionName` sitting at `status`. */
+function useStatusCount(collectionName: string, status: string): number | null {
+  const [count, setCount] = useState<number | null>(null);
+  useEffect(() => {
+    const q = query(collection(db, collectionName), where('status', '==', status));
+    const unsub = onSnapshot(q, (snap) => setCount(snap.size), () => setCount(null));
+    return () => unsub();
+  }, [collectionName, status]);
+  return count;
+}
+
 function Tile({
   icon,
   title,
@@ -64,6 +75,7 @@ export default function AdminHubScreen() {
   const openDisputes = useOpenCount('disputes');
   const openClaims   = useOpenCount('careClaims');
   const openReports  = useOpenCount('reports');
+  const openFleet    = useStatusCount('fleetOrders', 'requested');
 
   return (
     <SafeAreaView edges={['top']} style={styles.safe}>
@@ -105,6 +117,14 @@ export default function AdminHubScreen() {
           badge={openReports}
           tone="alert"
           onPress={() => router.push('/admin/reports')}
+        />
+        <Tile
+          icon="car-outline"
+          title="Fleet orders"
+          body="Quote dealership bulk requests."
+          badge={openFleet}
+          tone="alert"
+          onPress={() => router.push('/admin/fleet')}
         />
         <Tile
           icon="person-circle-outline"

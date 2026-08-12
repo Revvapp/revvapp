@@ -361,8 +361,12 @@ async function loadOrders() {
         <td>${when(o.createdAt)}</td>
         <td>${esc(o.service)}</td>
         <td class="mono">${(o.vehicles || []).length}</td>
-        <td>${orderPill(o.status)}</td>
+        <td>${orderPill(o.status)}${o.quoteNote ? `<div class="qnote">${esc(o.quoteNote)}</div>` : ""}</td>
         <td class="amt mono">${o.quotedCents != null ? money(o.quotedCents / 100) : money((o.estimateCents || 0) / 100)}</td>
+        <td class="amt">${o.status === "quoted"
+          ? `<button class="linkbtn" data-accept="${esc(o.id)}">Accept</button>
+             <button class="linkbtn decline" data-decline="${esc(o.id)}">Decline</button>`
+          : ""}</td>
       </tr>`).join("");
   } catch {
     $("fleetEmpty").hidden = false;
@@ -384,3 +388,27 @@ function orderPill(s) {
 }
 
 addVehicle();
+
+/**
+ * Accept or decline a quote. The server re-checks ownership and that the order
+ * is still open, so a stale page cannot respond to something already resolved.
+ */
+$("fleetRows").addEventListener("click", async (e) => {
+  const btn = e.target.closest("button[data-accept], button[data-decline]");
+  if (!btn) return;
+  const accept = btn.hasAttribute("data-accept");
+  const orderId = btn.dataset.accept || btn.dataset.decline;
+  const order = state.orders.find((o) => o.id === orderId);
+  const amount = order?.quotedCents != null ? money(order.quotedCents / 100) : "this quote";
+  if (accept && !confirm(`Accept ${amount} for ${order?.vehicleCount ?? ""} vehicles?`)) return;
+  if (!accept && !confirm("Decline this quote? We'll follow up by email.")) return;
+
+  [...$("fleetRows").querySelectorAll("button")].forEach((b) => (b.disabled = true));
+  try {
+    await httpsCallable(fns, "respondToFleetQuote")({ orderId, accept });
+    await loadOrders();
+  } catch (err) {
+    alert(err?.message || "Could not record that. Try again.");
+    [...$("fleetRows").querySelectorAll("button")].forEach((b) => (b.disabled = false));
+  }
+});

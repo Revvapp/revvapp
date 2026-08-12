@@ -28,7 +28,8 @@ export type NotificationEvent =
   | 'subscription_past_due'
   | 'subscription_canceled'
   | 'subscription_active'
-  | 'review';
+  | 'review'
+  | 'fleet_quote_ready';
 
 /**
  * The channel policy. Every event must appear here; an event missing from the
@@ -43,6 +44,10 @@ export const CHANNEL_POLICY: Readonly<Record<NotificationEvent, readonly Channel
   vir_ready: ['push', 'sms'],
   // Losing marketplace visibility means losing income — worth interrupting for.
   subscription_past_due: ['push', 'email', 'sms'],
+
+  // A quote is a commercial decision the dealership needs in writing, and it is
+  // the whole reason they filled the form in. Not urgent enough to text for.
+  fleet_quote_ready: ['push', 'email'],
 
   // Money moved, or a decision was made that the user may need to look up later.
   booking_accepted: ['push', 'email'],

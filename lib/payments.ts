@@ -195,3 +195,27 @@ export async function resolveReport(input: {
   const call = httpsCallable<typeof input, { ok: boolean }>(functions, 'resolveReport');
   await call(input);
 }
+
+/**
+ * Admin: return the binding quote on a fleet order. The estimate the dealership
+ * saw is indicative; this is the figure they actually agree to, which is why it
+ * can only be written here.
+ */
+export async function quoteFleetOrder(input: {
+  orderId: string;
+  quotedCents: number;
+  note?: string;
+}): Promise<{ ok: true }> {
+  const call = httpsCallable<typeof input, { ok: true }>(functions, 'quoteFleetOrder');
+  return (await call(input)).data;
+}
+
+/** Admin: grant or revoke fleet-ordering access for an account. */
+export async function setDealershipStatus(input: {
+  userId: string;
+  isDealership: boolean;
+  businessName?: string;
+}): Promise<{ ok: true }> {
+  const call = httpsCallable<typeof input, { ok: true }>(functions, 'setDealershipStatus');
+  return (await call(input)).data;
+}

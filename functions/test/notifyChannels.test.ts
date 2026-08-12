@@ -40,7 +40,7 @@ describe('CHANNEL_POLICY', () => {
     for (const event of [
       'dispute_created', 'dispute_response', 'dispute_resolved',
       'care_claim_resolved', 'subscription_past_due', 'subscription_canceled',
-      'job_complete', 'booking_accepted', 'booking_declined',
+      'job_complete', 'booking_accepted', 'booking_declined', 'fleet_quote_ready',
     ] as NotificationEvent[]) {
       assert.ok(CHANNEL_POLICY[event].includes('email'), `${event} has no email`);
     }

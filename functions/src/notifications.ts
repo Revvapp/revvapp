@@ -369,3 +369,23 @@ export const onReviewCreated = onDocumentCreated('reviews/{reviewId}', async (ev
     { type: 'review' }
   );
 });
+
+// 9. Fleet quote returned → tell the dealership it is ready to accept. Without
+// this the portal is a page they have to remember to go back and check.
+export const onFleetOrderQuoted = onDocumentUpdated('fleetOrders/{orderId}', async (event) => {
+  const before = event.data?.before.data();
+  const after = event.data?.after.data();
+  if (!before || !after) return;
+  if (before.status === after.status || String(after.status) !== 'quoted') return;
+
+  const amount = (Number(after.quotedCents ?? 0) / 100).toFixed(2);
+  const count = Number(after.vehicleCount ?? 0);
+  await notifyUser(
+    after.dealershipId as string | undefined,
+    'fleet_quote_ready',
+    'Your fleet quote is ready',
+    `$${amount} for ${count} ${count === 1 ? 'vehicle' : 'vehicles'}. `
+      + 'Open the portal to accept or decline.',
+    { type: 'fleet_quote', orderId: event.params.orderId }
+  );
+});
