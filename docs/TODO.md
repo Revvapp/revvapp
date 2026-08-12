@@ -22,6 +22,17 @@ Companions: `APPLE_IAP_RISK.md`, `QA_CRITICAL_PATH.md`, `STORE_LISTING.md`,
 - **App Privacy answers refreshed** — processor table added; corrected the phone
   row (both roles collect it, not detailers only).
 - **Privacy Policy gap analysis** — 8 specific gaps in `PRIVACY_POLICY_DELTA.md`.
+- **Support page built** (`docs/support.html`) — the missing hard Apple
+  requirement. Covers contact, payments, the dispute window, Revv Care, detailer
+  payouts, reporting, notification controls, account deletion and sign-in
+  trouble. Goes live at `/support.html` on the next push; cross-linked from the
+  policy and terms pages.
+- **Privacy Policy brought current** — added the email/SMS disclosure and STOP
+  language, named SendGrid and Twilio as processors, described vehicle data and
+  the Wikipedia image lookup, disclosed dispute/claim photo evidence, and
+  corrected the deletion route (it told users to email us; the App has had
+  in-app deletion for a while). Retired the duplicate Markdown copy —
+  `docs/index.html` is now the single source.
 - **Expo 57 assessed → deferred.** 54 → 57 is three major SDKs, 28 packages in
   lockstep plus a React Native upgrade and native rebuild. Not before a
   submission. Leaves one `postcss` advisory in build-time tooling only.
@@ -31,6 +42,8 @@ Companions: `APPLE_IAP_RISK.md`, `QA_CRITICAL_PATH.md`, `STORE_LISTING.md`,
 ---
 
 ## What's left
+
+*37 items.*
 
 ### A. Unblock — everything queues behind these
 
@@ -83,32 +96,31 @@ Companions: `APPLE_IAP_RISK.md`, `QA_CRITICAL_PATH.md`, `STORE_LISTING.md`,
 |---|---|---|
 | 21 | **Terms of Service legal review.** The long pole — start today. | You |
 | 22 | **Fill the ToS placeholders, remove the `noindex` line, merge `terms.html`.** | Either |
-| 23 | **Apply the Privacy Policy edits** in `PRIVACY_POLICY_DELTA.md` — §1 and §3 first, they are factually wrong today. | Either |
-| 24 | **🆕 Build a Support URL page.** Apple requires one that resolves; the in-app `/help` screen does not satisfy it. ~30 min: a `docs/support.html` with the FAQ and support email. **Hard requirement, currently missing.** | Either |
-| 25 | **App Privacy nutrition label** — transcribe from `APP_PRIVACY.md`. | You |
-| 26 | **Screenshots** — plan and captions in `STORE_LISTING.md`. | You |
-| 27 | **Paste the store listing** from `STORE_LISTING.md`; trim keywords to 100 chars. | You |
-| 28 | **Run `npm run seed-demo`** and paste the credentials into App Review Information. | You |
-| 29 | **Prepare the UGC moderation answer** — reviewers ask, given messaging/reviews/photos. | You |
+| 23 | **Two Privacy Policy decisions remain** (the text edits are done): the anonymized-record **retention period** needs a number from counsel, and whether adding SMS/email processing is a *material* change that moves the effective date and triggers the in-App notice §9 promises. | You |
+| 24 | **App Privacy nutrition label** — transcribe from `APP_PRIVACY.md`. | You |
+| 25 | **Screenshots** — plan and captions in `STORE_LISTING.md`. | You |
+| 26 | **Paste the store listing** from `STORE_LISTING.md`; trim keywords to 100 chars. | You |
+| 27 | **Run `npm run seed-demo`** and paste the credentials into App Review Information. | You |
+| 28 | **Prepare the UGC moderation answer** — reviewers ask, given messaging/reviews/photos. | You |
 
 ### G. Money go-live
 
 | # | Task | Owner |
 |---|---|---|
-| 30 | **Enable 1099 tax reporting** — Connect settings → Tax forms. | You |
-| 31 | **Switch Stripe to LIVE** — keys, new webhook + secret, re-verify **all 9** events. | You |
-| 32 | **One small real transaction** end to end, including payout. | You |
-| 33 | **Confirm the entity can receive funds** — bank connected, identity verified. | You |
+| 29 | **Enable 1099 tax reporting** — Connect settings → Tax forms. | You |
+| 30 | **Switch Stripe to LIVE** — keys, new webhook + secret, re-verify **all 9** events. | You |
+| 31 | **One small real transaction** end to end, including payout. | You |
+| 32 | **Confirm the entity can receive funds** — bank connected, identity verified. | You |
 
 ### H. Deferred — explicitly not blocking launch
 
 | # | Task |
 |---|---|
-| 34 | **Checkr** — needs counsel on FCRA consent/adverse-action first. |
-| 35 | **Revv Reach video + AI captions** — needs a vendor decision and cost model. |
-| 36 | **App Check monitor → enforce.** |
-| 37 | **Expo 57 bump** — clears the last `postcss` advisory. Post-launch. |
-| 38 | **Split the detailer app out** — the durable answer to #7. |
+| 33 | **Checkr** — needs counsel on FCRA consent/adverse-action first. |
+| 34 | **Revv Reach video + AI captions** — needs a vendor decision and cost model. |
+| 35 | **App Check monitor → enforce.** |
+| 36 | **Expo 57 bump** — clears the last `postcss` advisory. Post-launch. |
+| 37 | **Split the detailer app out** — the durable answer to #7. |
 
 ---
 
@@ -129,6 +141,6 @@ unit-tested; no human has exercised it end to end.
 Achievable, aggressively: #1–#8 this week, legal engaged today, TestFlight in
 ~10 days, submission by ~Aug 22 to leave room for one rejection round.
 
-Stripe LIVE (#30–#33) is on the critical path — launching in test mode is not an
+Stripe LIVE (#29–#32) is on the critical path — launching in test mode is not an
 option. If it slips, the honest lever is a TestFlight beta by Aug 31 and public
 release in early September, rather than compressing #14.

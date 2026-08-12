@@ -1,4 +1,12 @@
-# Privacy Policy — what's out of date
+# Privacy Policy — change log and what remains
+
+> **STATUS 2026-08-05: §1, §3, §4, §5, §6 and §7 are APPLIED to
+> `docs/index.html`.** §2 needed no change (the policy already lists phone
+> number role-agnostically). What remains is §5's retention period and §8's
+> effective date — both need a decision, see the bottom of this file.
+> Counsel should still review the applied wording alongside the Terms (item 21).
+
+## Original analysis
 
 Item 28. The hosted policy (`docs/index.html`, effective 2026-05-20) predates
 several things the app now does. Apple checks that the policy matches the App
@@ -99,3 +107,25 @@ changed.
    ship the other.
 3. §2, §4, §5, §6 — accuracy improvements.
 4. §8 — last, once the text is final.
+
+
+---
+
+## What remains after the 2026-08-05 pass
+
+**A. The retention period is still unspecified.** The policy now says
+transaction, dispute and safety records are retained in anonymized form "where
+we are required to for tax, accounting, fraud-prevention and legal purposes,"
+but gives no duration. Seven years is the usual answer for US tax records —
+**counsel should confirm the number**, then it can be stated outright.
+
+**B. The effective date was deliberately not moved.** "Last updated" is now
+2026-08-05; "Effective" still reads 2026-05-20. A materially changed policy
+normally takes a new effective date, and §9 of the policy itself promises that
+material changes are communicated in-App or by email. That is a notice
+obligation, not a text edit — **decide whether this counts as material** (adding
+SMS/email processing arguably does), and if so, move the effective date and send
+the notice together.
+
+**C. The Markdown copy was retired, not updated.** `PRIVACY_POLICY.md` is now
+`docs/PRIVACY_POLICY.superseded.md`, a pointer. `docs/index.html` is canonical.

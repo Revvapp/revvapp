@@ -98,16 +98,17 @@ ready; it does not change the 4+ rating, but reviewers do ask.
 ## URLs
 | Field | Value |
 |---|---|
-| Support URL | Needs a real page — **see gap below** |
+| Support URL | https://revvapp.github.io/revvapp/support.html ✅ **built** |
 | Marketing URL | https://revvapp.github.io/revvapp/ (or a real landing page) |
 | Privacy Policy URL | https://revvapp.github.io/revvapp/ |
 | EULA / Terms | https://revvapp.github.io/revvapp/terms.html *(after item 27)* |
 
-> **Gap:** there is no support page. Apple requires a Support URL that actually
-> resolves and offers a way to get help. The in-app `/help` screen does not
-> satisfy this. Cheapest fix: a `docs/support.html` page on the same GitHub Pages
-> site with the FAQ from `app/help.tsx` and the support email. **~30 minutes, and
-> it is a hard requirement.**
+> ✅ **Built 2026-08-05.** `docs/support.html` covers contact, payments, the
+> dispute window, Revv Care, detailer payouts, reporting, notification controls,
+> account deletion and sign-in trouble. It goes live at
+> https://revvapp.github.io/revvapp/support.html on the next push to `main`
+> (Pages serves `docs/` from `main`). Verify the URL resolves before entering it
+> in App Store Connect.
 
 ## App Review Information
 - Demo accounts: run `npm run seed-demo` in `functions/` (item 32) and paste the
