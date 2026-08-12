@@ -60,28 +60,13 @@ Companion docs: `RELEASE_RUNBOOK.md` (exact commands), `STRIPE_PLAN.md`,
   then `npx eas-cli submit --platform ios --latest`. EAS provisions the
   distribution cert + profile interactively the first time (Apple credentials).
 
-### Cloud Functions — 🔴 three functions written but never deployed
-`functions:list` on 2026-08-12 returns **30** functions, but the source exports
-**33**. The 2026-07-27 deploy predates commit `61ad6a2`, so these three have
-never existed in production:
-
-| Missing function | What is silently broken without it |
-|---|---|
-| `resolveReport` | `/admin/reports` calls a function that isn't there — a trust & safety report can never be cleared. |
-| `onCareClaimUpdated` | A client who files a Revv Care claim is never notified of the outcome. |
-| `onSubscriptionStatusChanged` | A detailer whose payment fails loses marketplace visibility with no explanation. |
-
-The checklist previously described all three as fixed. They are fixed **in
-code** — the deploy is what's missing. `firebase deploy --only functions` was
-attempted 2026-08-12 and blocked by the Claude Code permission classifier, so it
-needs to be run by hand:
-
-```bash
-npx firebase-tools deploy --only functions --project revv-app2026
-```
-
-That deploy also carries the behaviour-preserving `money.ts` / `bookingRules.ts`
-refactor and the invoice-fee unification.
+### Cloud Functions — ✅ all 38 deployed 2026-08-12
+`functions:list` returns **38**, matching the source exactly. The eight that had
+never existed in production are live: `resolveReport`, `onCareClaimUpdated`,
+`onSubscriptionStatusChanged`, and the five fleet-ordering functions. IAM invoker
+verified on every new callable (401 unauthenticated, not a 403 org-policy block).
+Firestore and Storage rules redeployed in the same pass, carrying the
+`isDealership` lock and the `fleetOrders` collection.
 
 ### Cloud Functions — ✅ first deployed 2026-07-27
 All 30 functions are live on `revv-app2026`/`us-west2`, including the 9 that
