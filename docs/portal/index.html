@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Revv Business Portal</title>
+  <meta name="description" content="Download receipts and payout statements, and place fleet detailing orders." />
+  <meta name="robots" content="noindex" />
+  <link rel="stylesheet" href="portal.css" />
+</head>
+<body>
+<div class="wrap">
+
+  <div class="bar noprint">
+    <a class="brand" href="./">RE<span>VV</span></a>
+    <span class="who" id="who" hidden></span>
+    <button class="linkbtn" id="signOut" hidden>Sign out</button>
+  </div>
+
+  <!-- ---------- signed out ---------- -->
+  <section id="viewAuth" hidden>
+    <h1>Business portal</h1>
+    <p class="lede">
+      Download receipts and payout statements, or place a fleet order. Sign in with the
+      same email you use in the Revv app.
+    </p>
+    <div class="card pad" style="max-width:420px">
+      <form id="signInForm">
+        <div class="field">
+          <label for="email">Email</label>
+          <input id="email" type="email" autocomplete="email" required />
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <input id="password" type="password" autocomplete="current-password" required />
+        </div>
+        <button class="btn" id="signInBtn" type="submit" style="width:100%">Sign in</button>
+        <p class="err" id="authErr" hidden></p>
+        <p style="margin:14px 0 0;font-size:13px;color:var(--ink-soft)">
+          <button class="linkbtn" id="reset" type="button">Email me a reset link</button>
+        </p>
+      </form>
+    </div>
+    <p class="lede" style="margin-top:18px;font-size:13px">
+      Don't have an account? Create one in the Revv app, or
+      <a href="../support.html">contact support</a> to set up a dealership account.
+    </p>
+  </section>
+
+  <!-- ---------- signed in ---------- -->
+  <section id="viewMain" hidden>
+    <div class="tabs noprint" id="tabs" role="tablist"></div>
+
+    <!-- receipts -->
+    <div id="tabReceipts" role="tabpanel" hidden>
+      <h1 id="recTitle">Receipts</h1>
+      <p class="lede" id="recLede"></p>
+      <div class="totals" id="totals"></div>
+      <div class="card">
+        <div class="scroll">
+          <table>
+            <thead><tr id="recHead"></tr></thead>
+            <tbody id="recRows"></tbody>
+          </table>
+        </div>
+        <div class="empty" id="recEmpty" hidden>No receipts yet.</div>
+      </div>
+    </div>
+
+    <!-- fleet -->
+    <div id="tabFleet" role="tabpanel" hidden>
+      <h1>Fleet order</h1>
+      <p class="lede">
+        Tell us the vehicles and the service. We'll confirm a detailer and send a quote
+        for approval — nothing is charged until you accept it.
+      </p>
+      <div class="card pad">
+        <form id="fleetForm">
+          <div class="field">
+            <label for="fleetService">Service</label>
+            <select id="fleetService" required>
+              <option value="Express Wash">Express Wash</option>
+              <option value="Full Interior" selected>Full Interior</option>
+              <option value="Paint Correction">Paint Correction</option>
+              <option value="Ceramic Coating">Ceramic Coating</option>
+            </select>
+          </div>
+
+          <h2 style="margin-top:20px">Vehicles</h2>
+          <div id="vehicles"></div>
+          <button class="btn ghost" id="addVeh" type="button" style="margin-top:4px">Add vehicle</button>
+
+          <div class="field" style="margin-top:20px">
+            <label for="fleetWhen">Preferred date</label>
+            <input id="fleetWhen" type="date" required />
+          </div>
+          <div class="field">
+            <label for="fleetAddr">Where the vehicles will be</label>
+            <input id="fleetAddr" type="text" placeholder="1200 Auto Row, Oakland, CA" required />
+          </div>
+          <div class="field">
+            <label for="fleetNotes">Anything we should know <span style="font-weight:400">(optional)</span></label>
+            <textarea id="fleetNotes" rows="3" placeholder="Gate code, contact on site, condition notes…"></textarea>
+          </div>
+
+          <div class="quote" id="quote"></div>
+
+          <button class="btn" id="fleetBtn" type="submit" style="width:100%;margin-top:16px">
+            Request quote
+          </button>
+          <p class="err" id="fleetErr" hidden></p>
+          <p class="ok-msg" id="fleetOk" hidden></p>
+        </form>
+      </div>
+
+      <h2 style="margin-top:28px">Your fleet orders</h2>
+      <div class="card">
+        <div class="scroll">
+          <table>
+            <thead><tr>
+              <th>Requested</th><th>Service</th><th>Vehicles</th><th>Status</th><th class="amt">Estimate</th>
+            </tr></thead>
+            <tbody id="fleetRows"></tbody>
+          </table>
+        </div>
+        <div class="empty" id="fleetEmpty" hidden>No fleet orders yet.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---------- one receipt ---------- -->
+  <section id="viewDoc" hidden>
+    <div class="noprint" style="display:flex;gap:10px;margin-bottom:18px">
+      <button class="btn ghost" id="backBtn" type="button">Back</button>
+      <button class="btn" id="printBtn" type="button">Download / print</button>
+    </div>
+    <div class="card pad doc" id="doc"></div>
+  </section>
+
+</div>
+<script type="module" src="portal.js"></script>
+</body>
+</html>

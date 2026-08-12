@@ -8,6 +8,9 @@ import { splitPayout } from './money';
 // Server-side push notifications (booking, message, dispute and review events).
 export * from './notifications';
 
+// Fleet ordering for dealerships (business portal).
+export * from './fleet';
+
 // Trust & safety report logging (off-platform / safety reports).
 export * from './reports';
 

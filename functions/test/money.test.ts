@@ -8,6 +8,8 @@ import {
   PLATFORM_FEE_RATE,
   careReserveCents,
   parseRateToCents,
+  FLEET_RATE_CARD,
+  fleetEstimate,
   splitPartialRefund,
   splitPayout,
 } from '../src/money';
@@ -149,5 +151,53 @@ describe('parseRateToCents', () => {
     assert.equal(parseRateToCents(''), null);
     assert.equal(parseRateToCents(null), null);
     assert.equal(parseRateToCents(undefined), null);
+  });
+});
+
+describe('fleetEstimate', () => {
+  it('prices a small order at the flat rate card', () => {
+    // 3 vehicles is below every tier, so no discount applies.
+    assert.deepEqual(fleetEstimate('Full Interior', 3), {
+      grossCents: 54_000, discountCents: 0, totalCents: 54_000, discountRate: 0,
+    });
+  });
+
+  it('applies each volume tier at its threshold', () => {
+    assert.equal(fleetEstimate('Express Wash', 4)!.discountRate, 0);
+    assert.equal(fleetEstimate('Express Wash', 5)!.discountRate, 0.10);
+    assert.equal(fleetEstimate('Express Wash', 9)!.discountRate, 0.10);
+    assert.equal(fleetEstimate('Express Wash', 10)!.discountRate, 0.15);
+    assert.equal(fleetEstimate('Express Wash', 24)!.discountRate, 0.15);
+    assert.equal(fleetEstimate('Express Wash', 25)!.discountRate, 0.20);
+    assert.equal(fleetEstimate('Express Wash', 500)!.discountRate, 0.20);
+  });
+
+  it('always reconciles gross − discount = total', () => {
+    for (const service of Object.keys(FLEET_RATE_CARD)) {
+      for (let n = 1; n <= 60; n += 1) {
+        const e = fleetEstimate(service, n)!;
+        assert.equal(e.grossCents - e.discountCents, e.totalCents, `${service} × ${n}`);
+        assert.ok(Number.isInteger(e.totalCents), `${service} × ${n} not whole cents`);
+      }
+    }
+  });
+
+  it('refuses a service that is not on the rate card', () => {
+    // Returning null rather than 0 keeps an unknown service from being quoted free.
+    assert.equal(fleetEstimate('Engine Swap', 10), null);
+    assert.equal(fleetEstimate('', 10), null);
+  });
+
+  it('refuses a non-positive vehicle count', () => {
+    assert.equal(fleetEstimate('Full Interior', 0), null);
+    assert.throws(() => fleetEstimate('Full Interior', -1), RangeError);
+    assert.throws(() => fleetEstimate('Full Interior', 2.5), RangeError);
+  });
+
+  it('never discounts more than the gross', () => {
+    for (let n = 1; n <= 200; n += 7) {
+      const e = fleetEstimate('Ceramic Coating', n)!;
+      assert.ok(e.discountCents < e.grossCents && e.totalCents > 0);
+    }
   });
 });

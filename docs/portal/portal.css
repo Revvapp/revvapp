@@ -1,0 +1,146 @@
+/* Revv business portal — receipts and fleet ordering.
+   Shares the navy/gold identity of the app and the public pages. Print styles
+   matter as much as screen here: a receipt exists to be saved or filed. */
+:root {
+  --ground:      #EFF3F8;
+  --card:        #FFFFFF;
+  --sunk:        #F4F7FB;
+  --ink:         #10243A;
+  --ink-soft:    #526C8B;
+  --ink-faint:   #8AA0B8;
+  --rule:        #E1E9F2;
+  --rule-strong: #C9D6E4;
+  --gold:        #9C7C18;
+  --gold-bg:     rgba(156,124,24,0.10);
+  --ok:          #1F7A54;
+  --ok-bg:       rgba(31,122,84,0.10);
+  --warn:        #A8511B;
+  --warn-bg:     rgba(168,81,27,0.10);
+  --bad:         #A33528;
+  --bad-bg:      rgba(163,53,40,0.10);
+  --shadow:      0 1px 2px rgba(16,36,58,.05), 0 10px 30px -18px rgba(16,36,58,.3);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #071320; --card: #0E2032; --sunk: #0A1A29;
+    --ink: #E8EFF7; --ink-soft: #9CB2CA; --ink-faint: #6A83A0;
+    --rule: #1C3049; --rule-strong: #2A4160;
+    --gold: #DCB44C; --gold-bg: rgba(220,180,76,.14);
+    --ok: #4FB98A; --ok-bg: rgba(79,185,138,.14);
+    --warn: #E08A4E; --warn-bg: rgba(224,138,78,.14);
+    --bad: #E0705F; --bad-bg: rgba(224,112,95,.14);
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px -18px rgba(0,0,0,.7);
+  }
+}
+:root[data-theme="dark"] {
+  --ground: #071320; --card: #0E2032; --sunk: #0A1A29;
+  --ink: #E8EFF7; --ink-soft: #9CB2CA; --ink-faint: #6A83A0;
+  --rule: #1C3049; --rule-strong: #2A4160;
+  --gold: #DCB44C; --gold-bg: rgba(220,180,76,.14);
+  --ok: #4FB98A; --ok-bg: rgba(79,185,138,.14);
+  --warn: #E08A4E; --warn-bg: rgba(224,138,78,.14);
+  --bad: #E0705F; --bad-bg: rgba(224,112,95,.14);
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px -18px rgba(0,0,0,.7);
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--ground); color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 15px; line-height: 1.55;
+}
+.mono { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; }
+.wrap { max-width: 880px; margin: 0 auto; padding: 26px 18px 80px; }
+[hidden] { display: none !important; }
+
+/* ---------- chrome ---------- */
+.bar { display: flex; align-items: center; gap: 14px; margin-bottom: 24px; flex-wrap: wrap; }
+.brand { font-weight: 900; font-size: 18px; letter-spacing: 3.5px; text-decoration: none; color: var(--ink); }
+.brand span { color: var(--gold); }
+.bar .who { margin-left: auto; font-size: 13px; color: var(--ink-soft); }
+.tabs { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 1px solid var(--rule); }
+.tabs button {
+  font: inherit; font-size: 14px; font-weight: 600; padding: 9px 13px; border: 0; cursor: pointer;
+  background: none; color: var(--ink-faint); border-bottom: 2px solid transparent; margin-bottom: -1px;
+}
+.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--gold); }
+.tabs button:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
+
+h1 { font-size: 21px; margin: 0 0 4px; }
+.lede { margin: 0 0 20px; color: var(--ink-soft); font-size: 14px; }
+h2 { font-size: 15px; margin: 0 0 12px; }
+
+.card { background: var(--card); border: 1px solid var(--rule); border-radius: 14px; box-shadow: var(--shadow); }
+.pad { padding: 20px; }
+
+/* ---------- forms ---------- */
+label { display: block; font-size: 12.5px; font-weight: 600; color: var(--ink-soft); margin-bottom: 5px; }
+input, select, textarea {
+  font: inherit; width: 100%; padding: 10px 12px; border: 1px solid var(--rule-strong);
+  border-radius: 9px; background: var(--card); color: var(--ink);
+}
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--gold); outline-offset: -1px; border-color: var(--gold); }
+.field { margin-bottom: 14px; }
+.btn {
+  font: inherit; font-weight: 700; font-size: 14.5px; padding: 11px 18px; border: 0; border-radius: 10px;
+  background: var(--ink); color: var(--ground); cursor: pointer;
+}
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn.ghost { background: none; color: var(--ink); border: 1px solid var(--rule-strong); }
+.btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.err { color: var(--bad); font-size: 13.5px; margin: 10px 0 0; }
+.ok-msg { color: var(--ok); font-size: 13.5px; margin: 10px 0 0; }
+
+/* ---------- receipts ---------- */
+.totals { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
+.stat { flex: 1 1 150px; background: var(--card); border: 1px solid var(--rule); border-radius: 12px; padding: 14px 16px; }
+.stat .k { font-size: 11px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--ink-faint); font-weight: 700; }
+.stat .v { font-size: 22px; font-weight: 700; margin-top: 3px; }
+
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.scroll { overflow-x: auto; }
+th { text-align: left; font-size: 11px; letter-spacing: 1.1px; text-transform: uppercase; color: var(--ink-faint); padding: 0 14px 9px; font-weight: 700; white-space: nowrap; }
+td { padding: 12px 14px; border-top: 1px solid var(--rule); vertical-align: top; }
+tbody tr:hover { background: var(--sunk); }
+.amt { text-align: right; font-weight: 600; white-space: nowrap; }
+.pill { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; padding: 3px 8px; border-radius: 6px; white-space: nowrap; }
+.pill.ok { background: var(--ok-bg); color: var(--ok); }
+.pill.warn { background: var(--warn-bg); color: var(--warn); }
+.pill.bad { background: var(--bad-bg); color: var(--bad); }
+.pill.mute { background: var(--sunk); color: var(--ink-soft); }
+.linkbtn { font: inherit; font-size: 13.5px; background: none; border: 0; color: var(--ink); cursor: pointer; text-decoration: underline; padding: 0; }
+.empty { text-align: center; padding: 44px 20px; color: var(--ink-soft); }
+
+/* ---------- receipt document ---------- */
+.doc { max-width: 620px; margin: 0 auto; }
+.doc-h { display: flex; justify-content: space-between; gap: 20px; align-items: flex-start; padding-bottom: 18px; border-bottom: 2px solid var(--ink); }
+.doc-h .t { font-size: 12px; letter-spacing: 1.6px; text-transform: uppercase; color: var(--ink-faint); font-weight: 700; }
+.doc-h .n { font-size: 19px; font-weight: 700; }
+.parties { display: flex; gap: 26px; flex-wrap: wrap; padding: 18px 0; }
+.parties div { flex: 1 1 200px; }
+.parties .k { font-size: 11px; letter-spacing: 1.1px; text-transform: uppercase; color: var(--ink-faint); font-weight: 700; margin-bottom: 3px; }
+.lines { width: 100%; margin-top: 6px; }
+.lines td { padding: 10px 0; }
+.lines .r { text-align: right; }
+.lines tr.sum td { border-top: 1px solid var(--rule); }
+.lines tr.grand td { border-top: 2px solid var(--ink); font-size: 17px; font-weight: 700; padding-top: 13px; }
+.doc-foot { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--rule); font-size: 12px; color: var(--ink-faint); }
+
+/* ---------- fleet order ---------- */
+.veh { display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end; margin-bottom: 10px; }
+.veh .rm { padding: 10px 12px; }
+@media (max-width: 560px) { .veh { grid-template-columns: 1fr; } }
+.quote { background: var(--sunk); border-radius: 12px; padding: 16px 18px; margin-top: 16px; }
+.quote .row { display: flex; justify-content: space-between; padding: 5px 0; font-size: 14px; }
+.quote .row.tot { border-top: 1px solid var(--rule-strong); margin-top: 8px; padding-top: 10px; font-size: 17px; font-weight: 700; }
+
+@media print {
+  body { background: #fff; color: #000; }
+  .noprint { display: none !important; }
+  .card { border: 0; box-shadow: none; }
+  .pad { padding: 0; }
+  .wrap { padding: 0; max-width: none; }
+  .doc-h { border-bottom-color: #000; }
+  .lines tr.grand td { border-top-color: #000; }
+}

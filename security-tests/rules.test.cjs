@@ -47,6 +47,14 @@ beforeEach(async () => {
       bookingId: 'booking-1', invoiceId: 'booking-1', clientId: 'client',
       detailerId: 'detailer', status: 'open', description: 'private evidence',
     });
+    await setDoc(doc(db, 'users/dealer'), {
+      uid: 'dealer', email: 'dealer@example.com', userType: 'client',
+      isDealership: true, subscriptionStatus: 'pending', trialDays: 0, trialStartDate: null,
+    });
+    await setDoc(doc(db, 'fleetOrders/order-1'), {
+      dealershipId: 'dealer', service: 'Full Interior', vehicleCount: 12,
+      status: 'requested', estimateCents: 183600, quotedCents: null,
+    });
   });
 });
 
@@ -267,4 +275,30 @@ test('reviews require a paid, completed booking, valid score, and are immutable'
   await assertSucceeds(setDoc(doc(clientDb, 'reviews/booking-paid'), good));
   // Reviews are permanent — no edits after the fact.
   await assertFails(updateDoc(doc(clientDb, 'reviews/booking-paid'), { rating: 1 }));
+});
+
+test('dealership status cannot be self-granted and fleet orders are private', async () => {
+  const clientDb = env.authenticatedContext('client', { email: 'client@example.com' }).firestore();
+  const dealerDb = env.authenticatedContext('dealer', { email: 'dealer@example.com' }).firestore();
+
+  // isDealership gates volume pricing, so it is server-owned like the billing
+  // fields — a client must not be able to promote themselves into it.
+  await assertFails(updateDoc(doc(clientDb, 'users/client'), { isDealership: true }));
+  await assertFails(setDoc(doc(clientDb, 'users/client'), {
+    uid: 'client', email: 'client@example.com', userType: 'client', isDealership: true,
+  }));
+  // Nor may a real dealership revoke or re-assert it by hand.
+  await assertFails(updateDoc(doc(dealerDb, 'users/dealer'), { isDealership: false }));
+
+  // A dealership reads its own orders; nobody else can.
+  await assertSucceeds(getDoc(doc(dealerDb, 'fleetOrders/order-1')));
+  await assertFails(getDoc(doc(clientDb, 'fleetOrders/order-1')));
+
+  // Every mutation is a callable, so direct writes are closed to everyone —
+  // including the dealership that owns the order.
+  await assertFails(updateDoc(doc(dealerDb, 'fleetOrders/order-1'), { quotedCents: 1 }));
+  await assertFails(updateDoc(doc(dealerDb, 'fleetOrders/order-1'), { status: 'accepted' }));
+  await assertFails(setDoc(doc(dealerDb, 'fleetOrders/forged'), {
+    dealershipId: 'dealer', service: 'Ceramic Coating', vehicleCount: 99, status: 'accepted',
+  }));
 });

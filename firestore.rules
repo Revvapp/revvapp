@@ -30,6 +30,7 @@ service cloud.firestore {
         && request.resource.data.uid == uid
         && request.resource.data.email == request.auth.token.email
         && request.resource.data.get('isFoundingPro', false) == false
+        && request.resource.data.get('isDealership', false) == false
         && request.resource.data.get('subscriptionStatus', 'pending') == 'pending'
         && request.resource.data.get('trialDays', 0) == 0
         && request.resource.data.get('trialStartDate', null) == null;
@@ -38,6 +39,9 @@ service cloud.firestore {
         && request.resource.data.email == resource.data.email
         && request.resource.data.userType == resource.data.userType
         && request.resource.data.get('isFoundingPro', false) == resource.data.get('isFoundingPro', false)
+        // Dealership status gates fleet ordering and its volume pricing, so it
+        // is server-owned like the billing fields — never self-grantable.
+        && request.resource.data.get('isDealership', false) == resource.data.get('isDealership', false)
         && request.resource.data.get('subscriptionStatus', '') == resource.data.get('subscriptionStatus', '')
         && request.resource.data.get('trialDays', 0) == resource.data.get('trialDays', 0)
         && request.resource.data.get('trialStartDate', null) == resource.data.get('trialStartDate', null);
@@ -239,6 +243,18 @@ service cloud.firestore {
       // owner — a client can manage its own token and nothing more. The Admin
       // SDK bypasses these rules, so the notification functions still read freely.
       allow read, write: if isOwner(uid);
+    }
+
+    // Fleet orders are raised from the business portal and priced server-side.
+    // A dealership reads only its own; every mutation is a callable that
+    // re-derives the estimate, so the quote can never be set from a client.
+    match /fleetOrders/{orderId} {
+      allow read: if signedIn() && (
+        resource == null ||
+        resource.data.dealershipId == request.auth.uid ||
+        isAdmin()
+      );
+      allow create, update, delete: if false;
     }
 
     match /stripeEvents/{eventId} {

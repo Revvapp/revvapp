@@ -101,3 +101,63 @@ export function parseRateToCents(rate: unknown): number | null {
   }
   return cents;
 }
+
+/**
+ * Platform rate card used to estimate a fleet order.
+ *
+ * A normal booking is priced from the detailer's own rate card, but a fleet
+ * request has no detailer assigned yet — so an estimate has to come from
+ * somewhere neutral. These are indicative figures only: the binding number is
+ * the quote a human returns after confirming who can take the work.
+ */
+export const FLEET_RATE_CARD: Readonly<Record<string, number>> = {
+  'Express Wash': 8_500,
+  'Full Interior': 18_000,
+  'Paint Correction': 45_000,
+  'Ceramic Coating': 90_000,
+};
+
+/**
+ * Volume discount by vehicle count, as [minimum vehicles, discount fraction].
+ * Ordered high to low so the first match is the best tier that applies.
+ */
+export const FLEET_TIERS: ReadonlyArray<readonly [number, number]> = [
+  [25, 0.20],
+  [10, 0.15],
+  [5, 0.10],
+];
+
+/** The discount fraction a given vehicle count earns. */
+export function fleetDiscountRate(vehicleCount: number): number {
+  const n = wholeCents(vehicleCount, 'vehicleCount');
+  return FLEET_TIERS.find(([min]) => n >= min)?.[1] ?? 0;
+}
+
+export interface FleetEstimate {
+  /** Undiscounted total: rate card × vehicles. */
+  grossCents: number;
+  /** Amount taken off for volume. */
+  discountCents: number;
+  /** What the dealership would pay at the indicative rate. */
+  totalCents: number;
+  discountRate: number;
+}
+
+/**
+ * Estimates a fleet order. Returns null for a service that is not on the rate
+ * card, so a caller cannot be tricked into quoting an unknown service at zero.
+ *
+ * The discount is rounded and subtracted (rather than multiplying the total by
+ * `1 - rate`) so gross, discount and total always reconcile exactly.
+ */
+export function fleetEstimate(service: string, vehicleCount: number): FleetEstimate | null {
+  const unit = FLEET_RATE_CARD[service];
+  if (unit === undefined) return null;
+  const n = wholeCents(vehicleCount, 'vehicleCount');
+  if (n <= 0) return null;
+
+  const grossCents = unit * n;
+  const discountRate = fleetDiscountRate(n);
+  const discountCents = Math.round(grossCents * discountRate);
+  return { grossCents, discountCents, totalCents: grossCents - discountCents, discountRate };
+}
