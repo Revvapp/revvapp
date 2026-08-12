@@ -10,7 +10,7 @@ Companion docs: `RELEASE_RUNBOOK.md` (exact commands), `STRIPE_PLAN.md`,
 
 ## 🔴 Blockers remaining
 
-### EAS build environment — ✅ fixed 2026-08-04, would have shipped a dead app
+### EAS build environment — ✅ fixed 2026-08-12, would have shipped a dead app
 - 🔴→✅ **EAS had no environment variables at all.** `firebaseConfig.js` /
   `firebaseConfig.native.js` read `EXPO_PUBLIC_FIREBASE_*` from `process.env`,
   which Expo inlines at bundle time. `.env` is gitignored, so it never reaches
@@ -61,7 +61,7 @@ Companion docs: `RELEASE_RUNBOOK.md` (exact commands), `STRIPE_PLAN.md`,
   distribution cert + profile interactively the first time (Apple credentials).
 
 ### Cloud Functions — 🔴 three functions written but never deployed
-`functions:list` on 2026-08-04 returns **30** functions, but the source exports
+`functions:list` on 2026-08-12 returns **30** functions, but the source exports
 **33**. The 2026-07-27 deploy predates commit `61ad6a2`, so these three have
 never existed in production:
 
@@ -73,7 +73,7 @@ never existed in production:
 
 The checklist previously described all three as fixed. They are fixed **in
 code** — the deploy is what's missing. `firebase deploy --only functions` was
-attempted 2026-08-04 and blocked by the Claude Code permission classifier, so it
+attempted 2026-08-12 and blocked by the Claude Code permission classifier, so it
 needs to be run by hand:
 
 ```bash

@@ -1,6 +1,6 @@
 # The $34.99 Subscription vs. Apple In-App Purchase
 
-Researched 2026-08-05 against the current App Review Guidelines. **Read this
+Researched 2026-08-12 against the current App Review Guidelines. **Read this
 before running a production build** — the conclusion may change what gets built.
 
 ## Short version

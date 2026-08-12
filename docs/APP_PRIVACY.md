@@ -42,7 +42,7 @@ disclosed in the Privacy Policy:
 | **Sentry** *(once DSN set)* | Crash diagnostics, user id | Crash reporting |
 | **Wikipedia API** | Vehicle make/model only — **no user identifiers** | Fetching a car image (`lib/carImage.ts`) |
 
-SendGrid and Twilio are new as of 2026-08-04 and are **not yet reflected in the
+SendGrid and Twilio are new as of 2026-08-12 and are **not yet reflected in the
 hosted Privacy Policy** — see item 28 on the road-to-publish list.
 
 ## Info.plist permission strings (already in app.json → verify wording at submit)

@@ -103,7 +103,7 @@ ready; it does not change the 4+ rating, but reviewers do ask.
 | Privacy Policy URL | https://revvapp.github.io/revvapp/ |
 | EULA / Terms | https://revvapp.github.io/revvapp/terms.html *(after item 27)* |
 
-> ✅ **Built 2026-08-05.** `docs/support.html` covers contact, payments, the
+> ✅ **Built 2026-08-12.** `docs/support.html` covers contact, payments, the
 > dispute window, Revv Care, detailer payouts, reporting, notification controls,
 > account deletion and sign-in trouble. It goes live at
 > https://revvapp.github.io/revvapp/support.html on the next push to `main`

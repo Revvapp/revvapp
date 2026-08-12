@@ -1,6 +1,6 @@
 # REVV — Road to Publish
 
-Target: **App Store, by 2026-08-31.** Updated 2026-08-05.
+Target: **App Store, by 2026-08-31.** Updated 2026-08-12.
 
 Companions: `APPLE_IAP_RISK.md`, `QA_CRITICAL_PATH.md`, `STORE_LISTING.md`,
 `PRIVACY_POLICY_DELTA.md`, `RELEASE_RUNBOOK.md`, `RELEASE_CHECKLIST.md`.
@@ -136,11 +136,28 @@ unit-tested; no human has exercised it end to end.
 
 **3 — Legal review is external (#21).** Gates #22, #23 and submission itself.
 
-## Timeline
+## Timeline — 19 days left
 
-Achievable, aggressively: #1–#8 this week, legal engaged today, TestFlight in
-~10 days, submission by ~Aug 22 to leave room for one rejection round.
+**Aug 31 for a public release is now unlikely.** Working backwards: Apple review
+is 1–3 days, so submission by ~Aug 26 at the very latest; a beta worth running is
+a week, so TestFlight by ~Aug 19; which means the build, the 40-step QA pass
+(#14) and the IAP decision (#7) all have to land inside the next 7 days — while
+legal review (#21) runs in parallel and gates the submission itself.
 
-Stripe LIVE (#29–#32) is on the critical path — launching in test mode is not an
-option. If it slips, the honest lever is a TestFlight beta by Aug 31 and public
-release in early September, rather than compressing #14.
+That can happen, but only if nothing surprises you, and #14 exists precisely
+because something probably will.
+
+**The realistic plan:** target **TestFlight by Aug 31**, public release early
+September. That keeps the one thing you cannot compress — a real beta on real
+devices — and it does not force you to submit before the critical path has ever
+been run end to end.
+
+**If Aug 31 public is non-negotiable**, the levers in order of least damage:
+1. Ship without SMS (#19) — email covers the same events.
+2. Ship without Sentry (#20) — accept blind debugging for a few weeks.
+3. Shorten the beta to 3 days.
+Do **not** compress #14, and do not submit before #7 is settled — a rejection
+costs more days than either saves.
+
+Stripe LIVE (#29–#32) is on the critical path regardless; launching in test mode
+is not an option.

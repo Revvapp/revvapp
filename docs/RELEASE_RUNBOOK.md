@@ -5,7 +5,7 @@ Status: rules, storage and all 30 Cloud Functions are deployed to
 to every event the handler processes, and verified working end-to-end with a
 real signed test event. Native config files are committed. The EAS build
 environment was empty and the Storage bucket was wrong; both were fixed
-2026-08-04 (see §0). What is left needs a credential, a payment or a web UI.
+2026-08-12 (see §0). What is left needs a credential, a payment or a web UI.
 
 ---
 
@@ -163,7 +163,7 @@ emailed or texted. Users opt out per channel at Profile → Notifications.
 
 ## 4. App env — local `.env` *and* EAS both matter
 
-This bit was silently broken until 2026-08-04 and is worth understanding, because
+This bit was silently broken until 2026-08-12 and is worth understanding, because
 the failure mode is invisible locally.
 
 `firebaseConfig.js` reads `EXPO_PUBLIC_*` from `process.env`. Expo inlines those
@@ -232,8 +232,8 @@ trial → active → past_due → canceled lifecycle.
 | Set Stripe secrets + subscription price id | — | ✅ done |
 | Fix webhook event subscriptions + verify secret | — | ✅ done |
 | Pull native config files | — | ✅ done (via CLI, no console visit needed) |
-| Populate EAS build environment | — | ✅ done 2026-08-04 |
-| Fix the Storage bucket (pointed at a 404) | — | ✅ done 2026-08-04 |
+| Populate EAS build environment | — | ✅ done 2026-08-12 |
+| Fix the Storage bucket (pointed at a 404) | — | ✅ done 2026-08-12 |
 | Money / state-machine test coverage | — | ✅ done (59 tests, in CI) |
 | Terms of Service page | ✅ counsel + entity details | ✅ page built, figures verified |
 | `firebase login --reauth` | ✅ **expired again** | — |

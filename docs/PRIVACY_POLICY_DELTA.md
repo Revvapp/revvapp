@@ -1,6 +1,6 @@
 # Privacy Policy — change log and what remains
 
-> **STATUS 2026-08-05: §1, §3, §4, §5, §6 and §7 are APPLIED to
+> **STATUS 2026-08-12: §1, §3, §4, §5, §6 and §7 are APPLIED to
 > `docs/index.html`.** §2 needed no change (the policy already lists phone
 > number role-agnostically). What remains is §5's retention period and §8's
 > effective date — both need a decision, see the bottom of this file.
@@ -19,7 +19,7 @@ Terms (item 26).
 
 ## 1. SMS and email notifications — **not mentioned at all** (highest priority)
 
-As of 2026-08-04 the app sends transactional email (SendGrid) and SMS (Twilio).
+As of 2026-08-12 the app sends transactional email (SendGrid) and SMS (Twilio).
 The policy says nothing about either, and does not list them as processors. This
 is the clearest gap.
 
@@ -111,7 +111,7 @@ changed.
 
 ---
 
-## What remains after the 2026-08-05 pass
+## What remains after the 2026-08-12 pass
 
 **A. The retention period is still unspecified.** The policy now says
 transaction, dispute and safety records are retained in anonymized form "where
@@ -120,7 +120,7 @@ but gives no duration. Seven years is the usual answer for US tax records —
 **counsel should confirm the number**, then it can be stated outright.
 
 **B. The effective date was deliberately not moved.** "Last updated" is now
-2026-08-05; "Effective" still reads 2026-05-20. A materially changed policy
+2026-08-12; "Effective" still reads 2026-05-20. A materially changed policy
 normally takes a new effective date, and §9 of the policy itself promises that
 material changes are communicated in-App or by email. That is a notice
 obligation, not a text edit — **decide whether this counts as material** (adding
