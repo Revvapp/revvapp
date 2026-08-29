@@ -338,6 +338,11 @@ export default function DetailerProfileScreen() {
           <Text style={styles.editBtnText}>Notifications</Text>
         </Pressable>
 
+        <Pressable style={styles.editBtn} onPress={() => router.push('/blocked-accounts')}>
+          <Ionicons name="hand-left-outline" size={16} color={C.navy} />
+          <Text style={styles.editBtnText}>Blocked accounts</Text>
+        </Pressable>
+
         <Pressable style={styles.editBtn} onPress={() => router.push('/help')}>
           <Ionicons name="help-circle-outline" size={16} color={C.navy} />
           <Text style={styles.editBtnText}>Help & Support</Text>

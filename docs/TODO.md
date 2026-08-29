@@ -36,6 +36,16 @@ Companions: `APPLE_IAP_RISK.md`, `QA_CRITICAL_PATH.md`, `STORE_LISTING.md`,
 - **Everything deployed 2026-08-12.** All 38 Cloud Functions live (eight had
   never existed in production), plus Firestore and Storage rules. IAM invoker
   verified on every new callable.
+- **User blocking built** (2026-08-12) — App Store guideline 1.2 requires apps
+  with user-generated content to let users block abusive ones, and there was no
+  block or suspend capability anywhere in the codebase. Enforced in Firestore
+  rules (not client code), one-directional, and invisible to the person blocked.
+  Offered at the point of reporting, managed at Profile → Blocked accounts, and
+  blocked detailers are hidden from search. 14 rules tests.
+- **CI verified green** on all three jobs, including the Actions `@v5` bump.
+- **Store listing corrected** — keywords trimmed to 93 chars, and a moderation
+  answer written for App Review (the earlier claim that blocking existed was
+  wrong; it does now).
 - **Expo 57 assessed → deferred.** 54 → 57 is three major SDKs, 28 packages in
   lockstep plus a React Native upgrade and native rebuild. Not before a
   submission. Leaves one `postcss` advisory in build-time tooling only.
@@ -46,82 +56,81 @@ Companions: `APPLE_IAP_RISK.md`, `QA_CRITICAL_PATH.md`, `STORE_LISTING.md`,
 
 ## What's left
 
-*35 items.*
+*34 items.*
 
 ### A. Unblock — everything queues behind these
 
 | # | Task | Owner |
 |---|---|---|
-| 1 | **Verify CI is still green** after the Actions `@v5` bump — pushed but unconfirmed. | Either |
-| 2 | **Grant the `admin` claim** — service-account key + which app-user email. | You |
-| 3 | **Rewrite history** to strip 9 AI co-author trailers + purge `skills-lock.json`. Backup branch exists; warn `abdullaahahmadi` first. | You |
-| 4 | **Delete `backup-pre-trailer-cleanup`** after #5 — holds the original 26. | You |
+| 1 | **Grant the `admin` claim** — service-account key + which app-user email. | You |
+| 2 | **Rewrite history** to strip 9 AI co-author trailers + purge `skills-lock.json`. Backup branch exists; warn `abdullaahahmadi` first. | You |
+| 3 | **Delete the backup branches** after #2 — holds the original 26. | You |
 
 ### B. Decide before building
 
 | # | Task | Owner |
 |---|---|---|
-| 5 | **Settle the subscription/IAP question.** Recommendation: remove the purchase CTA from the iOS subscription screen and bill on the web (option 3), with a separate detailer app as the roadmap (option 1). File a pre-submission question to App Review. **Architectural — do this before #10.** | You |
-| 6 | **Confirm Apple Developer Program membership is active** ($99/yr). | You |
+| 4 | **Settle the subscription/IAP question.** Recommendation: remove the purchase CTA from the iOS subscription screen and bill on the web (option 3), with a separate detailer app as the roadmap (option 1). File a pre-submission question to App Review. **Architectural — do this before #10.** | You |
+| 5 | **Confirm Apple Developer Program membership is active** ($99/yr). | You |
 
 ### C. Build and distribution
 
 | # | Task | Owner |
 |---|---|---|
-| 7 | **Create the APNs push key** (`eas credentials`). | You |
-| 8 | **Run the production iOS build.** | Either |
-| 9 | **Create the App Store Connect record** (`com.revvapp.revv`). | You |
-| 10 | **Submit to TestFlight.** | You |
-| 11 | **Run a real beta** — a week, real devices, real people. | You |
+| 6 | **Create the APNs push key** (`eas credentials`). | You |
+| 7 | **Run the production iOS build.** | Either |
+| 8 | **Create the App Store Connect record** (`com.revvapp.revv`). | You |
+| 9 | **Submit to TestFlight.** | You |
+| 10 | **Run a real beta** — a week, real devices, real people. | You |
 
 ### D. Testing
 
 | # | Task | Owner |
 |---|---|---|
-| 12 | **Run `QA_CRITICAL_PATH.md` end to end.** 40 steps. Never once executed — budget for finding bugs. | You |
-| 13 | **Device matrix** — smallest/largest iPhone, oldest supported iOS, iPad if `supportsTablet` stays on. | You |
-| 14 | **Poor-network and offline** behaviour on booking/payment paths. | You |
-| 15 | **Verify App Check in monitor mode.** | You |
+| 11 | **Run `QA_CRITICAL_PATH.md` end to end.** 40 steps. Never once executed — budget for finding bugs. | You |
+| 12 | **Device matrix** — smallest/largest iPhone, oldest supported iOS, iPad if `supportsTablet` stays on. | You |
+| 13 | **Poor-network and offline** behaviour on booking/payment paths. | You |
+| 14 | **Verify App Check in monitor mode.** | You |
 
 ### E. Third-party accounts
 
 | # | Task | Owner |
 |---|---|---|
-| 16 | **SendGrid** account + verified sender + API key → turns on email. | You |
-| 17 | **Twilio** account + number → turns on SMS. | You |
-| 18 | **Sentry DSN** in `.env` *and* EAS → crash reporting. | You |
+| 15 | **SendGrid** account + verified sender + API key → turns on email. | You |
+| 16 | **Twilio** account + number → turns on SMS. | You |
+| 17 | **Sentry DSN** in `.env` *and* EAS → crash reporting. | You |
 
 ### F. Legal and store metadata
 
 | # | Task | Owner |
 |---|---|---|
-| 19 | **Terms of Service legal review.** The long pole — start today. | You |
-| 20 | **Fill the ToS placeholders, remove the `noindex` line, merge `terms.html`.** | Either |
-| 21 | **Two Privacy Policy decisions remain** (the text edits are done): the anonymized-record **retention period** needs a number from counsel, and whether adding SMS/email processing is a *material* change that moves the effective date and triggers the in-App notice §9 promises. | You |
-| 22 | **App Privacy nutrition label** — transcribe from `APP_PRIVACY.md`. | You |
-| 23 | **Screenshots** — plan and captions in `STORE_LISTING.md`. | You |
-| 24 | **Paste the store listing** from `STORE_LISTING.md`; trim keywords to 100 chars. | You |
-| 25 | **Run `npm run seed-demo`** and paste the credentials into App Review Information. | You |
-| 26 | **Prepare the UGC moderation answer** — reviewers ask, given messaging/reviews/photos. | You |
+| 18 | **Terms of Service legal review.** The long pole — start today. | You |
+| 19 | **Fill the ToS placeholders, remove the `noindex` line, merge `terms.html`.** | Either |
+| 20 | **Two Privacy Policy decisions remain** (the text edits are done): the anonymized-record **retention period** needs a number from counsel, and whether adding SMS/email processing is a *material* change that moves the effective date and triggers the in-App notice §9 promises. | You |
+| 21 | **App Privacy nutrition label** — transcribe from `APP_PRIVACY.md`. | You |
+| 22 | **Screenshots** — plan and captions in `STORE_LISTING.md`. | You |
+| 23 | **Paste the store listing** from `STORE_LISTING.md`; trim keywords to 100 chars. | You |
+| 24 | **Run `npm run seed-demo`** and paste the credentials into App Review Information. | You |
+| 25 | **Prepare the UGC moderation answer** — reviewers ask, given messaging/reviews/photos. | You |
 
 ### G. Money go-live
 
 | # | Task | Owner |
 |---|---|---|
-| 27 | **Enable 1099 tax reporting** — Connect settings → Tax forms. | You |
-| 28 | **Switch Stripe to LIVE** — keys, new webhook + secret, re-verify **all 9** events. | You |
-| 29 | **One small real transaction** end to end, including payout. | You |
-| 30 | **Confirm the entity can receive funds** — bank connected, identity verified. | You |
+| 26 | **Enable 1099 tax reporting** — Connect settings → Tax forms. | You |
+| 27 | **Switch Stripe to LIVE** — keys, new webhook + secret, re-verify **all 9** events. | You |
+| 28 | **One small real transaction** end to end, including payout. | You |
+| 29 | **Confirm the entity can receive funds** — bank connected, identity verified. | You |
 
 ### H. Deferred — explicitly not blocking launch
 
 | # | Task |
 |---|---|
-| 31 | **Checkr** — needs counsel on FCRA consent/adverse-action first. |
-| 32 | **Revv Reach video + AI captions** — needs a vendor decision and cost model. |
-| 33 | **App Check monitor → enforce.** |
-| 34 | **Expo 57 bump** — clears the last `postcss` advisory. Post-launch. |
-| 35 | **Split the detailer app out** — the durable answer to #7. |
+| 30 | **Checkr** — needs counsel on FCRA consent/adverse-action first. |
+| 31 | **Revv Reach video + AI captions** — needs a vendor decision and cost model. |
+| 32 | **App Check monitor → enforce.** |
+| 33 | **Expo 57 bump** — clears the last `postcss` advisory. Post-launch. |
+| 34 | **Split the detailer app out** — the durable answer to #7. |
 
 ---
 
@@ -160,5 +169,5 @@ been run end to end.
 Do **not** compress #14, and do not submit before #7 is settled — a rejection
 costs more days than either saves.
 
-Stripe LIVE (#27–#30) is on the critical path regardless; launching in test mode
+Stripe LIVE (#26–#29) is on the critical path regardless; launching in test mode
 is not an option.

@@ -2,7 +2,8 @@ import { collection, getDocs, onSnapshot, query, where } from 'firebase/firestor
 import * as Location from 'expo-location';
 import { useEffect, useMemo, useState } from 'react';
 
-import { db } from '@/firebaseConfig';
+import { auth, db } from '@/firebaseConfig';
+import { blockedIds } from '@/lib/blocks';
 import { mapFirestoreError } from '@/lib/firestoreErrors';
 import type { DetailerDocument } from '@/types/firestore';
 
@@ -144,6 +145,20 @@ export function useFindDetailers(): FindDetailersModel {
     return () => { cancelled = true; };
   }, [detailerIdKey]);
 
+  // Blocked detailers are hidden from search. Loaded once rather than
+  // subscribed: a block is rare and the list is re-read on the next mount,
+  // which is soon enough for something the user just did themselves.
+  const [blocked, setBlocked] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+    let active = true;
+    blockedIds(uid)
+      .then((ids) => { if (active) setBlocked(ids); })
+      .catch(() => {});
+    return () => { active = false; };
+  }, []);
+
   const MAX_RADIUS_MI = 50;
 
   const detailers: DetailerWithDistance[] = useMemo(
@@ -162,6 +177,7 @@ export function useFindDetailers(): FindDetailersModel {
             distanceMi,
           };
         })
+        .filter((d) => !blocked.has(d.uid))
         .filter((d) => d.distanceMi == null || d.distanceMi <= MAX_RADIUS_MI)
         .sort((a, b) => {
           if (a.distanceMi == null && b.distanceMi == null) return 0;
@@ -169,7 +185,7 @@ export function useFindDetailers(): FindDetailersModel {
           if (b.distanceMi == null) return -1;
           return a.distanceMi - b.distanceMi;
         }),
-    [rawDetailers, ratings, clientLat, clientLng]
+    [rawDetailers, ratings, clientLat, clientLng, blocked]
   );
 
   return { loading, locationDenied, error, detailers, clientLat, clientLng };

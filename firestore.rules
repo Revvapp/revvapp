@@ -24,6 +24,14 @@ service cloud.firestore {
       return signedIn() && request.auth.token.get('admin', false) == true;
     }
 
+    // True when `blocker` has blocked `blocked`. get()/exists() inside rules are
+    // not themselves subject to read rules, so this can check a document the
+    // caller is not allowed to read — which is the point: a blocked user must
+    // not be able to discover that they were blocked.
+    function hasBlocked(blocker, blocked) {
+      return exists(/databases/$(database)/documents/blocks/$(blocker)/blocked/$(blocked));
+    }
+
     match /users/{uid} {
       allow read: if isOwner(uid);
       allow create: if isOwner(uid)
@@ -245,6 +253,17 @@ service cloud.firestore {
       allow read, write: if isOwner(uid);
     }
 
+    // Who a user has blocked. Owner-only in both directions: nobody can read
+    // another person's block list, and nobody can add an entry on someone
+    // else's behalf. App Store guideline 1.2 requires this for user-generated
+    // content, and the messaging rule below is what gives it teeth.
+    match /blocks/{blockerUid}/blocked/{blockedUid} {
+      allow read: if isOwner(blockerUid);
+      allow create, delete: if isOwner(blockerUid)
+        && blockedUid != request.auth.uid;   // blocking yourself is nonsense
+      allow update: if false;
+    }
+
     // Fleet orders are raised from the business portal and priced server-side.
     // A dealership reads only its own; every mutation is a callable that
     // re-derives the estimate, so the quote can never be set from a client.
@@ -279,6 +298,13 @@ service cloud.firestore {
               || booking().detailerId == request.auth.uid);
       }
 
+      // Whichever booking party is not the caller.
+      function otherParty() {
+        return booking().clientId == request.auth.uid
+          ? booking().detailerId
+          : booking().clientId;
+      }
+
       // Read/list off the conversation's own participant fields — no cross-doc
       // get(), so listing a user's threads (where clientId/detailerId == uid)
       // stays a single cheap query. Those fields are trustworthy because the
@@ -299,9 +325,11 @@ service cloud.firestore {
       match /messages/{messageId} {
         // Only the two booking parties can read the thread's messages.
         allow read: if isBookingParty();
-        // A party may post, but only as themselves — no spoofing senderId.
+        // A party may post, but only as themselves — no spoofing senderId — and
+        // not into a thread where the other party has blocked them.
         allow create: if isBookingParty()
-          && request.resource.data.senderId == request.auth.uid;
+          && request.resource.data.senderId == request.auth.uid
+          && !hasBlocked(otherParty(), request.auth.uid);
         // Messages are an immutable record.
         allow update, delete: if false;
       }

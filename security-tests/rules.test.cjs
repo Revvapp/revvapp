@@ -6,7 +6,7 @@ const {
   assertSucceeds,
   initializeTestEnvironment,
 } = require('@firebase/rules-unit-testing');
-const { doc, getDoc, setDoc, updateDoc } = require('firebase/firestore');
+const { deleteDoc, doc, getDoc, setDoc, updateDoc } = require('firebase/firestore');
 const { getBytes, ref, uploadBytes } = require('firebase/storage');
 
 const PROJECT_ID = 'demo-no-project';
@@ -54,6 +54,10 @@ beforeEach(async () => {
     await setDoc(doc(db, 'fleetOrders/order-1'), {
       dealershipId: 'dealer', service: 'Full Interior', vehicleCount: 12,
       status: 'requested', estimateCents: 183600, quotedCents: null,
+    });
+    await setDoc(doc(db, 'conversations/booking-1'), {
+      clientId: 'client', detailerId: 'detailer',
+      clientName: 'Client', detailerName: 'Detailer',
     });
   });
 });
@@ -300,5 +304,49 @@ test('dealership status cannot be self-granted and fleet orders are private', as
   await assertFails(updateDoc(doc(dealerDb, 'fleetOrders/order-1'), { status: 'accepted' }));
   await assertFails(setDoc(doc(dealerDb, 'fleetOrders/forged'), {
     dealershipId: 'dealer', service: 'Ceramic Coating', vehicleCount: 99, status: 'accepted',
+  }));
+});
+
+test('a blocked user cannot message, and cannot see that they were blocked', async () => {
+  const clientDb = env.authenticatedContext('client', { email: 'client@example.com' }).firestore();
+  const detailerDb = env.authenticatedContext('detailer', { email: 'detailer@example.com' }).firestore();
+  const strangerDb = env.authenticatedContext('stranger').firestore();
+
+  // Both parties can message before any block exists.
+  await assertSucceeds(setDoc(doc(clientDb, 'conversations/booking-1/messages/m1'), {
+    senderId: 'client', text: 'hello',
+  }));
+  await assertSucceeds(setDoc(doc(detailerDb, 'conversations/booking-1/messages/m2'), {
+    senderId: 'detailer', text: 'hi',
+  }));
+
+  // The client blocks the detailer.
+  await assertSucceeds(setDoc(doc(clientDb, 'blocks/client/blocked/detailer'), {
+    createdAt: new Date(),
+  }));
+
+  // The detailer can no longer post into that thread...
+  await assertFails(setDoc(doc(detailerDb, 'conversations/booking-1/messages/m3'), {
+    senderId: 'detailer', text: 'let me back in',
+  }));
+  // ...but the client still can. Blocking is one-directional.
+  await assertSucceeds(setDoc(doc(clientDb, 'conversations/booking-1/messages/m4'), {
+    senderId: 'client', text: 'still fine',
+  }));
+
+  // The blocked user must not be able to discover the block.
+  await assertFails(getDoc(doc(detailerDb, 'blocks/client/blocked/detailer')));
+  await assertFails(getDoc(doc(strangerDb, 'blocks/client/blocked/detailer')));
+  // Only the owner reads their own list.
+  await assertSucceeds(getDoc(doc(clientDb, 'blocks/client/blocked/detailer')));
+
+  // Nobody can plant a block on someone else's behalf, or block themselves.
+  await assertFails(setDoc(doc(detailerDb, 'blocks/client/blocked/stranger'), { createdAt: new Date() }));
+  await assertFails(setDoc(doc(clientDb, 'blocks/client/blocked/client'), { createdAt: new Date() }));
+
+  // Unblocking restores messaging.
+  await assertSucceeds(deleteDoc(doc(clientDb, 'blocks/client/blocked/detailer')));
+  await assertSucceeds(setDoc(doc(detailerDb, 'conversations/booking-1/messages/m5'), {
+    senderId: 'detailer', text: 'thanks',
   }));
 });

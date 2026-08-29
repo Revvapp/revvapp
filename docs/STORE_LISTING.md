@@ -25,9 +25,10 @@ and your card isn't charged until the work is done. Damage protection included.
 
 ## Keywords (100 max, comma-separated, no spaces)
 ```
-car detailing,auto detail,mobile detailing,car wash,ceramic coating,paint correction,car care,detailer,auto spa
+car detailing,auto detail,mobile detailing,car wash,ceramic coating,paint correction,detailer
 ```
-*(112 — over limit; trim `,auto spa` to land at 103, then `,car care` to reach 94)*
+*(94 — trimmed from 112 by dropping `auto spa` and `car care`; both were the
+weakest terms and `detailing`/`detailer` already cover that intent.)*
 
 Do not repeat words already in the name or subtitle — Apple indexes those
 separately, so "revv", "mobile", "book" and "detailers" are wasted here.
@@ -90,10 +91,38 @@ the category is dominated by retail apps.)*
 ## Age rating
 **4+.** No objectionable content. Answer "None" to every content question.
 
-⚠️ **User-generated content:** the app has messaging, reviews and photo upload.
-Apple requires a moderation story — you have in-app reporting (`/report`), an
-admin resolution queue, and blocking via account suspension. Have that answer
-ready; it does not change the 4+ rating, but reviewers do ask.
+**User-generated content:** the app has messaging, reviews and photo upload, so
+guideline 1.2 applies. It does not change the 4+ rating, but reviewers do ask.
+
+> ⚠️ An earlier revision of this file claimed blocking existed "via account
+> suspension." It did not — there was no block or suspend capability anywhere in
+> the codebase. Blocking was built 2026-08-12 to close that gap.
+
+**Paste this into the review notes if asked how content is moderated:**
+
+```
+Revv includes messaging between a client and their detailer, written reviews,
+and photo upload (vehicle inspections, before/after, dispute and claim
+evidence). Messaging is private and scoped to a single booking — there is no
+public feed, no discovery between strangers, and no way to contact someone you
+have not booked with.
+
+Reporting: any participant can report the other from the booking screen
+(Report a Problem), choosing a category and description. Reports go to a
+trust & safety queue in our admin console and are never shown to the reported
+party.
+
+Blocking: a user can block the other party, offered directly at the point of
+reporting and manageable any time under Profile > Blocked accounts. A blocked
+person cannot send messages, is hidden from that user's search results, and is
+not told they were blocked. Enforcement is in Firestore security rules, not
+client code, so it holds even against a modified client.
+
+Response: reports are reviewed by our team and resolved as reviewed or
+dismissed, with the outcome recorded against the report. Support is reachable
+at support@revvapp.net and at
+https://revvapp.github.io/revvapp/support.html.
+```
 
 ## URLs
 | Field | Value |

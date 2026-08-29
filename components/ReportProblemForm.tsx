@@ -17,6 +17,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { db } from '@/firebaseConfig';
+import { blockUser } from '@/lib/blocks';
 import { useAuth } from '@/hooks/useAuth';
 
 const C = {
@@ -53,6 +54,8 @@ const CATEGORIES: Category[] = [
 type BookingParties = {
   clientId: string;
   detailerId: string;
+  clientName: string;
+  detailerName: string;
   vehicleLabel: string;
 };
 
@@ -87,6 +90,8 @@ export default function ReportProblemForm({ role }: { role: 'client' | 'detailer
           setParties({
             clientId: String(b.clientId ?? ''),
             detailerId: String(b.detailerId ?? ''),
+            clientName: String(b.clientName ?? ''),
+            detailerName: String(b.businessName ?? b.detailerName ?? ''),
             vehicleLabel: String(b.vehicleLabel ?? ''),
           });
         }
@@ -114,10 +119,31 @@ export default function ReportProblemForm({ role }: { role: 'client' | 'detailer
         status: 'open',
         createdAt: serverTimestamp(),
       });
+      // Offer to block right here. Reporting is the moment someone has decided
+      // they want nothing more to do with the other party, and making them hunt
+      // through settings for it is how a safety feature goes unused.
+      const otherName = role === 'client' ? parties.detailerName : parties.clientName;
       Alert.alert(
-        'Report Submitted',
-        'Thank you. Our trust & safety team reviews every report and will follow up by email if we need more detail. Reports are confidential.',
-        [{ text: 'Done', onPress: () => router.back() }]
+        'Report submitted',
+        'Thank you. Our trust & safety team reviews every report and will follow up by email if we need more detail. '
+          + `Reports are confidential.\n\nWould you also like to block ${otherName || 'this person'}? `
+          + 'They will not be able to message you, and we will not tell them.',
+        [
+          { text: 'No thanks', style: 'cancel', onPress: () => router.back() },
+          {
+            text: 'Block',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                await blockUser(user.uid, reportedUserId, otherName ?? '');
+              } catch {
+                // The report is filed either way; a failed block must not read
+                // as a failed report. Manage blocks later in Profile.
+              }
+              router.back();
+            },
+          },
+        ]
       );
     } catch {
       Alert.alert('Error', 'Could not submit your report. Please try again.');
