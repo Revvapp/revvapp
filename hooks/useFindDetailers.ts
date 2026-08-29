@@ -1,3 +1,4 @@
+import { onAuthStateChanged } from 'firebase/auth';
 import { collection, getDocs, onSnapshot, query, where } from 'firebase/firestore';
 import * as Location from 'expo-location';
 import { useEffect, useMemo, useState } from 'react';
@@ -150,13 +151,17 @@ export function useFindDetailers(): FindDetailersModel {
   // which is soon enough for something the user just did themselves.
   const [blocked, setBlocked] = useState<Set<string>>(new Set());
   useEffect(() => {
-    const uid = auth.currentUser?.uid;
-    if (!uid) return;
     let active = true;
-    blockedIds(uid)
-      .then((ids) => { if (active) setBlocked(ids); })
-      .catch(() => {});
-    return () => { active = false; };
+    // Subscribe to auth rather than reading currentUser once: on a cold start
+    // the session has not rehydrated yet, so a one-shot read returns null and
+    // blocked detailers would stay visible for the whole mount.
+    const unsub = onAuthStateChanged(auth, (u) => {
+      if (!u?.uid) { setBlocked(new Set()); return; }
+      blockedIds(u.uid)
+        .then((ids) => { if (active) setBlocked(ids); })
+        .catch(() => {});
+    });
+    return () => { active = false; unsub(); };
   }, []);
 
   const MAX_RADIUS_MI = 50;

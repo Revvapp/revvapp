@@ -376,7 +376,10 @@ export const onFleetOrderQuoted = onDocumentUpdated('fleetOrders/{orderId}', asy
   const before = event.data?.before.data();
   const after = event.data?.after.data();
   if (!before || !after) return;
-  if (before.status === after.status || String(after.status) !== 'quoted') return;
+  // quoteFleetOrder deliberately allows re-quoting an order that is already
+  // 'quoted', so a status-only check would silently swallow every revision.
+  if (String(after.status) !== 'quoted') return;
+  if (before.status === after.status && before.quotedCents === after.quotedCents) return;
 
   const amount = (Number(after.quotedCents ?? 0) / 100).toFixed(2);
   const count = Number(after.vehicleCount ?? 0);

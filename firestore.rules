@@ -259,9 +259,11 @@ service cloud.firestore {
     // content, and the messaging rule below is what gives it teeth.
     match /blocks/{blockerUid}/blocked/{blockedUid} {
       allow read: if isOwner(blockerUid);
-      allow create, delete: if isOwner(blockerUid)
+      // create and update both allowed so re-blocking someone already blocked is
+      // a no-op rather than an error — blockUser is documented as idempotent and
+      // setDoc on an existing document is an update, not a create.
+      allow create, update, delete: if isOwner(blockerUid)
         && blockedUid != request.auth.uid;   // blocking yourself is nonsense
-      allow update: if false;
     }
 
     // Fleet orders are raised from the business portal and priced server-side.

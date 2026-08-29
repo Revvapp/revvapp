@@ -63,10 +63,11 @@ export const createFleetOrder = onCall({ region: REGION }, async (request) => {
   if (userSnap.data()?.isDealership !== true) {
     throw new HttpsError('permission-denied', 'Fleet ordering is available to dealership accounts.');
   }
-  await enforceRateLimit(uid, 'fleet_order', 20, 24 * 60 * 60 * 1_000);
 
   const service = text(request.data?.service, 'service', 60);
-  if (!(service in FLEET_RATE_CARD)) {
+  // hasOwnProperty, not `in`: `in` walks the prototype chain, so a service of
+  // "toString" would pass the whitelist and then price as NaN.
+  if (!Object.prototype.hasOwnProperty.call(FLEET_RATE_CARD, service)) {
     throw new HttpsError('invalid-argument', 'That service is not available for fleet orders.');
   }
 
@@ -87,6 +88,13 @@ export const createFleetOrder = onCall({ region: REGION }, async (request) => {
 
   const estimate = fleetEstimate(service, vehicles.length);
   if (!estimate) throw new HttpsError('invalid-argument', 'Could not price that order.');
+  const preferredDate = futureDate(request.data?.preferredDate);
+  const address = text(request.data?.address, 'address', 500);
+  const notes = text(request.data?.notes, 'notes', MAX_TEXT, false) || null;
+
+  // Charged only once the payload is known good. Billing the quota for rejected
+  // submissions would let a mistyped date lock a dealership out for a day.
+  await enforceRateLimit(uid, 'fleet_order', 20, 24 * 60 * 60 * 1_000);
 
   const ref = db.collection('fleetOrders').doc();
   await ref.set({
@@ -96,9 +104,9 @@ export const createFleetOrder = onCall({ region: REGION }, async (request) => {
     service,
     vehicles,
     vehicleCount: vehicles.length,
-    preferredDate: futureDate(request.data?.preferredDate),
-    address: text(request.data?.address, 'address', 500),
-    notes: text(request.data?.notes, 'notes', MAX_TEXT, false) || null,
+    preferredDate,
+    address,
+    notes,
     estimateCents: estimate.totalCents,
     estimateGrossCents: estimate.grossCents,
     estimateDiscountCents: estimate.discountCents,

@@ -144,6 +144,7 @@ function OrderCard({ order }: { order: Order }) {
 
 export default function AdminFleetScreen() {
   const [orders, setOrders] = useState<Order[] | null>(null);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     // Only orders awaiting a quote — once quoted, the ball is in their court.
@@ -155,7 +156,7 @@ export default function AdminFleetScreen() {
         rows.sort((a, b) => a.preferredDate.localeCompare(b.preferredDate));
         setOrders(rows);
       },
-      () => setOrders([])
+      () => setFailed(true)
     );
     return () => unsub();
   }, []);
@@ -168,8 +169,16 @@ export default function AdminFleetScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-          {orders === null && <ActivityIndicator color={AC.gold} style={{ marginTop: 40 }} />}
-          {orders?.length === 0 && (
+          {failed && (
+            <EmptyState
+              icon="cloud-offline-outline"
+              text="Could not load fleet requests. Check your connection and reopen this screen."
+            />
+          )}
+          {!failed && orders === null && (
+            <ActivityIndicator color={AC.gold} style={{ marginTop: 40 }} />
+          )}
+          {!failed && orders?.length === 0 && (
             <EmptyState icon="car-outline" text="No fleet requests waiting on a quote." />
           )}
           {orders?.map((o) => <OrderCard key={o.id} order={o} />)}

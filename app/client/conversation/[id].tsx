@@ -13,6 +13,7 @@ import {
 } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import {
+  Alert,
   ActivityIndicator,
   FlatList,
   KeyboardAvoidingView,
@@ -133,6 +134,16 @@ export default function ClientConversationScreen() {
       );
 
       // The detailer is notified of the new message server-side (onMessageCreated).
+    } catch (e) {
+      // A blocked sender is denied by security rules. Put the draft back — the
+      // text is the user's work and losing it silently is worse than the block.
+      setText(msgText);
+      Alert.alert(
+        'Message not sent',
+        (e as { code?: string })?.code === 'permission-denied'
+          ? 'You can no longer send messages in this conversation.'
+          : 'Something went wrong sending that. Check your connection and try again.'
+      );
     } finally {
       setSending(false);
     }

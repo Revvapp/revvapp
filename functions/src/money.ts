@@ -151,8 +151,12 @@ export interface FleetEstimate {
  * `1 - rate`) so gross, discount and total always reconcile exactly.
  */
 export function fleetEstimate(service: string, vehicleCount: number): FleetEstimate | null {
+  // hasOwnProperty, not a plain lookup: `FLEET_RATE_CARD['toString']` resolves
+  // to an inherited Function rather than undefined, which would slip past an
+  // `=== undefined` guard and price the order as NaN.
+  if (!Object.prototype.hasOwnProperty.call(FLEET_RATE_CARD, service)) return null;
   const unit = FLEET_RATE_CARD[service];
-  if (unit === undefined) return null;
+  if (typeof unit !== 'number') return null;
   const n = wholeCents(vehicleCount, 'vehicleCount');
   if (n <= 0) return null;
 

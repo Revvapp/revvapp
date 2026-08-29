@@ -188,6 +188,14 @@ describe('fleetEstimate', () => {
     assert.equal(fleetEstimate('', 10), null);
   });
 
+  it('is not fooled by inherited Object properties', () => {
+    // `'toString' in FLEET_RATE_CARD` is true, so a membership check written
+    // with `in` would let these through and price a Function as NaN.
+    for (const key of ['toString', 'constructor', 'hasOwnProperty', '__proto__']) {
+      assert.equal(fleetEstimate(key, 10), null, `accepted ${key}`);
+    }
+  });
+
   it('refuses a non-positive vehicle count', () => {
     assert.equal(fleetEstimate('Full Interior', 0), null);
     assert.throws(() => fleetEstimate('Full Interior', -1), RangeError);

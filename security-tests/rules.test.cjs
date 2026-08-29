@@ -334,6 +334,13 @@ test('a blocked user cannot message, and cannot see that they were blocked', asy
     senderId: 'client', text: 'still fine',
   }));
 
+  // Re-blocking someone already blocked must be a no-op, not an error —
+  // blockUser is documented as idempotent and setDoc on an existing doc is an
+  // update, which an earlier revision of these rules forbade.
+  await assertSucceeds(setDoc(doc(clientDb, 'blocks/client/blocked/detailer'), {
+    createdAt: new Date(), name: 'Detailer',
+  }));
+
   // The blocked user must not be able to discover the block.
   await assertFails(getDoc(doc(detailerDb, 'blocks/client/blocked/detailer')));
   await assertFails(getDoc(doc(strangerDb, 'blocks/client/blocked/detailer')));

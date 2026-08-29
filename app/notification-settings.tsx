@@ -48,8 +48,10 @@ export default function NotificationSettingsScreen() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      if (!user?.uid) return;
+      // The guard sits inside the try so `finally` always clears the spinner —
+      // returning early above it left the screen loading forever.
       try {
+        if (!user?.uid) return;
         const snap = await getDoc(doc(db, 'users', user.uid));
         if (cancelled) return;
         const prefs = snap.data()?.notificationPrefs ?? {};
