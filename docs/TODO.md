@@ -70,7 +70,7 @@ Companions: `APPLE_IAP_RISK.md`, `QA_CRITICAL_PATH.md`, `STORE_LISTING.md`,
 
 | # | Task | Owner |
 |---|---|---|
-| 4 | **Settle the subscription/IAP question.** Recommendation unchanged: option 3 (bill on the web) now, option 1 (separate detailer app) as the roadmap. File a pre-submission question to App Review. **Architectural — do this before #7.** <br>**Half built 2026-09-05:** the web subscribe page now exists at `docs/subscribe/` — sign-in, live status, Stripe Elements against the SetupIntent, same copy as the app. It is additive and safe to ship whatever you decide. **What remains is your call:** if you pick option 3, the iOS purchase CTA comes out of `app/detailer/subscription.tsx` (~40 lines) and the screen points here instead. Nothing has been removed from the app yet. See `APPLE_IAP_RISK.md`. | You decide, I build |
+| 4 | **Settle the subscription/IAP question — code done 2026-09-05, option 3 implemented.** Web subscribe page at `docs/subscribe/`; the iOS screen no longer presents a purchase, it reflects status and links out. What is left is not code: **file the pre-submission question to App Review** describing both payment types and asking them to confirm the treatment of the seller subscription. Option 1 (separate detailer app) remains the roadmap. See `APPLE_IAP_RISK.md`. | You |
 | 5 | **Confirm Apple Developer Program membership is active** ($99/yr). | You |
 
 ### C. Build and distribution
@@ -181,7 +181,7 @@ Assuming legal starts immediately and comes back inside two weeks:
 |---|---|
 | Now | Kick off legal review (#18). Nothing else moves it. |
 | Days 1–2 | Apple membership (#5), App Store Connect record (#8), APNs key (#6). |
-| Days 2–3 | Settle IAP (#4), then build the web subscribe page and cut the iOS CTA. |
+| Days 2–3 | File the App Review pre-submission question (#4). |
 | Days 3–4 | Production build (#7), then run QA (#11) — budget for finding bugs. |
 | ~Day 6 | TestFlight (#9). |
 | Days 6–13 | Beta (#10), with legal running in parallel. |
@@ -200,8 +200,10 @@ If you do nothing else, do these, in this order:
    the end.
 2. **Confirm the Apple Developer membership is active (#5).** Cheap to check,
    and everything in section C is dead until it is.
-3. **Decide the IAP question (#4).** Once you pick, the build is unblocked and I
-   can do the work.
+3. **File the App Review pre-submission question (#4).** The code is done — both
+   surfaces are built and the purchase is off the iOS screen. What is still worth
+   having in writing is Apple's own read on the seller subscription, and that
+   answer takes days to come back.
 
 Stripe LIVE (#26–#29) stays on the critical path regardless; shipping in test
 mode is not an option.

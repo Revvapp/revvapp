@@ -138,6 +138,25 @@ Estimate: about a day, mostly reusing the portal's existing auth shell.
 **Sequencing consequence:** the web page has to exist *before* the iOS CTA comes
 out, or there is a window with no subscription path on either surface.
 
+### Implemented 2026-09-05
+
+Both halves landed in the right order. `docs/subscribe/` went in first, then the
+purchase came out of `app/detailer/subscription.tsx`. The screen keeps the status
+card, the benefit list and the price, and where the trial button used to be it
+now explains that billing is on the web and opens the page.
+
+**The one judgment call:** the screen still *links* to the subscribe page rather
+than saying nothing at all. Under 3.1.1(a) post-injunction that is allowed on the
+US storefront, and this document's option 3 anticipated it. It is not free of
+risk — Apple regained the ability to commission external-link purchases in
+December 2025, and a reviewer could read a link-out as still presenting the
+purchase. Removing the button and leaving only the explanatory text is the
+strictly safer variant if App Review pushes back; it is a one-line change.
+
+`lib/payments.ts` still exports `createSubscription`. Nothing in the app calls it
+now — the web page calls the callable directly — but it is left in place because
+option 1 would need it again.
+
 **Do this before the production build**, and file a pre-submission question to
 App Review describing the two payment types and asking them to confirm the
 treatment of the seller subscription. Getting that answer in writing costs days;

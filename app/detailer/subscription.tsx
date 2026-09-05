@@ -4,7 +4,7 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,8 +15,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { db } from '@/firebaseConfig';
 import { useAuth } from '@/hooks/useAuth';
-import { useNativeStripe } from '@/hooks/useNativeStripe';
-import { createSubscription } from '@/lib/payments';
 
 const C = {
   bg:      '#0A1628',
@@ -36,6 +34,11 @@ const C = {
 };
 
 const PLAN_PRICE = '$34.99';
+
+// Billing lives on the web. Revv Pro unlocks marketplace visibility, which reads
+// as in-app functionality under App Store guideline 3.1.1, so the purchase is
+// not presented here — this screen reflects status and sends people to the web.
+const SUBSCRIBE_URL = 'https://revvapp.github.io/revvapp/subscribe/';
 
 const BENEFITS = [
   { icon: 'search-outline'        as const, text: 'Appear in client search and on the map' },
@@ -73,13 +76,10 @@ function statusCopy(status: string | null): {
 
 export default function DetailerSubscriptionScreen() {
   const { user } = useAuth();
-  const { initPaymentSheet, presentPaymentSheet } = useNativeStripe();
 
   const [status, setStatus]           = useState<string | null>(null);
   const [isFoundingPro, setFounding]  = useState(false);
   const [loading, setLoading]         = useState(true);
-  const [submitting, setSubmitting]   = useState(false);
-  const [error, setError]             = useState('');
 
   // Live-follow the user doc so the screen flips to "active" the moment the
   // Stripe webhook lands, without the detailer having to pull to refresh.
@@ -100,53 +100,6 @@ export default function DetailerSubscriptionScreen() {
 
   const entitled  = status === 'active' || status === 'trialing';
   const trialDays = isFoundingPro ? 60 : 14;
-
-  async function handleSubscribe() {
-    if (!user?.uid) return;
-    setSubmitting(true);
-    setError('');
-    try {
-      const setup = await createSubscription();
-
-      // A trial subscription has no payment due today, so Stripe hands back a
-      // SetupIntent (save the card now, charge it at trial end) rather than a
-      // PaymentIntent.
-      if (!setup.setupIntentClientSecret) {
-        Alert.alert(
-          'Subscription started',
-          'Your trial is active. We will confirm your billing details shortly.'
-        );
-        return;
-      }
-
-      const init = await initPaymentSheet({
-        merchantDisplayName: 'Revv',
-        customerId: setup.customerId,
-        customerEphemeralKeySecret: setup.ephemeralKeySecret,
-        setupIntentClientSecret: setup.setupIntentClientSecret,
-        returnURL: 'revvapp://stripe-redirect',
-      });
-      if (init.error) throw new Error(init.error.message);
-
-      const result = await presentPaymentSheet();
-      if (result.error) {
-        // 'Canceled' is the detailer dismissing the sheet, not a failure.
-        if (result.error.code !== 'Canceled') setError(result.error.message);
-        return;
-      }
-
-      // Entitlement is granted by the webhook, not here — the status card above
-      // will flip on its own once Stripe reports the subscription.
-      Alert.alert(
-        'You’re all set',
-        `Your ${setup.trialDays}-day free trial has started. We’ll charge ${PLAN_PRICE}/mo when it ends.`
-      );
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not start your subscription. Please try again.');
-    } finally {
-      setSubmitting(false);
-    }
-  }
 
   if (loading) {
     return (
@@ -227,13 +180,6 @@ export default function DetailerSubscriptionScreen() {
           ))}
         </View>
 
-        {!!error && (
-          <View style={styles.errorBox}>
-            <Ionicons name="alert-circle-outline" size={16} color={C.red} />
-            <Text style={styles.errorText}>{error}</Text>
-          </View>
-        )}
-
         {entitled ? (
           <View style={styles.manageCard}>
             <Ionicons name="information-circle-outline" size={16} color={C.muted} />
@@ -243,24 +189,19 @@ export default function DetailerSubscriptionScreen() {
             </Text>
           </View>
         ) : (
-          <Pressable
-            style={[styles.cta, submitting && styles.ctaOff]}
-            onPress={handleSubscribe}
-            disabled={submitting}
-          >
-            {submitting ? (
-              <ActivityIndicator color={C.navy} size="small" />
-            ) : (
-              <>
-                <Ionicons name="rocket" size={17} color={C.navy} />
-                <Text style={styles.ctaText}>
-                  {status === 'canceled' || status === 'past_due'
-                    ? 'Resubscribe'
-                    : `Start ${trialDays}-day free trial`}
-                </Text>
-              </>
-            )}
-          </Pressable>
+          <View>
+            <Text style={styles.webNote}>
+              {status === 'canceled' || status === 'past_due'
+                ? 'Resubscribe at revvapp.github.io to go live again.'
+                : `Start your ${trialDays}-day free trial at revvapp.github.io. Sign in with this same email — your status here updates as soon as it goes through.`}
+            </Text>
+            <Pressable style={styles.cta} onPress={() => Linking.openURL(SUBSCRIBE_URL)}>
+              <Ionicons name="open-outline" size={17} color={C.navy} />
+              <Text style={styles.ctaText}>
+                {status === 'canceled' || status === 'past_due' ? 'Resubscribe' : 'Manage on the web'}
+              </Text>
+            </Pressable>
+          </View>
         )}
 
         <Text style={styles.finePrint}>
@@ -339,15 +280,6 @@ const styles = StyleSheet.create({
   benefitRow:  { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 12 },
   benefitText: { color: C.navy, fontSize: 13.5, flex: 1, lineHeight: 19 },
 
-  errorBox: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-    backgroundColor: C.redDim,
-    borderRadius: 12,
-    padding: 12,
-  },
-  errorText: { color: C.red, fontSize: 12.5, flex: 1, lineHeight: 17 },
 
   cta: {
     flexDirection: 'row',
@@ -358,8 +290,8 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingVertical: 17,
   },
-  ctaOff:  { opacity: 0.5 },
   ctaText: { color: C.navy, fontSize: 15, fontWeight: '900' },
+  webNote: { color: C.muted, fontSize: 12.5, lineHeight: 18, marginBottom: 12, textAlign: 'center' },
 
   manageCard: {
     flexDirection: 'row',
