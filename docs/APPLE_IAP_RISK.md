@@ -98,9 +98,45 @@ and a rearchitecture at worst — precisely when there is no slack.
 
 ## Recommendation
 
-For an August ship: **option 3 as the immediate move, option 1 as the roadmap.**
-It is a small change now (remove the purchase CTA from the iOS subscription
-screen; keep status display) and preserves everything already built on Stripe.
+**Option 3 as the immediate move, option 1 as the roadmap.** It preserves
+everything already built on Stripe and keeps the webhook architecture intact.
+
+### Correction (2026-09-05): option 3 is not a pure deletion
+
+An earlier draft of this section called option 3 "a small change — remove the
+purchase CTA from the iOS subscription screen." That understates it, and taken
+literally it would ship a broken product.
+
+`app/detailer/subscription.tsx` is the **only** place a detailer can subscribe.
+There is no web subscribe flow: `docs/` contains the marketing and policy pages
+plus the Business Portal, and the portal serves business *clients* (receipts,
+payout statements, fleet ordering) — it has no billing screen. Deleting the CTA
+without building the web replacement leaves detailers with no way to pay at all,
+which means `detailers.isActive` never turns on and nobody appears in client
+search.
+
+**Option 3 is therefore two pieces of work, not one:**
+
+1. Remove the purchase path from the iOS screen — drop `handleSubscribe`, the
+   `initPaymentSheet` / `presentPaymentSheet` calls and the `createSubscription`
+   import, and replace the CTA with status display plus a pointer to the web.
+   Keep the entitled-state card as it is. ~40 lines.
+2. **Build the web subscribe page** at revvapp.net — the part that was missing
+   from the estimate.
+
+The good news is that piece 2 is cheaper than it looks, because
+`docs/portal/portal.js` already carries every bit of plumbing it needs: Firebase
+app init, email/password sign-in, `onAuthStateChanged`, Firestore reads and
+`httpsCallable`. The `createSubscription` callable
+(`functions/src/stripe.ts:872`) is transport-agnostic and works from web
+unchanged. What has to be added is Stripe.js Elements to collect the card
+against the SetupIntent the callable returns — the web equivalent of the
+PaymentSheet the app uses today.
+
+Estimate: about a day, mostly reusing the portal's existing auth shell.
+
+**Sequencing consequence:** the web page has to exist *before* the iOS CTA comes
+out, or there is a window with no subscription path on either surface.
 
 **Do this before the production build**, and file a pre-submission question to
 App Review describing the two payment types and asking them to confirm the

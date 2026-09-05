@@ -1,6 +1,6 @@
 # REVV — Road to Publish
 
-Target: **App Store, by 2026-08-31.** Updated 2026-08-12.
+Target: **App Store.** Updated 2026-09-05. (The 2026-08-31 target was missed — see Timeline.)
 
 Companions: `APPLE_IAP_RISK.md`, `QA_CRITICAL_PATH.md`, `STORE_LISTING.md`,
 `PRIVACY_POLICY_DELTA.md`, `RELEASE_RUNBOOK.md`, `RELEASE_CHECKLIST.md`.
@@ -70,7 +70,7 @@ Companions: `APPLE_IAP_RISK.md`, `QA_CRITICAL_PATH.md`, `STORE_LISTING.md`,
 
 | # | Task | Owner |
 |---|---|---|
-| 4 | **Settle the subscription/IAP question.** Recommendation: remove the purchase CTA from the iOS subscription screen and bill on the web (option 3), with a separate detailer app as the roadmap (option 1). File a pre-submission question to App Review. **Architectural — do this before #10.** | You |
+| 4 | **Settle the subscription/IAP question.** Recommendation unchanged: option 3 (bill on the web) now, option 1 (separate detailer app) as the roadmap. File a pre-submission question to App Review. **Architectural — do this before #7.** <br>**Re-scoped 2026-09-05:** option 3 is *two* jobs, not one. `app/detailer/subscription.tsx` is the only place anyone can subscribe and no web billing page exists, so deleting the CTA alone strands every detailer with no way to pay. The web page must ship first. ~1 day, reusing the portal's existing Firebase auth shell. See `APPLE_IAP_RISK.md`. | You decides, I build |
 | 5 | **Confirm Apple Developer Program membership is active** ($99/yr). | You |
 
 ### C. Build and distribution
@@ -136,38 +136,72 @@ Companions: `APPLE_IAP_RISK.md`, `QA_CRITICAL_PATH.md`, `STORE_LISTING.md`,
 
 ## Risks
 
-**1 — The subscription/IAP question (#7).** Now researched rather than
+**1 — The subscription/IAP question (#4).** Now researched rather than
 speculative: by a strict reading of 3.1.1 the subscription needs IAP, and no
-3.1.3 exemption fits. Mitigations are known and cheap *if* decided before the
-build. See `APPLE_IAP_RISK.md`.
+3.1.3 exemption fits. Still cheap *if* decided before the build, but no longer
+free: option 3 needs a web subscribe page built before the iOS CTA comes out,
+because that screen is currently the only way anyone can subscribe. See
+`APPLE_IAP_RISK.md`.
 
-**2 — The critical path has never been run (#14).** Everything is deployed and
+**2 — The critical path has never been run (#11).** Everything is deployed and
 unit-tested; no human has exercised it end to end.
 
-**3 — Legal review is external (#21).** Gates #22, #23 and submission itself.
+**3 — Legal review is external (#18).** Gates #19, #20 and submission itself,
+and it has not started.
 
-## Timeline — 19 days left
+## Timeline
 
-**Aug 31 for a public release is now unlikely.** Working backwards: Apple review
-is 1–3 days, so submission by ~Aug 26 at the very latest; a beta worth running is
-a week, so TestFlight by ~Aug 19; which means the build, the 40-step QA pass
-(#14) and the IAP decision (#7) all have to land inside the next 7 days — while
-legal review (#21) runs in parallel and gates the submission itself.
+**Where this actually stands: 2026-09-05.** The Aug 31 TestFlight target was
+missed by five days, and there have been no commits since Aug 29. Nothing broke
+— the repo is clean and all 133 tests pass. The project stalled because
+everything remaining needs a credential, an account, a payment or a lawyer, and
+none of that is work the codebase can do for itself.
 
-That can happen, but only if nothing surprises you, and #14 exists precisely
-because something probably will.
+**Stop treating this as a date-driven plan.** There is no useful "days left"
+number while five prerequisites are unstarted, because every one of them is
+external and none has a predictable turnaround. The schedule is a function of
+when you do items #1–#5, not of the calendar.
 
-**The realistic plan:** target **TestFlight by Aug 31**, public release early
-September. That keeps the one thing you cannot compress — a real beta on real
-devices — and it does not force you to submit before the critical path has ever
-been run end to end.
+### The honest critical path
 
-**If Aug 31 public is non-negotiable**, the levers in order of least damage:
-1. Ship without SMS (#19) — email covers the same events.
-2. Ship without Sentry (#20) — accept blind debugging for a few weeks.
-3. Shorten the beta to 3 days.
-Do **not** compress #14, and do not submit before #7 is settled — a rejection
-costs more days than either saves.
+Legal review (#18) is the long pole and **has not started**. It gates #19, #20
+and submission itself, and it is the one item where the turnaround is entirely
+someone else's. Everything else can be compressed; that cannot.
 
-Stripe LIVE (#26–#29) is on the critical path regardless; launching in test mode
-is not an option.
+Second-longest is the beta (#10) — a week of real devices, and it is the thing
+you least want to cut, because the 40-step critical path (#11) has *never been
+run end to end*. That is not a formality. It is the most likely source of
+surprises left in the project.
+
+### If you start this week
+
+Assuming legal starts immediately and comes back inside two weeks:
+
+| When | What |
+|---|---|
+| Now | Kick off legal review (#18). Nothing else moves it. |
+| Days 1–2 | Apple membership (#5), App Store Connect record (#8), APNs key (#6). |
+| Days 2–3 | Settle IAP (#4), then build the web subscribe page and cut the iOS CTA. |
+| Days 3–4 | Production build (#7), then run QA (#11) — budget for finding bugs. |
+| ~Day 6 | TestFlight (#9). |
+| Days 6–13 | Beta (#10), with legal running in parallel. |
+| ~Day 15 | Submit, once legal has cleared #19 and #20. |
+| +1–3 days | Apple review. |
+
+That puts a public release around **early October**, and only if the QA pass
+does not turn up something structural.
+
+### The next three things
+
+If you do nothing else, do these, in this order:
+
+1. **Start the legal review (#18).** It is the only item whose clock runs
+   without you, and it gates submission. Every day it waits is a day added to
+   the end.
+2. **Confirm the Apple Developer membership is active (#5).** Cheap to check,
+   and everything in section C is dead until it is.
+3. **Decide the IAP question (#4).** Once you pick, the build is unblocked and I
+   can do the work.
+
+Stripe LIVE (#26–#29) stays on the critical path regardless; shipping in test
+mode is not an option.
