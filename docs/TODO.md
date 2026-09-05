@@ -70,7 +70,7 @@ Companions: `APPLE_IAP_RISK.md`, `QA_CRITICAL_PATH.md`, `STORE_LISTING.md`,
 
 | # | Task | Owner |
 |---|---|---|
-| 4 | **Settle the subscription/IAP question.** Recommendation unchanged: option 3 (bill on the web) now, option 1 (separate detailer app) as the roadmap. File a pre-submission question to App Review. **Architectural — do this before #7.** <br>**Re-scoped 2026-09-05:** option 3 is *two* jobs, not one. `app/detailer/subscription.tsx` is the only place anyone can subscribe and no web billing page exists, so deleting the CTA alone strands every detailer with no way to pay. The web page must ship first. ~1 day, reusing the portal's existing Firebase auth shell. See `APPLE_IAP_RISK.md`. | You decides, I build |
+| 4 | **Settle the subscription/IAP question.** Recommendation unchanged: option 3 (bill on the web) now, option 1 (separate detailer app) as the roadmap. File a pre-submission question to App Review. **Architectural — do this before #7.** <br>**Half built 2026-09-05:** the web subscribe page now exists at `docs/subscribe/` — sign-in, live status, Stripe Elements against the SetupIntent, same copy as the app. It is additive and safe to ship whatever you decide. **What remains is your call:** if you pick option 3, the iOS purchase CTA comes out of `app/detailer/subscription.tsx` (~40 lines) and the screen points here instead. Nothing has been removed from the app yet. See `APPLE_IAP_RISK.md`. | You decide, I build |
 | 5 | **Confirm Apple Developer Program membership is active** ($99/yr). | You |
 
 ### C. Build and distribution
@@ -128,7 +128,7 @@ Companions: `APPLE_IAP_RISK.md`, `QA_CRITICAL_PATH.md`, `STORE_LISTING.md`,
 |---|---|
 | 30 | **Checkr** — needs counsel on FCRA consent/adverse-action first. |
 | 31 | **Revv Reach video + AI captions** — needs a vendor decision and cost model. |
-| 32 | **App Check monitor → enforce.** |
+| 32 | **App Check monitor → enforce.** Note: `docs/subscribe/` and `docs/portal/` call Firebase from the browser, so enforcing App Check means registering a reCAPTCHA provider for the web app too, not just the iOS app. Callables are not enforcing today, so both pages work as-is. |
 | 33 | **Expo 57 bump** — clears the last `postcss` advisory. Post-launch. |
 | 34 | **Split the detailer app out** — the durable answer to #7. |
 

@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Revv Pro — Subscribe</title>
+  <meta name="description" content="Start or manage your Revv Pro detailer subscription." />
+  <meta name="robots" content="noindex" />
+  <link rel="stylesheet" href="../portal/portal.css" />
+  <style>
+    /* Stripe injects its own iframe here; it only needs a framed box to sit in. */
+    .cardbox {
+      background: var(--sunk); border: 1px solid var(--rule);
+      border-radius: 10px; padding: 14px; margin: 4px 0 16px;
+    }
+    .plan { display: flex; align-items: baseline; gap: 8px; margin: 0 0 4px; }
+    .plan .amt { font-size: 30px; font-weight: 800; letter-spacing: -.5px; }
+    .plan .per { color: var(--ink-soft); font-size: 14px; }
+    .benefits { list-style: none; margin: 16px 0 0; padding: 0; }
+    .benefits li {
+      position: relative; padding: 0 0 0 24px; margin-bottom: 9px;
+      font-size: 14px; color: var(--ink-soft); line-height: 1.5;
+    }
+    .benefits li::before {
+      content: "✓"; position: absolute; left: 0; top: 0;
+      color: var(--gold); font-weight: 700;
+    }
+    .statuscard {
+      border-radius: 12px; padding: 14px 16px; margin-bottom: 18px;
+      border: 1px solid var(--rule); background: var(--sunk);
+    }
+    .statuscard.good { background: var(--ok-bg);   border-color: var(--ok); }
+    .statuscard.warn { background: var(--warn-bg); border-color: var(--warn); }
+    .statuscard h2 { margin: 0 0 3px; font-size: 14.5px; }
+    .statuscard p  { margin: 0; font-size: 13px; color: var(--ink-soft); }
+    .trialnote { font-size: 13px; color: var(--ink-soft); margin: 0 0 16px; }
+    .fine { font-size: 12.5px; color: var(--ink-faint); line-height: 1.6; margin: 18px 0 0; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="bar">
+    <a class="brand" href="./">RE<span>VV</span></a>
+    <span class="who" id="who" hidden></span>
+    <button class="linkbtn" id="signOut" hidden>Sign out</button>
+  </div>
+
+  <!-- ---------- signed out ---------- -->
+  <section id="viewAuth" hidden>
+    <h1>Revv Pro</h1>
+    <p class="lede">
+      Sign in with the same email you use in the Revv app to start or manage your
+      detailer subscription.
+    </p>
+    <div class="card pad" style="max-width:420px">
+      <form id="signInForm">
+        <div class="field">
+          <label for="email">Email</label>
+          <input id="email" type="email" autocomplete="email" required />
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <input id="password" type="password" autocomplete="current-password" required />
+        </div>
+        <button class="btn" id="signInBtn" type="submit" style="width:100%">Sign in</button>
+        <p class="err" id="authErr" hidden></p>
+        <p style="margin:14px 0 0;font-size:13px;color:var(--ink-soft)">
+          <button class="linkbtn" id="reset" type="button">Email me a reset link</button>
+        </p>
+      </form>
+    </div>
+    <p class="lede" style="margin-top:18px;font-size:13px">
+      Don't have a detailer account yet? Create one in the Revv app first, then come back here.
+    </p>
+  </section>
+
+  <!-- ---------- signed in, but not a detailer ---------- -->
+  <section id="viewWrongRole" hidden>
+    <h1>Detailer accounts only</h1>
+    <p class="lede">
+      Revv Pro is the subscription for detailers. You're signed in with a client account,
+      so there's nothing to subscribe to here.
+    </p>
+    <p class="lede">
+      Looking for receipts or fleet ordering? That's the
+      <a href="../portal/">business portal</a>.
+    </p>
+  </section>
+
+  <!-- ---------- signed in as a detailer ---------- -->
+  <section id="viewMain" hidden>
+    <h1>Revv Pro</h1>
+
+    <div class="statuscard" id="statusCard">
+      <h2 id="statusTitle">Checking your subscription…</h2>
+      <p id="statusBody"></p>
+    </div>
+
+    <!-- entitled: nothing to buy -->
+    <div class="card pad" id="paneEntitled" hidden>
+      <p style="margin:0;font-size:14px;color:var(--ink-soft)">
+        To update your card or cancel, email
+        <a href="mailto:support@revvapp.net">support@revvapp.net</a>. Billing changes are
+        handled by our team so your marketplace visibility stays in sync.
+      </p>
+    </div>
+
+    <!-- not entitled: the purchase path -->
+    <div class="card pad" id="paneBuy" hidden>
+      <p class="plan"><span class="amt">$34.99</span><span class="per">per month</span></p>
+      <p class="trialnote" id="trialNote"></p>
+
+      <ul class="benefits">
+        <li>Appear in client search and on the map</li>
+        <li>Accept unlimited bookings — no per-job fee beyond the 10% platform rate</li>
+        <li>Revv Care damage protection on every job you complete</li>
+        <li>Revv Reach — auto-generated before/after reels for your socials</li>
+        <li>Verified badge and rating profile</li>
+      </ul>
+
+      <!-- step 1 -->
+      <button class="btn" id="startBtn" style="width:100%;margin-top:18px">
+        <span id="startLabel">Start my free trial</span>
+      </button>
+
+      <!-- step 2, revealed once the subscription exists -->
+      <div id="payStep" hidden>
+        <p class="lede" style="margin:18px 0 8px;font-size:13.5px">
+          Add the card we'll charge when your trial ends. You won't be charged today.
+        </p>
+        <div class="cardbox" id="paymentElement"></div>
+        <button class="btn" id="payBtn" style="width:100%">Save card and start trial</button>
+      </div>
+
+      <p class="err" id="buyErr" hidden></p>
+
+      <p class="fine">
+        Your subscription is separate from job payouts. Revv takes a 10% platform fee on each
+        completed job; the remaining 90% is transferred to your connected Stripe account.
+        Cancel any time by emailing support. See the
+        <a href="../terms.html">Terms of Service</a> and
+        <a href="../">Privacy Policy</a>.
+      </p>
+    </div>
+  </section>
+
+</div>
+<script src="https://js.stripe.com/v3/"></script>
+<script type="module" src="subscribe.js"></script>
+</body>
+</html>
